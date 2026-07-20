@@ -45,6 +45,9 @@ so what ships is what was tested. `coverage` and `docs` run on ubuntu.
 commits or title are not [Conventional Commits](https://www.conventionalcommits.org/)
 (`CONTRIBUTING.md`).
 
+The same gates run locally with pre-commit: `pip install pre-commit && pre-commit install`
+(`CONTRIBUTING.md`).
+
 `docs` publishes to GitHub Pages only from a public repo — the template itself is
 private, so that deploy stays skipped here and turns itself on in the engines.
 

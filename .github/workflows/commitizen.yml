@@ -25,4 +25,5 @@ jobs:
             ci
             chore
             revert
+            bump
           validateSingleCommit: true
