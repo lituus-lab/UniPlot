@@ -29,6 +29,16 @@ jobs:
           done
           exit $bad
 
+  spdx:
+    name: SPDX headers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Mirrors tools/hooks/spdx_check.sh: every tracked Nim/C/Python source must
+      # carry an SPDX-License-Identifier header in its first 5 lines.
+      - name: Every Nim/C/Python source carries an SPDX header
+        run: bash tools/hooks/spdx_check.sh
+
   test:
     name: Nim (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

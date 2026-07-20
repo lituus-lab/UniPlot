@@ -43,6 +43,12 @@ repos:
         files: \.nim$
         pass_filenames: false
         stages: [pre-push]
+      - id: spdx
+        name: SPDX headers (nim/C/Python)
+        entry: tools/hooks/spdx_check.sh
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: dco
         name: DCO sign-off
         entry: tools/hooks/dco_check.sh
