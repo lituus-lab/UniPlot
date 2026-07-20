@@ -67,6 +67,27 @@ Files to rename: `UniTemplate.nimble`, `src/UniTemplate.nim`, `src/UniTemplate/`
 `include/UniTemplate.h`, `tests/c/test_unitemplate.c` (+ its Makefile target),
 `py/unitemplate/`. Then update `LICENSE`/`NOTICE` copyright and the ADR titles.
 
+## AI-assisted contributions
+
+Assistance from AI/LLM tools is welcome on the same terms as any other
+contribution.
+
+- **Accountability.** The human contributor is the author and remains fully
+  responsible for the change. The DCO sign-off (`Signed-off-by`) is the mechanism:
+  by signing you certify the content is yours or properly licensed — this covers
+  AI-assisted work, provided you can stand behind it.
+- **No third-party contamination.** Ensure AI output introduces no code from a
+  third party without a compatible license and attribution. If an LLM reproduced
+  protected material, do not submit it.
+- **Correctness is yours.** The gates (tests, `nimble lint`, conventional commits,
+  pre-commit) catch a lot, but you own the result — review and verify what you
+  commit.
+- **Atomic commits.** Each commit is one logical change. A PR may stack
+  several atomic commits (one per element, say) — one monolithic big-bang
+  commit is not.
+- **Disclosure.** State in the PR whether AI assistance was used (see the PR
+  template). It is not a hard requirement — the DCO remains the gate.
+
 ## License
 
 Apache-2.0 (`LICENSE`). DCO sign-off on every commit (`CONTRIBUTING.md`).

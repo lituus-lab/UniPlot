@@ -64,5 +64,5 @@ pre-commit run --all-files
 
 ## Conventions
 
-See `ADRs/0004` and `CLAUDE.md`. English comments, terse, describe what is done.
+See `ADRs/0004` and `AGENTS.md`. English comments, terse, describe what is done.
 NimContracts compiled away under `-d:release`; the C ABI clamps, never raises.

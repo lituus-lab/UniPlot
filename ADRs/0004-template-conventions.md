@@ -19,7 +19,7 @@ py/                         Cython binding + pytest
 book/                       nimib placeholder
 ADRs/                       0001–0004
 .github/workflows/ci.yml    3-OS Nim + C ABI + Python
-LICENSE NOTICE CONTRIBUTING.md SECURITY.md .gitignore README.md CLAUDE.md
+LICENSE NOTICE CONTRIBUTING.md SECURITY.md .gitignore README.md AGENTS.md CLAUDE.md
 ```
 
 ## Naming
