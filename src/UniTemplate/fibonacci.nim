@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## Iterative Fibonacci. Template hello-world, exercised in Nim/C/Python.
 import contracts
 

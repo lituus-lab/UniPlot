@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 # UniTemplate — reference scaffold for the lituus-lab Uni* family.
 
 version       = "0.1.0"

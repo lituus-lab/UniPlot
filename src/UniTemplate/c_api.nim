@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 ## C ABI for UniTemplate. Built --app:staticlib/--app:lib --noMain --mm:arc -d:release.
 ## Keep in sync with include/UniTemplate.h; tests/c links the header against this lib.
 import ../UniTemplate

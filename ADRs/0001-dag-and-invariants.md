@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 # ADR-0001: Acyclic DAG + anti-cycle invariants
 
 - Status: Accepted

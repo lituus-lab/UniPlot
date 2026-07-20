@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 lituus-lab
 #ifndef UNITEMPLATE_H
 #define UNITEMPLATE_H
 

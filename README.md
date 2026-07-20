@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
 # UniTemplate
 
 Reference scaffold cloned to start each `lituus-lab` `Uni*` library. Private

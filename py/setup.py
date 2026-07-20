@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 """Build unitemplate._core, a Cython extension over the UniTemplate C ABI.
 Run `nimble pyLib` first so the library is at the repo root."""
 import os

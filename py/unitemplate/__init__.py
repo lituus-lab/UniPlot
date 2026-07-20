@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
 """unitemplate — Python binding over the UniTemplate C library."""
 from ._core import fibonacci as _fib_c, version as _version_c
 
