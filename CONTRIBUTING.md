@@ -14,6 +14,29 @@ git commit -s
 
 Commits without a `Signed-off-by` trailer are not accepted.
 
+## Conventional commits
+
+Commit subjects and the PR title follow [Conventional Commits 1.0](https://www.conventionalcommits.org/):
+
+```
+<type>(scope)!: <description>
+```
+
+`type` is one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
+`build`, `ci`, `chore`, `revert`. `scope` and `!` (breaking change) are
+optional. A space separates the colon from the description.
+
+```
+feat: add fibonacci C ABI
+fix(c_api): clamp negative index instead of raising
+docs: clarify clone map
+feat(core)!: drop the old accumulator API
+```
+
+The `commitizen` CI job blocks the PR if any non-merge commit — or the PR
+title — does not match. The title matters because a squash-merge folds the
+whole PR into one commit whose subject is the title.
+
 ## Workflow
 
 1. Branch from `main`, one logical change per commit.

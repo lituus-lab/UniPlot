@@ -5,6 +5,7 @@
 ## Checks
 
 - [ ] Every commit carries `Signed-off-by:` (`git commit -s`) — the DCO job blocks otherwise
+- [ ] Commits and this PR title follow Conventional Commits — the `commitizen` job blocks otherwise
 - [ ] `nimble testAll` passes
 - [ ] `nimble lint` and `nimble checkVGraph` pass
 - [ ] C ABI touched → `include/UniTemplate.h` updated in the same commit
