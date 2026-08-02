@@ -7,7 +7,6 @@ import shutil
 import sys
 
 from setuptools import Extension, setup
-from setuptools.command.build_ext import build_ext as _build_ext
 from Cython.Build import cythonize
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,46 +16,40 @@ PKG_DIR = os.path.join(HERE, "unitemplate")
 
 # Windows: link a vcc static lib, since MSVC CPython cannot link MinGW output.
 # Elsewhere: bundle the shared lib in the package, found through an rpath
-# relative to the extension. macOS rejects distutils' -R, hence extra_link_args.
+# relative to the extension.
 if sys.platform == "win32":
     LIB_NAME, BUNDLED = "UniTemplate.lib", False
-    RUNTIME_DIRS, LINK_ARGS, NIMBLE_TASK = [], [], "clibMsvc"
+    LINK_ARGS, NIMBLE_TASK = [], "clibMsvc"
 elif sys.platform == "darwin":
     LIB_NAME, BUNDLED = "libUniTemplate.dylib", True
-    RUNTIME_DIRS, LINK_ARGS, NIMBLE_TASK = [], ["-Wl,-rpath,@loader_path"], "clib"
+    LINK_ARGS, NIMBLE_TASK = ["-Wl,-rpath,@loader_path"], "clib"
 else:
     LIB_NAME, BUNDLED = "libUniTemplate.so", True
-    RUNTIME_DIRS, LINK_ARGS, NIMBLE_TASK = ["$ORIGIN"], [], "clib"
+    LINK_ARGS, NIMBLE_TASK = ["-Wl,-rpath,$ORIGIN"], "clib"
 
-
-class build_ext_with_lib(_build_ext):
-    """Copy the shared library into the package dir before linking."""
-
-    def run(self):
-        src = os.path.join(ROOT, LIB_NAME)
-        if not os.path.exists(src):
-            raise SystemExit(
-                f"setup.py: {src} not found — run `nimble {NIMBLE_TASK}` first."
-            )
-        if BUNDLED:
-            os.makedirs(PKG_DIR, exist_ok=True)
-            shutil.copy2(src, os.path.join(PKG_DIR, LIB_NAME))
-        super().run()
-
+# Copy the shared library into the package dir at import time, before setup()
+# runs any command. A copy done from a custom build_ext.run() instead landed
+# too late on some setuptools versions: build_py had already scanned
+# package_data by the time build_ext ran, so the wheel shipped without the
+# library and delocate/auditwheel failed to find it downstream.
+src = os.path.join(ROOT, LIB_NAME)
+if not os.path.exists(src):
+    raise SystemExit(f"setup.py: {src} not found — run `nimble {NIMBLE_TASK}` first.")
+if BUNDLED:
+    os.makedirs(PKG_DIR, exist_ok=True)
+    shutil.copy2(src, os.path.join(PKG_DIR, LIB_NAME))
 
 ext = Extension(
     "unitemplate._core",
     sources=[os.path.join("unitemplate", "_core.pyx")],
     include_dirs=[INCLUDE],
     library_dirs=[ROOT],
-    runtime_library_dirs=RUNTIME_DIRS,
     extra_link_args=LINK_ARGS,
     libraries=["UniTemplate"],
 )
 
 setup(
     ext_modules=cythonize([ext], language_level=3),
-    cmdclass={"build_ext": build_ext_with_lib},
     include_package_data=True,
     package_data={"unitemplate": [LIB_NAME] if BUNDLED else []},
     exclude_package_data={"unitemplate": ["_core.c"]},
