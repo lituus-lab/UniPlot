@@ -9,7 +9,7 @@ name = "unitemplate"
 version = "0.1.0"
 description = "Python binding for the UniTemplate C library"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "lbartoletti" }]
 keywords = ["nim", "c-extension", "template"]
@@ -17,7 +17,6 @@ classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -34,7 +33,7 @@ Repository = "https://github.com/lituus-lab/UniTemplate"
 Issues = "https://github.com/lituus-lab/UniTemplate/issues"
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+test = ["pytest>=9.1.1"]
 
 [tool.setuptools]
 packages = ["unitemplate"]
