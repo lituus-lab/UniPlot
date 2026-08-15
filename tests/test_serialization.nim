@@ -24,6 +24,8 @@ proc completeSpec(): PlotSpec =
   result.labels(title = "Round trip", x = "time", y = "value")
   result.legend(title = "Series")
   result.scaleX(skLog10, reversed = true)
+  result.xLimits(0.5, 8.0)
+  result.yLimits(-1.0, 6.0)
   result.referenceY(3.25, label = "target")
   result.applyTheme(darkTheme())
 
@@ -39,6 +41,15 @@ suite "PlotSpec JSON schema":
   test "pretty encoding remains semantically identical":
     let spec = completeSpec()
     check fromJson(spec.toJson(pretty = true)).toJson == spec.toJson
+
+  test "automatic domains retain the original schema-v1 representation":
+    var spec = completeSpec()
+    spec.clearXLimits()
+    spec.clearYLimits()
+    let encoded = spec.toJsonNode
+    check not encoded["xScale"].hasKey("domain")
+    check not encoded["yScale"].hasKey("domain")
+    check fromJsonNode(encoded).toJsonNode == encoded
 
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()

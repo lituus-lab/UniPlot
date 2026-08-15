@@ -173,6 +173,16 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
       "minimum": reference.minimum, "maximum": reference.maximum,
       "color": reference.color.colorNode, "width": reference.width,
       "label": reference.label}
+  var xScale = %*{"kind": $spec.xScaleSpec.kind,
+    "reversed": spec.xScaleSpec.reversed}
+  if spec.xScaleSpec.domain.configured:
+    xScale["domain"] = %*{"minimum": spec.xScaleSpec.domain.minimum,
+      "maximum": spec.xScaleSpec.domain.maximum}
+  var yScale = %*{"kind": $spec.yScaleSpec.kind,
+    "reversed": spec.yScaleSpec.reversed}
+  if spec.yScaleSpec.domain.configured:
+    yScale["domain"] = %*{"minimum": spec.yScaleSpec.domain.minimum,
+      "maximum": spec.yScaleSpec.domain.maximum}
   %*{
     "schema": "org.lituus-lab.uniplot.plot-spec",
     "version": PlotSpecSchemaVersion,
@@ -192,10 +202,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
       "maximum": spec.mappedSizeRange.maximum},
     "mappedAlphaRange": {"minimum": spec.mappedAlphaRange.minimum,
       "maximum": spec.mappedAlphaRange.maximum},
-    "xScale": {"kind": $spec.xScaleSpec.kind,
-      "reversed": spec.xScaleSpec.reversed},
-    "yScale": {"kind": $spec.yScaleSpec.kind,
-      "reversed": spec.yScaleSpec.reversed},
+    "xScale": xScale,
+    "yScale": yScale,
     "references": references
   }
 
@@ -253,9 +261,19 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
   let xScale = root.field("xScale", JObject)
   result.xScaleSpec = AxisScaleSpec(kind: enumValue[ScaleKind](xScale, "kind"),
     reversed: xScale.field("reversed", JBool).getBool)
+  if xScale.hasKey("domain"):
+    let domain = xScale.field("domain", JObject)
+    result.xScaleSpec.domain = AxisDomainSpec(configured: true,
+      minimum: domain.finiteNumber("minimum"),
+      maximum: domain.finiteNumber("maximum"))
   let yScale = root.field("yScale", JObject)
   result.yScaleSpec = AxisScaleSpec(kind: enumValue[ScaleKind](yScale, "kind"),
     reversed: yScale.field("reversed", JBool).getBool)
+  if yScale.hasKey("domain"):
+    let domain = yScale.field("domain", JObject)
+    result.yScaleSpec.domain = AxisDomainSpec(configured: true,
+      minimum: domain.finiteNumber("minimum"),
+      maximum: domain.finiteNumber("maximum"))
   result.references.setLen(0)
   for node in root.field("references", JArray):
     result.references.add Reference(
