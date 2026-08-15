@@ -56,6 +56,11 @@ type
     domain*: AxisDomainSpec
     categories*: AxisCategoryDomainSpec
 
+  SecondaryAxisSpec* = object
+    enabled*: bool
+    scale*, offset*: float64
+    label*: string
+
   ReferenceKind* = enum
     rkXLine
     rkYLine
@@ -106,6 +111,7 @@ type
     continuousColors*: Palette
     mappedSizeRange*, mappedAlphaRange*: AestheticRange
     xScaleSpec*, yScaleSpec*: AxisScaleSpec
+    secondaryYSpec*: SecondaryAxisSpec
     references*: seq[Reference]
 
 proc cssColor(value: string): Color =
@@ -301,6 +307,23 @@ proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric y transform and coordinate direction.
   spec.yScaleSpec.kind = kind
   spec.yScaleSpec.reversed = reversed
+
+proc secondaryY*(spec: var PlotSpec; scale = 1.0; offset = 0.0;
+    label = "") {.contractual.} =
+  ## Add a right guide transformed bijectively from primary y values.
+  require:
+    scale.isFinite and scale != 0
+    offset.isFinite
+  body:
+    if not scale.isFinite or scale == 0 or not offset.isFinite:
+      raise newException(PlotError,
+        "secondary y transform must be finite with a non-zero scale")
+    spec.secondaryYSpec = SecondaryAxisSpec(enabled: true, scale: scale,
+      offset: offset, label: label)
+
+proc clearSecondaryY*(spec: var PlotSpec) =
+  ## Remove the transformed right-side y guide.
+  spec.secondaryYSpec = SecondaryAxisSpec()
 
 proc xLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
   ## Fix the numeric x domain. The limits must contain every rendered value.

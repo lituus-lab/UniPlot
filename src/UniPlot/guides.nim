@@ -357,6 +357,14 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     if spec.legendSpec.position != lpRight:
       raise newException(PlotError, "unsupported legend position")
     area.xMax -= legendWidth
+  const secondaryAxisWidth = 80'f32
+  if spec.secondaryYSpec.enabled:
+    if not spec.secondaryYSpec.scale.isFinite or
+        spec.secondaryYSpec.scale == 0 or
+        not spec.secondaryYSpec.offset.isFinite:
+      raise newException(PlotError,
+        "secondary y transform must be finite with a non-zero scale")
+    area.xMax -= secondaryAxisWidth
   if area.width <= 0 or area.height <= 0:
     raise newException(PlotError, "plot margins leave no drawing area")
   let legendHeight = float32(legendEntries.len * 24 +
@@ -413,6 +421,14 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       Point(x: area.xMax, y: y), 1), spec.theme.gridColor)
     result.addText(tickLabel(value), Point(x: 5, y: y), 11,
       spec.theme.foreground)
+    if spec.secondaryYSpec.enabled:
+      let secondaryValue = value * spec.secondaryYSpec.scale +
+        spec.secondaryYSpec.offset
+      if not secondaryValue.isFinite:
+        raise newException(PlotError,
+          "secondary y transform produced a non-finite tick")
+      result.addText(tickLabel(secondaryValue),
+        Point(x: area.xMax + 8, y: y), 11, spec.theme.foreground)
   if spec.title.len > 0:
     result.addText(spec.title, Point(x: area.xMin, y: 25), 18,
       spec.theme.foreground)
@@ -423,6 +439,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if spec.yLabel.len > 0:
     result.addText(spec.yLabel, Point(x: 5, y: area.yMin - 20), 13,
       spec.theme.foreground)
+  if spec.secondaryYSpec.enabled and spec.secondaryYSpec.label.len > 0:
+    result.addText(spec.secondaryYSpec.label,
+      Point(x: area.xMax + secondaryAxisWidth - 5, y: area.yMin - 20), 13,
+      spec.theme.foreground, anchor = textEnd)
   for reference in spec.references:
     case reference.kind
     of rkXLine:
@@ -673,7 +693,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
               inc nodeId
             start = stop
   if legendEntries.len > 0 or continuousGuides.len > 0:
-    let legendX = area.xMax + 24
+    let legendX = area.xMax +
+      (if spec.secondaryYSpec.enabled: secondaryAxisWidth else: 0'f32) + 24
     var legendY = area.yMin + 14
     if spec.legendSpec.title.len > 0:
       result.addText(spec.legendSpec.title, Point(x: legendX, y: legendY), 13,

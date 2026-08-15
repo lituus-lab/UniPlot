@@ -104,6 +104,44 @@ suite "plot compilation":
     spec.clearXCategories()
     check not spec.xScaleSpec.categories.configured
 
+  test "secondary y guides are affine views of primary ticks":
+    var spec = sample()
+    spec.secondaryY(scale = 10.0, offset = 2.0, label = "converted")
+    let scene = spec.compileScene()
+    var
+      foundLabel = false
+      foundTick = false
+    for node in scene.nodes:
+      if node.kind == snText:
+        foundLabel = foundLabel or node.text == "converted"
+        foundTick = foundTick or node.text == tickLabel(12)
+    check foundLabel
+    check foundTick
+    var withLegend = sample()
+    withLegend.layers[0].legendLabel = "series"
+    withLegend.legend()
+    withLegend.secondaryY(label = "converted")
+    let combined = withLegend.compileScene()
+    var secondaryX, legendX = -1'f32
+    for node in combined.nodes:
+      if node.kind == snText:
+        if node.text == "converted": secondaryX = node.position.x
+        if node.text == "series": legendX = node.position.x
+    check secondaryX >= 0
+    check legendX > secondaryX
+    expect PlotError:
+      var overflow = sample()
+      overflow.secondaryY(scale = 1e308)
+      discard overflow.compileScene()
+    spec.clearSecondaryY()
+    check not spec.secondaryYSpec.enabled
+    when defined(release):
+      expect PlotError: spec.secondaryY(scale = 0.0)
+      expect PlotError: spec.secondaryY(offset = Inf)
+    else:
+      expect PreConditionDefect: spec.secondaryY(scale = 0.0)
+      expect PreConditionDefect: spec.secondaryY(offset = Inf)
+
   test "incompatible transformed coordinates fail explicitly":
     var categorical = barPlot(["a", "b"], [1.0, 2.0])
     categorical.scaleX(skLog10)
