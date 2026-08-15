@@ -23,6 +23,11 @@ type
     DotDashLine
     LongDashLine
 
+  MissingValuePolicy* = enum
+    DropMissing
+    BreakOnMissing
+    RejectMissing
+
   LegendPosition* = enum
     lpRight
     lpNone
@@ -53,6 +58,7 @@ type
     legendLabel*: string
     shape*: MarkerShape
     lineStyle*: LineStyle
+    missingValues*: MissingValuePolicy
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -91,30 +97,38 @@ proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
-    shape = CircleMarker; lineStyle = SolidLine) =
+    shape = CircleMarker; lineStyle = SolidLine;
+    missingValues = DropMissing) =
   if mapping.x.len == 0 or mapping.y.len == 0:
     raise newException(PlotError, "x and y mappings are required")
   if size < 0 or not size.isFinite:
     raise newException(PlotError, "mark size must be finite and non-negative")
   spec.layers.add Layer(mark: mark, mapping: mapping, color: cssColor(color),
-    size: size, legendLabel: legend, shape: shape, lineStyle: lineStyle)
+    size: size, legendLabel: legend, shape: shape, lineStyle: lineStyle,
+    missingValues: missingValues)
 
 proc geomLine*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    width = 0'f32; legend = ""; lineStyle = SolidLine) =
+    width = 0'f32; legend = ""; lineStyle = SolidLine;
+    missingValues = BreakOnMissing) =
   spec.addLayer(mkLine, mapping, color, width, legend,
-    lineStyle = lineStyle)
+    lineStyle = lineStyle, missingValues = missingValues)
 proc geomPoint*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    radius = 0'f32; legend = ""; shape = CircleMarker) =
-  spec.addLayer(mkPoint, mapping, color, radius, legend, shape = shape)
+    radius = 0'f32; legend = ""; shape = CircleMarker;
+    missingValues = DropMissing) =
+  spec.addLayer(mkPoint, mapping, color, radius, legend, shape = shape,
+    missingValues = missingValues)
 proc geomBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    legend = "") =
-  spec.addLayer(mkBar, mapping, color, legend = legend)
+    legend = ""; missingValues = DropMissing) =
+  spec.addLayer(mkBar, mapping, color, legend = legend,
+    missingValues = missingValues)
 proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
-    legend = "") =
-  spec.addLayer(mkArea, mapping, color, legend = legend)
+    legend = ""; missingValues = BreakOnMissing) =
+  spec.addLayer(mkArea, mapping, color, legend = legend,
+    missingValues = missingValues)
 proc geomText*(spec: var PlotSpec; mapping: Aes; color = "#202124";
-    size = 12'f32; legend = "") =
-  spec.addLayer(mkText, mapping, color, size, legend)
+    size = 12'f32; legend = ""; missingValues = DropMissing) =
+  spec.addLayer(mkText, mapping, color, size, legend,
+    missingValues = missingValues)
 
 proc labels*(spec: var PlotSpec; title = ""; x = ""; y = "") =
   spec.title = title

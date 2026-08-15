@@ -75,6 +75,18 @@ suite "plot compilation":
     check spec.layers[1].lineStyle == DotDashLine
     check spec.layers[1].mapping.lineStyle == "series"
 
+  test "missing-value policies are explicit layer semantics":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    var spec = plot(frame)
+    spec.geomLine(aes("x", "y"))
+    spec.geomArea(aes("x", "y"))
+    spec.geomPoint(aes("x", "y"), missingValues = RejectMissing)
+    check spec.layers[0].missingValues == BreakOnMissing
+    check spec.layers[1].missingValues == BreakOnMissing
+    check spec.layers[2].missingValues == RejectMissing
+
   test "named layers produce a deterministic optional legend":
     var spec = sample()
     spec.layers[0].legendLabel = "Trend"
