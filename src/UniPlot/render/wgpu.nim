@@ -42,7 +42,8 @@ type
     state*: WgpuBackendState
     runtime: NativeWgpuRuntime
 
-  PreparedWgpuScene = object
+  WgpuPreparedScene* = ref object
+    size*: Size
     clear: array[4, float32]
     vertices: seq[float32]
     indices: seq[uint32]
@@ -167,35 +168,53 @@ proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
         backend.state = wbsDeviceLost
       raise newException(WgpuError, error.msg)
 
-proc prepareScene(scene: Scene; font: Font): PreparedWgpuScene =
-  let convertedBackground = scene.background.to(tagSRGB)
-  if convertedBackground.isErr:
-    raise newException(WgpuError, "cannot convert WGPU background to sRGB")
-  let clear = convertedBackground.get
-  result.clear = [clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha]
-  for node in scene.nodes:
-    let path = case node.kind
-      of snPath: node.path
-      of snText:
-        layoutText(textStyle(font, node.fontSize), node.text)
-          .combinedPath(vec2(node.position.x, node.position.y))
-    let mesh = path.preparePath().tessellateFill()
-    let converted = node.color.to(tagSRGB)
-    if converted.isErr:
-      raise newException(WgpuError, "cannot convert WGPU node color to sRGB")
-    let color = converted.get
-    if result.vertices.len div 6 > int(high(uint32)) - mesh.vertexCount:
-      raise newException(WgpuError, "WGPU scene exceeds uint32 vertex indices")
-    let base = uint32(result.vertices.len div 6)
-    for i in 0 ..< mesh.vertexCount:
-      let vertex = mesh.vertex(i)
-      result.vertices.add(vertex.position.x * 2'f32 /
-        float32(scene.size.width) - 1'f32)
-      result.vertices.add(1'f32 - vertex.position.y * 2'f32 /
-        float32(scene.size.height))
-      result.vertices.add([color.comp(0), color.comp(1), color.comp(2),
-        color.alpha * vertex.coverage])
-    for index in mesh.indices: result.indices.add(base + index)
+proc prepareWgpuScene*(scene: Scene;
+                       font: Font): WgpuPreparedScene {.contractual.} =
+  ## Shape text and tessellate paths once for repeated GPU frames.
+  require:
+    not font.isNil
+    scene.size.width > 0 and scene.size.height > 0
+  ensure:
+    not result.isNil
+    result.size == scene.size
+    result.vertices.len mod 6 == 0
+    result.indices.len mod 3 == 0
+  body:
+    if font.isNil:
+      raise newException(WgpuError, "WGPU scene preparation requires a font")
+    scene.size.validate()
+    if uint64(scene.size.width) > uint64(high(uint32)) or
+        uint64(scene.size.height) > uint64(high(uint32)):
+      raise newException(WgpuError, "WGPU target dimensions exceed uint32")
+    let convertedBackground = scene.background.to(tagSRGB)
+    if convertedBackground.isErr:
+      raise newException(WgpuError, "cannot convert WGPU background to sRGB")
+    let clear = convertedBackground.get
+    result = WgpuPreparedScene(size: scene.size,
+      clear: [clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha])
+    for node in scene.nodes:
+      let path = case node.kind
+        of snPath: node.path
+        of snText:
+          layoutText(textStyle(font, node.fontSize), node.text)
+            .combinedPath(vec2(node.position.x, node.position.y))
+      let mesh = path.preparePath().tessellateFill()
+      let converted = node.color.to(tagSRGB)
+      if converted.isErr:
+        raise newException(WgpuError, "cannot convert WGPU node color to sRGB")
+      let color = converted.get
+      if result.vertices.len div 6 > int(high(uint32)) - mesh.vertexCount:
+        raise newException(WgpuError, "WGPU scene exceeds uint32 vertex indices")
+      let base = uint32(result.vertices.len div 6)
+      for i in 0 ..< mesh.vertexCount:
+        let vertex = mesh.vertex(i)
+        result.vertices.add(vertex.position.x * 2'f32 /
+          float32(scene.size.width) - 1'f32)
+        result.vertices.add(1'f32 - vertex.position.y * 2'f32 /
+          float32(scene.size.height))
+        result.vertices.add([color.comp(0), color.comp(1), color.comp(2),
+          color.alpha * vertex.coverage])
+      for index in mesh.indices: result.indices.add(base + index)
 
 proc validateSceneTarget(backend: WgpuBackend; scene: Scene; font: Font) =
   if backend.isNil or backend.state != wbsReady:
@@ -207,9 +226,54 @@ proc validateSceneTarget(backend: WgpuBackend; scene: Scene; font: Font) =
       uint64(scene.size.height) > uint64(high(uint32)):
     raise newException(WgpuError, "WGPU target dimensions exceed uint32")
 
+proc renderWgpuPrepared*(backend: WgpuBackend;
+                         prepared: WgpuPreparedScene): seq[
+                             byte] {.contractual.} =
+  ## Upload, submit and read one previously prepared scene as RGBA8.
+  require:
+    not backend.isNil and backend.state == wbsReady
+    not prepared.isNil
+  ensure:
+    result.len == prepared.size.width * prepared.size.height * 4
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    if prepared.isNil:
+      raise newException(WgpuError, "prepared WGPU scene is nil")
+    try:
+      result = backend.runtime.renderMeshPixels(uint32(prepared.size.width),
+        uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
+        prepared.clear[2], prepared.clear[3], prepared.vertices,
+        prepared.indices)
+    except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
+      raise newException(WgpuError, error.msg)
+
+proc submitWgpuPrepared*(backend: WgpuBackend;
+                         prepared: WgpuPreparedScene) {.contractual.} =
+  ## Upload and enqueue one previously prepared scene without readback.
+  require:
+    not backend.isNil and backend.state == wbsReady
+    not prepared.isNil
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    if prepared.isNil:
+      raise newException(WgpuError, "prepared WGPU scene is nil")
+    try:
+      backend.runtime.submitMesh(uint32(prepared.size.width),
+        uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
+        prepared.clear[2], prepared.clear[3], prepared.vertices,
+        prepared.indices)
+    except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
+      raise newException(WgpuError, error.msg)
+
 proc renderWgpuScene*(backend: WgpuBackend; scene: Scene;
                       font: Font): seq[byte] {.contractual.} =
-  ## Compile, submit and read one retained scene back as unpadded RGBA8.
+  ## Prepare, submit and read one retained scene back as unpadded RGBA8.
   require:
     not backend.isNil and backend.state == wbsReady
     not font.isNil
@@ -218,33 +282,15 @@ proc renderWgpuScene*(backend: WgpuBackend; scene: Scene;
     result.len == scene.size.width * scene.size.height * 4
   body:
     validateSceneTarget(backend, scene, font)
-    let prepared = prepareScene(scene, font)
-    try:
-      result = backend.runtime.renderMeshPixels(uint32(scene.size.width),
-        uint32(scene.size.height), prepared.clear[0], prepared.clear[1],
-        prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices)
-    except LibraryError as error:
-      if backend.runtime.deviceLostReason() != 0'u32:
-        backend.state = wbsDeviceLost
-      raise newException(WgpuError, error.msg)
+    backend.renderWgpuPrepared(scene.prepareWgpuScene(font))
 
 proc submitWgpuScene*(backend: WgpuBackend; scene: Scene;
                       font: Font) {.contractual.} =
-  ## Compile and enqueue one retained scene without a GPU-to-CPU transfer.
+  ## Prepare and enqueue one retained scene without a GPU-to-CPU transfer.
   require:
     not backend.isNil and backend.state == wbsReady
     not font.isNil
     scene.size.width > 0 and scene.size.height > 0
   body:
     validateSceneTarget(backend, scene, font)
-    let prepared = prepareScene(scene, font)
-    try:
-      backend.runtime.submitMesh(uint32(scene.size.width),
-        uint32(scene.size.height), prepared.clear[0], prepared.clear[1],
-        prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices)
-    except LibraryError as error:
-      if backend.runtime.deviceLostReason() != 0'u32:
-        backend.state = wbsDeviceLost
-      raise newException(WgpuError, error.msg)
+    backend.submitWgpuPrepared(scene.prepareWgpuScene(font))

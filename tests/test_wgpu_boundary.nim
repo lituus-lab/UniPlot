@@ -65,9 +65,11 @@ suite "WGPU boundary":
       scene.addText("A", Point(x: 24, y: 20), 16,
         parseColor("#000000").get)
       let font = loadTtf("tests/DejaVuSans.ttf")
-      backend.submitWgpuScene(scene, font)
-      backend.submitWgpuScene(scene, font)
-      let scenePixels = backend.renderWgpuScene(scene, font)
+      let prepared = scene.prepareWgpuScene(font)
+      check prepared.size == scene.size
+      backend.submitWgpuPrepared(prepared)
+      backend.submitWgpuPrepared(prepared)
+      let scenePixels = backend.renderWgpuPrepared(prepared)
       check scenePixels.len == 64 * 32 * 4
       check scenePixels[(10 * 64 + 10) * 4 .. (10 * 64 + 10) * 4 + 3] ==
         @[255'u8, 0, 0, 255]
