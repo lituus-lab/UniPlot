@@ -570,6 +570,19 @@ proc histogramBreaksPlot*(values, breaks: openArray[float64];
     counts.add float64(bin.count)
   result = barPlot(labels, counts, color, legend)
 
+proc groupedAggregatePlot*(groups: openArray[string];
+    values: openArray[float64]; aggregation = agMean; color = "#3366cc";
+    legend = ""): PlotSpec =
+  ## Aggregate finite samples per first-seen group into categorical bars.
+  let grouped = aggregateGroups(groups, values, aggregation)
+  var
+    categories = newSeqOfCap[string](grouped.len)
+    aggregated = newSeqOfCap[float64](grouped.len)
+  for value in grouped:
+    categories.add value.group
+    aggregated.add value.value
+  result = barPlot(categories, aggregated, color, legend)
+
 proc boxPlot*(groups: openArray[string]; values: openArray[float64];
     whiskerLength = 1.5; color = "#3366cc"; outlierColor = "#cc3344";
     legend = ""): PlotSpec {.contractual.} =

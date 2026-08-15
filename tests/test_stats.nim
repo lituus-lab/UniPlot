@@ -133,3 +133,9 @@ suite "statistics":
     else:
       expect PreConditionDefect:
         discard aggregateGroups(["x"], [1.0, 2.0])
+
+    let spec = groupedAggregatePlot(
+      ["beta", "alpha", "beta"], [1.0, 4.0, 3.0], agSum)
+    check spec.layers.len == 1
+    check spec.data.categorical("category") == @["beta", "alpha"]
+    check spec.data.numeric("value") == @[4.0, 4.0]
