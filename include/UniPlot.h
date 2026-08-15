@@ -31,6 +31,13 @@ typedef enum {
   UPLOT_MISSING_BREAK = 1,
   UPLOT_MISSING_REJECT = 2
 } uplot_missing_policy;
+typedef enum {
+  UPLOT_AGG_COUNT = 0,
+  UPLOT_AGG_SUM = 1,
+  UPLOT_AGG_MEAN = 2,
+  UPLOT_AGG_MINIMUM = 3,
+  UPLOT_AGG_MAXIMUM = 4
+} uplot_aggregation;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -48,6 +55,9 @@ int uplot_add_box_plot(uplot_plot *, const char *const *groups,
                        const double *values, size_t count,
                        double whisker_length, const char *color,
                        const char *outlier_color);
+int uplot_add_heatmap(uplot_plot *, const char *const *xs,
+                      const char *const *ys, const double *values,
+                      size_t count, int aggregation);
 int uplot_add_categorical_column(uplot_plot *, const char *name,
                                  const char *const *values, size_t count);
 int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,

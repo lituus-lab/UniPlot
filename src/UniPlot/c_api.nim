@@ -140,6 +140,38 @@ proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
+    values: ptr float64; count: csize_t; aggregation: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or xs.isNil or ys.isNil or values.isNil or count == 0 or
+      count > csize_t(high(int)) or
+      aggregation < cint(low(AggregationKind).ord) or
+      aggregation > cint(high(AggregationKind).ord):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputXs = cast[ptr UncheckedArray[cstring]](xs)
+      inputYs = cast[ptr UncheckedArray[cstring]](ys)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+    var copiedXs = newSeqOfCap[string](int(count))
+    var copiedYs = newSeqOfCap[string](int(count))
+    var copiedValues = newSeqOfCap[float64](int(count))
+    for index in 0 ..< int(count):
+      if inputXs[index].isNil or inputYs[index].isNil:
+        return UPLOT_ERR_ARGUMENT
+      copiedXs.add $inputXs[index]
+      copiedYs.add $inputYs[index]
+      copiedValues.add inputValues[index]
+    h.spec = heatmapPlot(copiedXs, copiedYs, copiedValues,
+      AggregationKind(aggregation))
+    h.nextColumn = 0
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_categorical_column*(value: pointer; name: cstring;
     values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
   if value.isNil or name.isNil or values.isNil or count == 0 or

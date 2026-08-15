@@ -194,6 +194,33 @@ int main(void) {
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
   uplot_buffer_free(svg, svg_len);
   uplot_plot_free(box_plot);
+
+  uplot_plot *heatmap = uplot_plot_new(320, 360);
+  assert(heatmap != NULL);
+  const char *heat_x[] = {"left", "right", "left", "left"};
+  const char *heat_y[] = {"north", "north", "south", "north"};
+  const double heat_values[] = {1, 4, NAN, 3};
+  assert(uplot_add_heatmap(heatmap, heat_x, heat_y, heat_values, 4,
+                           UPLOT_AGG_MEAN) == UPLOT_OK);
+  assert(uplot_add_heatmap(heatmap, heat_x, heat_y, heat_values, 4,
+                           UPLOT_AGG_MEAN) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_heatmap(NULL, heat_x, heat_y, heat_values, 4,
+                           UPLOT_AGG_MEAN) == UPLOT_ERR_ARGUMENT);
+  uplot_plot *invalid_heatmap = uplot_plot_new(320, 240);
+  assert(invalid_heatmap != NULL);
+  const char *invalid_heat_x[] = {"left", NULL};
+  assert(uplot_add_heatmap(invalid_heatmap, invalid_heat_x, heat_y,
+                           heat_values, 2, UPLOT_AGG_MEAN) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_heatmap(invalid_heatmap, heat_x, heat_y, heat_values, 4,
+                           999) == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(invalid_heatmap);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(heatmap, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(heatmap);
   puts("All UniPlot C ABI tests passed.");
   return 0;
 }
