@@ -124,6 +124,21 @@ task wgpuTest, "Create a real native WGPU device (run wgpuDeps first)":
   exec "nim c -r --path:src -o:build/test_wgpu_native" &
        " tests/test_wgpu_boundary.nim"
 
+task wgpuBenchmark, "Benchmark warm WGPU frames with explicit readback":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r -d:release --path:src -o:build/benchmark_wgpu" &
+       " benchmarks/benchmark_wgpu.nim"
+
 # Nim takes `-o:` literally and appends no platform extension.
 const
   sharedLib =

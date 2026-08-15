@@ -38,3 +38,15 @@ VisPy is an interactive GPU library and requires a controlled GPU/windowing
 setup, so it does not belong in this CPU off-screen baseline. Missing runtimes,
 packages or static export engines are reported as unavailable and are never
 installed implicitly.
+
+The real WGPU path has a separate pure-Nim benchmark:
+
+```bash
+nimble wgpuDeps
+nimble wgpuBenchmark
+```
+
+It measures a warm retained backend while each frame still compiles paths,
+tessellates through UniVector, uploads buffers, submits work and reads the
+800×500 RGBA8 texture back. This is deliberately an end-to-end publication
+cost, not a claim about presentation-only frame rate.
