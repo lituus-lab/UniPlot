@@ -29,3 +29,16 @@ def test_line_styles_and_marker_shapes_are_exposed():
         uniplot.Plot().line([0, 1], [1, 2], style=999)
     with pytest.raises(ValueError):
         uniplot.Plot().scatter([0, 1], [1, 2], shape=999)
+
+def test_missing_value_policies_are_exposed():
+    broken = uniplot.Plot().line([0, 1, 2], [1, float("nan"), 2])
+    assert broken.svg(FONT).startswith(b"<svg")
+    dropped = uniplot.Plot().scatter(
+        [0, 1, 2], [1, float("inf"), 2], missing=uniplot.MISSING_DROP)
+    assert dropped.svg(FONT).startswith(b"<svg")
+    rejecting = uniplot.Plot().line(
+        [0, 1, 2], [1, float("nan"), 2], missing=uniplot.MISSING_REJECT)
+    with pytest.raises(RuntimeError):
+        rejecting.svg(FONT)
+    with pytest.raises(ValueError):
+        uniplot.Plot().line([0, 1], [1, 2], missing=999)
