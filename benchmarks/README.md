@@ -29,6 +29,11 @@ Three stages are reported:
 - SVG serialization from a retained/constructed plot;
 - PNG serialization from the same plot.
 
+UniPlot also reports `styled_construct_compile`, an internal diagnostic using
+a real UniVector dot-dash stroke and categorical marker shapes. This extra
+stage is excluded from cross-library ranking; it guards geometry features that
+the common line-plus-scatter workload does not otherwise exercise.
+
 These stages align user intent, not internal work. Matplotlib may defer work to
 `savefig`, while UniPlot performs layout in `compileScene`; timings must not be
 interpreted as identical instruction sets. Results are evidence for regression
