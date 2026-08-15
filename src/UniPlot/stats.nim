@@ -29,6 +29,11 @@ type
     value*: float64
     count*: int
 
+  GroupedValue* = object
+    group*: string
+    value*: float64
+    count*: int
+
 proc finiteSorted(values: openArray[float64]): seq[float64] =
   result = newSeqOfCap[float64](values.len)
   for value in values:
@@ -52,6 +57,32 @@ func stableMean(values: openArray[float64]; minimum,
   for value in values: normalized.add value / magnitude
   neumaierSum(normalized, assumeFinite = true) / float64(values.len) *
     magnitude
+
+proc aggregateFinite(values: openArray[float64]; kind: AggregationKind):
+    tuple[value: float64; count: int] =
+  result = (NaN, values.len)
+  case kind
+  of agCount:
+    result.value = float64(values.len)
+  of agSum:
+    if values.len > 0:
+      result.value = neumaierSum(values, assumeFinite = true)
+  of agMean:
+    if values.len > 0:
+      var minimum = values[0]
+      var maximum = values[0]
+      for value in values:
+        minimum = min(minimum, value)
+        maximum = max(maximum, value)
+      result.value = stableMean(values, minimum, maximum)
+  of agMinimum:
+    if values.len > 0:
+      result.value = values[0]
+      for value in values: result.value = min(result.value, value)
+  of agMaximum:
+    if values.len > 0:
+      result.value = values[0]
+      for value in values: result.value = max(result.value, value)
 
 proc quantile*(values: openArray[float64]; probability: float64): float64 {.
     contractual.} =
@@ -148,29 +179,39 @@ proc aggregate2D*(xs, ys: openArray[string]; values: openArray[float64];
         var cell = AggregatedCell(x: x, y: y, value: NaN)
         if key in observed:
           let finite = samples.getOrDefault(key)
-          cell.count = finite.len
-          case kind
-          of agCount:
-            cell.value = float64(finite.len)
-          of agSum:
-            if finite.len > 0: cell.value = neumaierSum(finite)
-          of agMean:
-            if finite.len > 0:
-              var minimum = finite[0]
-              var maximum = finite[0]
-              for value in finite:
-                minimum = min(minimum, value)
-                maximum = max(maximum, value)
-              cell.value = stableMean(finite, minimum, maximum)
-          of agMinimum:
-            if finite.len > 0:
-              cell.value = finite[0]
-              for value in finite: cell.value = min(cell.value, value)
-          of agMaximum:
-            if finite.len > 0:
-              cell.value = finite[0]
-              for value in finite: cell.value = max(cell.value, value)
+          let aggregated = aggregateFinite(finite, kind)
+          cell.value = aggregated.value
+          cell.count = aggregated.count
         result.add cell
+
+proc aggregateGroups*(groups: openArray[string]; values: openArray[float64];
+    kind = agMean): seq[GroupedValue] {.contractual.} =
+  ## Aggregate finite values per category in first-seen group order.
+  require:
+    groups.len == values.len
+    groups.len > 0
+  ensure:
+    result.len > 0
+  body:
+    if groups.len != values.len or groups.len == 0:
+      raise newException(PlotError, "grouped aggregation columns must align")
+    var
+      order: seq[string]
+      samples = initTable[string, seq[float64]]()
+    for index, group in groups:
+      if group.len == 0:
+        raise newException(PlotError,
+          "grouped aggregation categories cannot be empty")
+      if group notin samples:
+        samples[group] = @[]
+        order.add group
+      if values[index].isFinite:
+        samples[group].add values[index]
+    result = newSeqOfCap[GroupedValue](order.len)
+    for group in order:
+      let aggregated = aggregateFinite(samples[group], kind)
+      result.add GroupedValue(group: group, value: aggregated.value,
+        count: aggregated.count)
 
 proc histogram*(values: openArray[float64]; binCount = 30): seq[HistogramBin] {.
     contractual.} =

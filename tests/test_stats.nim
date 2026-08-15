@@ -110,3 +110,26 @@ suite "statistics":
     else:
       expect PreConditionDefect:
         discard aggregate2D(["x"], ["y", "z"], [1.0])
+
+  test "grouped aggregation preserves first-seen categories and finite counts":
+    let grouped = aggregateGroups(
+      ["beta", "alpha", "beta", "empty"], [1.0, 4.0, 3.0, NaN])
+    check grouped[0 .. 1] == @[
+      GroupedValue(group: "beta", value: 2.0, count: 2),
+      GroupedValue(group: "alpha", value: 4.0, count: 1)]
+    check grouped[2].group == "empty" and grouped[2].count == 0
+    check classify(grouped[2].value) == fcNan
+    check aggregateGroups(["x", "x"], [1e308, 1e308], agMean)[0].value ==
+      1e308
+    check aggregateGroups(["x", "x"], [NaN, 2.0], agCount)[0].value == 1.0
+    let missingCount = aggregateGroups(["x"], [NaN], agCount)[0]
+    check missingCount.value == 0.0 and missingCount.count == 0
+    check aggregateGroups(["x", "x"], [3.0, 2.0], agSum)[0].value == 5.0
+    check aggregateGroups(["x", "x"], [3.0, 2.0], agMinimum)[0].value == 2.0
+    check aggregateGroups(["x", "x"], [3.0, 2.0], agMaximum)[0].value == 3.0
+    expect PlotError: discard aggregateGroups([""], [1.0])
+    when defined(release):
+      expect PlotError: discard aggregateGroups(["x"], [1.0, 2.0])
+    else:
+      expect PreConditionDefect:
+        discard aggregateGroups(["x"], [1.0, 2.0])
