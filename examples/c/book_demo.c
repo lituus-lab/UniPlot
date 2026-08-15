@@ -20,8 +20,10 @@ int main(int argc, char **argv) {
   const double y[] = {1.0, 2.8, 2.1, 4.2, 3.4, 5.0};
   uint8_t *svg = NULL;
   uint8_t *png = NULL;
+  uint8_t *json = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
+  size_t json_length = 0;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -33,6 +35,11 @@ int main(int argc, char **argv) {
                               UPLOT_MARKER_DIAMOND) != UPLOT_OK ||
       uplot_set_title(plot, "Rendered through the UniPlot C ABI") != UPLOT_OK)
     goto cleanup;
+  if (uplot_plot_to_json(plot, &json, &json_length) != UPLOT_OK) goto cleanup;
+  uplot_plot *restored = uplot_plot_from_json(json, json_length, 800, 500);
+  if (restored == NULL) goto cleanup;
+  uplot_plot_free(plot);
+  plot = restored;
   if (uplot_render_svg(plot, argv[1], &svg, &svg_length) != UPLOT_OK ||
       uplot_render_png(plot, argv[1], &png, &png_length) != UPLOT_OK)
     goto cleanup;
@@ -44,6 +51,7 @@ int main(int argc, char **argv) {
 cleanup:
   uplot_buffer_free(svg, svg_length);
   uplot_buffer_free(png, png_length);
+  uplot_buffer_free(json, json_length);
   uplot_plot_free(plot);
   return result;
 }

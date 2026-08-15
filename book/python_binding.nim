@@ -40,6 +40,9 @@ figure = (uniplot.Plot(800, 500)
                    shape=uniplot.MARKER_DIAMOND)
           .title("Measurements"))
 
+payload = figure.to_json()
+figure = uniplot.Plot.from_json(payload, width=800, height=500)
+
 Path("plot.svg").write_bytes(figure.svg(font))
 Path("plot.png").write_bytes(figure.png(font))
 ```
@@ -62,6 +65,9 @@ copying it.
   the retained specification.
 - `title(text)` sets the plot title.
 - `svg(font_path)` and `png(font_path)` render bytes.
+- `to_json()` returns the complete schema-v1 specification as `str`;
+  `Plot.from_json(payload, width, height)` accepts `str` or UTF-8 `bytes` and
+  restores a full Nim grammar specification.
 - `version()`, `abi_version()` and `__version__` expose compatibility.
 
 Inputs accept Python iterables and are converted to contiguous double arrays.
@@ -78,9 +84,10 @@ The sdist carries the Nim sources needed to rebuild it, but excludes prebuilt
 native binaries. Linux, macOS and Windows wheels use their platform loader and
 ABI conventions.
 
-The Python binding intentionally exposes the stable styled line/point subset.
-Use pure Nim for data-frame aesthetics and the complete layered grammar until
-the foreign API grows additively or under an explicit ABI version.
+The direct Python builders intentionally expose the stable styled line/point
+subset. The JSON bridge gives Python lossless transport of every valid Nim
+grammar feature without reimplementing its validation or rendering semantics
+in Cython. More ergonomic builders can grow additively over that foundation.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """
@@ -89,8 +96,8 @@ let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
 nbRawHtml gallery([
-  svgFigure(pythonSvg, "SVG returned as Python bytes by the Cython binding."),
-  pngFigure(pythonPng, "PNG returned by the same Python Plot instance.",
+  svgFigure(pythonSvg, "SVG returned after a Python JSON round trip."),
+  pngFigure(pythonPng, "PNG returned by the restored Python Plot instance.",
     "Dashed line and cross markers rendered through the UniPlot Python binding")
 ])
 

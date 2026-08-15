@@ -20,6 +20,7 @@ def main() -> int:
                  shape=uniplot.MARKER_CROSS)
         .title("UniPlot Python binding")
     )
+    figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
     svg_path.write_bytes(figure.svg(font))
     png_path.write_bytes(figure.png(font))
     return 0

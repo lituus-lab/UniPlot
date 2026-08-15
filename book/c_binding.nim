@@ -48,6 +48,15 @@ int main(void) {
                           UPLOT_MARKER_DIAMOND);
   uplot_set_title(plot, "Measurements");
 
+  uint8_t *json = NULL;
+  size_t json_length = 0;
+  uplot_plot_to_json(plot, &json, &json_length);
+  uplot_plot *restored = uplot_plot_from_json(
+    json, json_length, 800, 500);
+  uplot_buffer_free(json, json_length);
+  uplot_plot_free(plot);
+  plot = restored;
+
   int status = uplot_render_svg(
     plot, "DejaVuSans.ttf", &bytes, &length);
   if (status == UPLOT_OK) {
@@ -65,6 +74,10 @@ int main(void) {
   `uplot_plot_free`.
 - SVG and PNG renderers allocate byte buffers; release them with
   `uplot_buffer_free` using the returned length.
+- `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
+  ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
+  explicit output dimensions and returns null for malformed or unsupported
+  documents.
 - Caller-owned input arrays only need to remain valid for the duration of the
   add call; UniPlot copies them into its specification.
 - Status is `UPLOT_OK`, `UPLOT_ERR_ARGUMENT` or `UPLOT_ERR_RENDER`.
@@ -86,10 +99,12 @@ int main(void) {
 compatibility. `UNIPLOT_ABI_VERSION` is 1. Adding functions may preserve this
 version; changing an existing signature or ownership rule may not.
 
-The C surface deliberately remains narrower than the Nim grammar: line and
-point series, their UniVector styles, titles and SVG/PNG are the stable 1.0
-primitives. The original solid-line and circle-point functions remain ABI
-compatible convenience entry points.
+The direct C builders deliberately remain narrower than the Nim grammar: line
+and point series, their UniVector styles and titles are the stable 1.0
+construction primitives. The versioned JSON bridge transports the complete
+valid Nim `PlotSpec`, including layers, mappings, references, scales, themes
+and palettes, without duplicating the grammar in C. The original solid-line
+and circle-point functions remain ABI-compatible convenience entry points.
 
 Next: [Python binding](python_binding.html).
 """
@@ -98,8 +113,8 @@ let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
 nbRawHtml gallery([
-  svgFigure(cSvg, "SVG produced by the compiled C consumer."),
-  pngFigure(cPng, "PNG produced by the same C handle.",
+  svgFigure(cSvg, "SVG produced after a C JSON round trip."),
+  pngFigure(cPng, "PNG produced by the restored C handle.",
     "Line and diamond markers rendered through the UniPlot C ABI")
 ])
 
