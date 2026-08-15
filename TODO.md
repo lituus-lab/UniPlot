@@ -116,6 +116,10 @@ than introducing competing geometry or text implementations.
 - [ ] Pan, zoom, selection, hover and linked-view event contracts.
 - [ ] Observable data updates and incremental scene diffs.
 - [ ] Persistent GPU resources keyed by semantic resource IDs.
+- [x] Keep the most recently submitted `WgpuPreparedScene` vertex/index
+  buffers resident by collision-free handle identity, with explicit upload
+  counters and invalidation tests. Multi-resource semantic residency remains
+  the broader item above.
 - [ ] Chunked uploads, streaming/ring buffers and bounded memory policies.
 - [ ] Level-of-detail, decimation and visibility culling for large series.
 - [ ] Instanced points, lines and rectangles; indirect draws where supported.
