@@ -11,6 +11,10 @@ nbText: """
 UniPlot exposes a versioned C ABI for native consumers. The stable public
 header is `include/UniPlot.h`; no Nim runtime types cross the boundary.
 
+The figures below are committed outputs of `examples/c/book_demo.c`, rendered
+through that ABI. Regenerate both C and Python evidence with
+`nimble bindingBookDemos`.
+
 ## Build
 
 ```bash
@@ -90,5 +94,14 @@ compatible convenience entry points.
 Next: [Python binding](python_binding.html).
 """
 
+let
+  cSvg = readFile("../assets/generated/c_binding.svg")
+  cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
+nbRawHtml gallery([
+  svgFigure(cSvg, "SVG produced by the compiled C consumer."),
+  pngFigure(cPng, "PNG produced by the same C handle.",
+    "Line and diamond markers rendered through the UniPlot C ABI")
+])
+
 nbSave
-validatePage("c_binding.html")
+validatePage("c_binding.html", minSvg = 1, requirePng = true)

@@ -11,6 +11,10 @@ nbText: """
 The Python package wraps the stable C ABI with Cython and bundles the native
 UniPlot library in its wheel.
 
+The figures below are committed outputs of `py/examples/book_demo.py`, using
+the public `uniplot.Plot` class. Regenerate both binding demonstrations with
+`nimble bindingBookDemos`.
+
 ## Build and test from a checkout
 
 ```bash
@@ -81,5 +85,14 @@ the foreign API grows additively or under an explicit ABI version.
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """
 
+let
+  pythonSvg = readFile("../assets/generated/python_binding.svg")
+  pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
+nbRawHtml gallery([
+  svgFigure(pythonSvg, "SVG returned as Python bytes by the Cython binding."),
+  pngFigure(pythonPng, "PNG returned by the same Python Plot instance.",
+    "Dashed line and cross markers rendered through the UniPlot Python binding")
+])
+
 nbSave
-validatePage("python_binding.html")
+validatePage("python_binding.html", minSvg = 1, requirePng = true)

@@ -5,6 +5,9 @@ import std/[base64, strutils]
 proc pngDataUri*(data: openArray[byte]): string =
   "data:image/png;base64," & base64.encode(data)
 
+proc pngDataUri*(data: string): string =
+  "data:image/png;base64," & base64.encode(data)
+
 proc svgFigure*(svg, caption: string): string =
   "<figure class=\"uniplot-demo\">" & svg &
     "<figcaption>" & caption & "</figcaption></figure>"
