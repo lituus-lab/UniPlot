@@ -75,10 +75,12 @@ history of the underlying design work.
 
 ## Benchmarks
 
-UniPlot 1.0 has no benchmark suite: rendering performance is dominated by the
-lower UniGlyph, UniVector and UniImage engines, while this repository currently
-prioritises deterministic semantic output and cross-backend equivalence. Any
-future performance claim will be backed by a reproducible, machine-tagged run.
+`nimble benchmark` runs the reproducible off-screen UniPlot, Matplotlib, Plotly,
+ggplot2 and Plots.jl baseline described in `benchmarks/README.md`, using the
+providers available in its isolated environments. It records construction/scene
+compilation, SVG and PNG stages with warmups, distribution statistics,
+dependency versions and machine metadata. Results are intended for same-machine
+regression tracking; the suite makes no universal performance claim.
 
 ## Build
 
@@ -90,6 +92,8 @@ nimble testAll
 nimble example
 nimble ctest
 nimble pyTest
+nimble benchmarkDeps  # optional isolated Matplotlib/Plotly/ggplot2/Plots.jl setup
+nimble benchmark
 nimble book
 nimble docs
 ```

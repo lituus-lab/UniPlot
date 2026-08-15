@@ -80,6 +80,12 @@ task testAll, "debug + release + C ABI":
 task example, "Nim demo (print-only; no file I/O)":
   exec "nim c -r --path:src -o:build/demo examples/demo.nim"
 
+task benchmark, "Reproducible UniPlot/Matplotlib off-screen benchmark":
+  exec "python3 benchmarks/run_benchmarks.py"
+
+task benchmarkDeps, "Install isolated Python/R/Julia benchmark dependencies":
+  exec "python3 benchmarks/install_deps.py"
+
 task uniplot, "Build the uniplot CLI (inspect and render PNG/SVG)":
   exec "nim c --path:src -o:bin/uniplot bin/uniplot_cli.nim"
 

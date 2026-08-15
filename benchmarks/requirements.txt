@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
+matplotlib>=3.10,<4
+plotly>=6,<7
+kaleido>=1,<2

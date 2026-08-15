@@ -21,6 +21,10 @@ libUniPlot.a
 coverage/
 lcov.info
 
+# machine-specific benchmark reports
+benchmarks/results/
+benchmarks/__pycache__/
+
 # nim cache
 nimcache/
 rnimcache/
