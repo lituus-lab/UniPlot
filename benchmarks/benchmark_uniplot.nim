@@ -174,9 +174,11 @@ when isMainModule:
   let categoricalGridSpecs = [categoricalSpec(0, categoryCount),
     categoricalSpec(categoryCount div 2, categoryCount)]
   let referenceX = referenceSpec.data.numeric("x")
+  let referenceY = referenceSpec.data.numeric("y")
   let referenceJson = referenceSpec.toJson
 
-  var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
+  var scaleTimes, rowFilterTimes, descriptiveSummaryTimes, compileTimes,
+      styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
       retainedAnnotationCompileTimes,
@@ -199,6 +201,10 @@ when isMainModule:
     for row in 0 ..< referenceSpec.data.rowCount:
       if rowFilter.rowIsFinite(row): inc finiteCount
     let rowFilterMs = elapsedMs(started)
+
+    started = getMonoTime()
+    let descriptive = summarize(referenceY)
+    let descriptiveSummaryMs = elapsedMs(started)
 
     var sceneResult, secondaryResult, retainedAnnotationResult:
       tuple[ms: float64; nodes: int]
@@ -272,11 +278,13 @@ when isMainModule:
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
-      preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
+      preparedPngResult.bytes + preparedWidth + int(trained.domainMax) +
+      descriptive.count + descriptive.outliers.len
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
       rowFilterTimes.push rowFilterMs
+      descriptiveSummaryTimes.push descriptiveSummaryMs
       compileTimes.push sceneResult.ms
       styledCompileTimes.push styledResult.ms
       continuousColorCompileTimes.push continuousColorResult.ms
@@ -312,6 +320,7 @@ when isMainModule:
     "stages": {
       "continuous_scale_train": summary(scaleTimes),
       "row_filter_scan": summary(rowFilterTimes),
+      "descriptive_summary": summary(descriptiveSummaryTimes),
       "construct_compile": summary(compileTimes),
       "styled_construct_compile": summary(styledCompileTimes),
       "continuous_color_construct_compile": summary(

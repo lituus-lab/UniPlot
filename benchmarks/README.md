@@ -140,6 +140,13 @@ ranking:
   Their observed ranges overlap, so this run does not establish a statistically
   reliable slowdown. Rendering and the cost of increasing the annotation count
   are not measured by this stage.
+- `descriptive_summary` filters and sorts the 100,000 finite, oscillating y
+  values from the reference workload, computes type-7 quartiles and Tukey
+  whiskers, collects outliers, and obtains the normalized mean through
+  UniAccurate compensated summation. On the 2026-08-15 Darwin arm64 run it
+  averaged 7.55 ms over five iterations after three warmups (7.29–7.90 ms).
+  Input copying, sorting and temporary normalized storage are included; this
+  is not a pre-sorted or allocation-free claim.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the
