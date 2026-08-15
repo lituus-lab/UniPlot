@@ -154,3 +154,50 @@ suite "plot compilation":
     else:
       expect PreConditionDefect: spec.sizeRange(0, 1)
       expect PreConditionDefect: spec.alphaRange(-0.1, 1)
+
+  test "shape mappings compile through UniVector marker paths":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 3.0])
+    frame.addColumn("shape", ["A", "B", "A"])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y", shape = "shape"), radius = 4)
+    let scene = spec.compileScene()
+    var commandCounts: seq[int]
+    for node in scene.nodes:
+      if node.id != 0 and node.kind == snPath:
+        commandCounts.add node.path.commands.len
+    check commandCounts.len == 3
+    check commandCounts[0] == commandCounts[2]
+    check commandCounts[0] != commandCounts[1]
+
+  test "explicit and mapped line styles use UniVector dashes":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 1.0])
+    frame.addColumn("style", ["solid", "dash", "dot"])
+    var solid = plot(frame)
+    solid.geomLine(aes("x", "y"), width = 2)
+    var dashed = plot(frame)
+    dashed.geomLine(aes("x", "y"), width = 2, lineStyle = DashedLine)
+    let solidScene = solid.compileScene()
+    let dashedScene = dashed.compileScene()
+    let solidCommands = solidScene.nodes[^1].path.commands.len
+    let dashedCommands = dashedScene.nodes[^1].path.commands.len
+    check dashedCommands > solidCommands
+
+    var mapped = plot(frame)
+    mapped.geomLine(aes("x", "y", lineStyle = "style"), width = 2)
+    check mapped.compileScene().nodes[^1].id > 0
+
+  test "shape and line-style mappings reject incompatible columns":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    frame.addColumn("numeric", [1.0, 2.0])
+    var badShape = plot(frame)
+    badShape.geomPoint(aes("x", "y", shape = "numeric"))
+    expect PlotError: discard badShape.compileScene()
+    var badStyle = plot(frame)
+    badStyle.geomPoint(aes("x", "y", lineStyle = "missing"))
+    expect PlotError: discard badStyle.compileScene()

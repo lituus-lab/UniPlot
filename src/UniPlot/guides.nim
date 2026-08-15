@@ -19,21 +19,54 @@ proc polygon(points: openArray[Point]): Path =
   for i in 1 ..< points.len: result.lineTo(points[i].x, points[i].y)
   result.closePath()
 
-proc circle(center: Point; radius: float32): Path =
-  result = newPath()
-  result.arc(center.x, center.y, radius, 0, (2 * PI).float32)
-  result.closePath()
-
 proc segmentPath(a, b: Point; width: float32): Path =
   let dx = b.x - a.x
   let dy = b.y - a.y
   let length = sqrt(dx * dx + dy * dy)
-  if length == 0: return circle(a, width * 0.5)
+  if length == 0:
+    return markerPath(CircleMarker, vec2(a.x, a.y), width)
   let nx = -dy / length * width * 0.5
   let ny = dx / length * width * 0.5
   polygon([Point(x: a.x + nx, y: a.y + ny),
     Point(x: b.x + nx, y: b.y + ny), Point(x: b.x - nx, y: b.y - ny),
     Point(x: a.x - nx, y: a.y - ny)])
+
+func mappedShape(index: int): MarkerShape =
+  if index > MarkerShape.high.ord:
+    raise newException(PlotError, "shape mapping exceeds marker capacity")
+  MarkerShape(index)
+
+func mappedLineStyle(index: int): LineStyle =
+  if index > LineStyle.high.ord:
+    raise newException(PlotError, "line-style mapping exceeds style capacity")
+  LineStyle(index)
+
+proc lineStrokeStyle(width: float32; lineStyle: LineStyle): StrokeStyle =
+  result = defaultStrokeStyle(width)
+  case lineStyle
+  of SolidLine:
+    discard
+  of DashedLine:
+    result.dash = dashPattern([6'f32 * width, 3'f32 * width])
+  of DottedLine:
+    result.cap = RoundCap
+    result.dash = dashPattern([width, 2'f32 * width])
+  of DotDashLine:
+    result.cap = RoundCap
+    result.dash = dashPattern([width, 2'f32 * width, 6'f32 * width,
+      2'f32 * width])
+  of LongDashLine:
+    result.dash = dashPattern([10'f32 * width, 4'f32 * width])
+
+proc linePath(points: openArray[Point]; width: float32;
+              lineStyle: LineStyle): Path =
+  result = newPath()
+  if points.len < 2: return
+  result.moveTo(points[0].x, points[0].y)
+  for i in 1 ..< points.len:
+    result.lineTo(points[i].x, points[i].y)
+  result = result.preparePath().strokeToPath(
+    lineStrokeStyle(width, lineStyle))
 
 proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
   if layer.mapping.color.len == 0: return
@@ -85,13 +118,25 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.columns[layer.mapping.color].kind != ckCategorical):
       raise newException(PlotError,
         "color mappings must reference categorical columns")
+    if layer.mapping.shape.len > 0 and
+        (layer.mark != mkPoint or layer.mapping.shape notin spec.data.columns or
+        spec.data.columns[layer.mapping.shape].kind != ckCategorical):
+      raise newException(PlotError,
+        "shape mappings require a categorical point-layer column")
+    if layer.mapping.lineStyle.len > 0 and
+        (layer.mark != mkLine or
+        layer.mapping.lineStyle notin spec.data.columns or
+        spec.data.columns[layer.mapping.lineStyle].kind != ckCategorical):
+      raise newException(PlotError,
+        "line-style mappings require a categorical line-layer column")
     for mapping in [layer.mapping.size, layer.mapping.alpha]:
       if mapping.len > 0 and (mapping notin spec.data.columns or
           spec.data.columns[mapping].kind != ckNumeric):
         raise newException(PlotError,
           "size and alpha mappings must reference numeric columns")
     if layer.mark == mkArea and (layer.mapping.color.len > 0 or
-        layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0):
+        layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
+        layer.mapping.shape.len > 0 or layer.mapping.lineStyle.len > 0):
       raise newException(PlotError,
         "area layers do not support per-row aesthetic mappings")
     if layer.mark == mkText and (layer.mapping.label.len == 0 or
@@ -184,6 +229,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var points: seq[Point]
     var colors: seq[Color]
     var sizes: seq[float32]
+    var shapes: seq[MarkerShape]
+    var lineStyles: seq[LineStyle]
     var categoryColors = initTable[string, Color]()
     if layer.mapping.color.len > 0:
       for entry in spec.categoricalEntries(layer):
@@ -192,6 +239,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       for row in rows: colors.add categoryColors[mappedValues[row]]
     else:
       for _ in rows: colors.add layer.color
+    if layer.mapping.shape.len > 0:
+      let values = spec.data.categorical(layer.mapping.shape)
+      var mapped = initTable[string, MarkerShape]()
+      for row in rows:
+        if values[row] notin mapped:
+          mapped[values[row]] = mappedShape(mapped.len)
+        shapes.add mapped[values[row]]
+    else:
+      for _ in rows: shapes.add layer.shape
+    if layer.mapping.lineStyle.len > 0:
+      let values = spec.data.categorical(layer.mapping.lineStyle)
+      var mapped = initTable[string, LineStyle]()
+      for row in rows:
+        if values[row] notin mapped:
+          mapped[values[row]] = mappedLineStyle(mapped.len)
+        lineStyles.add mapped[values[row]]
+    else:
+      for _ in rows: lineStyles.add layer.lineStyle
     if layer.mapping.alpha.len > 0:
       let values = spec.data.numeric(layer.mapping.alpha)
       let scale = trainContinuous(values, spec.mappedAlphaRange.minimum,
@@ -219,12 +284,22 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     case layer.mark
     of mkPoint:
       for i, point in points:
-        result.addPath(circle(point, sizes[i]), colors[i], nodeId); inc nodeId
+        result.addPath(markerPath(shapes[i], vec2(point.x, point.y),
+          sizes[i] * 2'f32), colors[i], nodeId)
+        inc nodeId
     of mkLine:
-      for i in 1 ..< points.len:
-        result.addPath(segmentPath(points[i - 1], points[i], sizes[i]),
-            colors[i],
-          nodeId); inc nodeId
+      let hasRowAesthetics = layer.mapping.color.len > 0 or
+        layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
+        layer.mapping.lineStyle.len > 0
+      if not hasRowAesthetics and points.len > 1:
+        result.addPath(linePath(points, sizes[0], lineStyles[0]), colors[0],
+          nodeId)
+        inc nodeId
+      else:
+        for i in 1 ..< points.len:
+          result.addPath(linePath([points[i - 1], points[i]], sizes[i],
+            lineStyles[i]), colors[i], nodeId)
+          inc nodeId
     of mkBar:
       let barWidth = if xKind == ckCategorical: xBand.bandwidth
         else: max(1'f32, area.width / float32(max(1, points.len)) * 0.8)
@@ -265,7 +340,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           Point(x: legendX + 20, y: center.y), width), entry.color)
       of mkPoint:
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
-        result.addPath(circle(center, min(radius, 7'f32)), entry.color)
+        result.addPath(markerPath(CircleMarker, vec2(center.x, center.y),
+          min(radius, 7'f32) * 2'f32), entry.color)
       of mkBar, mkArea:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
