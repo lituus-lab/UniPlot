@@ -101,9 +101,14 @@ nimble docs
 ## GPU boundary
 
 The core contains renderer-neutral resource identifiers, meshes, paths, text
-runs and clip nodes. An optional WGPU backend may translate those resources to
-`wgpu-native`, but importing `UniPlot` never loads or links WGPU. CPU rendering
-is the reference semantics and remains available on every supported platform.
+runs and clip nodes. The optional WGPU backend dynamically opens the pinned
+`wgpu-native` runtime and creates an adapter, device and queue. Importing
+`UniPlot` never loads or links WGPU, and CPU rendering remains the reference
+semantics on every supported platform.
+
+Install the pinned runtime with `nimble wgpuDeps`, then validate the native
+device path with `nimble wgpuTest`. Both tasks are implemented in Nim; the
+downloaded runtime stays in the ignored `.deps` directory.
 
 ## License
 

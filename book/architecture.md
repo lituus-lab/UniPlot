@@ -31,10 +31,10 @@ therefore produce equal scene ordering and deterministic vector output.
 
 ## CPU and GPU
 
-SVG and PNG are the 1.0 reference backends. The WGPU module currently defines
-resource identities, capabilities and frame preparation without loading a
-native runtime. A later optional package can bind wgpu-native while preserving
-the same compiled scene and stable mark IDs.
+SVG and PNG are the 1.0 reference backends. The optional WGPU module preserves
+resource identities and frame preparation, then dynamically loads the pinned
+wgpu-native runtime only when requested. It already creates and owns a native
+adapter, device and queue; drawing the compiled scene is the next backend layer.
 
 ## Current extension points
 

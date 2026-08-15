@@ -22,10 +22,15 @@ CPU and WGPU backends consume the same compiled scene. Parity is evaluated on
 node bounds, draw order, picking identifiers and tolerance-based pixels. GPU
 availability is a runtime capability, not a condition for constructing plots.
 
-## Deferred work
+The repository provides a pure-Nim installer for the pinned 29.0.1.1 release.
+The native test dynamically loads that runtime and must create an adapter,
+device and queue. Downloaded binaries remain outside the package in `.deps`.
 
-The 1.0 CPU release freezes the boundary against wgpu-native 29.0.1.1 but does
-not bundle it. Raw declarations will be generated from the release's
-`ffi/webgpu-headers/webgpu.h` and `ffi/wgpu.h`, rather than maintained by hand.
-Adapter selection, window surfaces, asynchronous device loss, shader packaging
-and platform distribution are delivered with the interactive/GPU milestone.
+## Current scope and deferred work
+
+The backend freezes its runtime boundary against wgpu-native 29.0.1.1 and does
+not bundle native binaries. It currently opens the first available adapter and
+owns a real device and queue. Scene drawing, explicit adapter selection, window
+surfaces, asynchronous device loss and shader packaging remain separate
+milestones. Additional raw declarations must continue to match the pinned
+release's `ffi/webgpu-headers/webgpu.h` and `ffi/wgpu.h` exactly.

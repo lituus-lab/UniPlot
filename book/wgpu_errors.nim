@@ -11,8 +11,9 @@ nbText: """
 ## Optional WGPU boundary
 
 Importing `UniPlot` never loads WGPU. The optional module extracts semantic
-resources from a scene before any native device exists. A future runtime can
-map them to the pinned wgpu-native API without changing layout.
+resources from a scene before any native device exists. When explicitly opened,
+the backend dynamically loads the pinned wgpu-native runtime and creates a real
+adapter, device and queue without changing plot layout.
 """
 
 nbCode:
@@ -35,8 +36,19 @@ nbText: """
 `WgpuBackendState` models unavailable, ready and device-lost states.
 `WgpuCapabilities` advertises picking, storage buffers and timestamp queries.
 `WgpuResourceKind` distinguishes path meshes, glyph atlases and image textures;
-`WgpuFrame` carries size, resources and node count. Core 1.0 reports unavailable
-until an optional native implementation is linked.
+`WgpuFrame` carries size, resources and node count. Calling
+`openWgpuBackend(path)` makes capabilities reflect the live native device;
+without that explicit call they remain unavailable and no library is loaded.
+
+Install and validate the optional runtime from the repository root:
+
+```text
+nimble wgpuDeps
+nimble wgpuTest
+```
+
+The installer and tasks are written in Nim. Native artifacts are pinned to
+wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 
 ## Typed failures
 
