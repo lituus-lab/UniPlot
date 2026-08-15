@@ -77,8 +77,9 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Error bars and ribbons with explicit numeric bounds and missing-value
       policies.
 - [ ] Box/violin plots, density, contours and heatmaps.
-- [ ] Statistical transforms: binning variants, smoothing, aggregation,
-  quantiles and confidence intervals.
+- [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
+- [ ] Statistical transforms: binning variants, smoothing, grouped
+  aggregation and confidence intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
