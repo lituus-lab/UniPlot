@@ -176,6 +176,30 @@ An empty finite input returns no bins. A constant input expands to a unit-width
 domain. A non-positive bin count raises `PlotError`; the contractual postcondition
 ensures a non-empty result has exactly the requested number of bins.
 
+## Quantiles and descriptive summaries
+
+`quantile(values, probability)` filters non-finite observations and uses the
+Hyndman–Fan type-7 interpolation also used by the default quantiles in R and
+NumPy. The probability belongs to `[0, 1]`; an all-non-finite sample is an
+error rather than an invented statistic.
+"""
+
+nbCode:
+  let sampleSummary = summarize([1.0, 2.0, 2.0, 3.0, 4.0, 100.0, NaN])
+  echo "quartiles: ", sampleSummary.firstQuartile, ", ",
+    sampleSummary.median, ", ", sampleSummary.thirdQuartile
+  echo "whiskers: ", sampleSummary.lowerWhisker, " .. ",
+    sampleSummary.upperWhisker
+  echo "outliers: ", sampleSummary.outliers
+
+nbText: """
+`summarize` returns count, extrema, quartiles, mean, Tukey whiskers and retained
+outliers. Its whisker multiplier defaults to `1.5` and must be finite and
+non-negative. The mean normalizes the sample and delegates compensated
+summation to UniAccurate, avoiding a local numerical kernel and preventing
+avoidable overflow for large finite values. This value object is the shared
+statistical basis for boxplots; rendering code does not recompute quartiles.
+
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
