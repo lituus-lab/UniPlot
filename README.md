@@ -20,6 +20,7 @@ rendering engines.
 - categorical colour mappings backed by immutable UniColor palettes;
 - categorical fill and marker-shape mappings with semantic legends;
 - solid, dashed, dotted, dot-dash and long-dash line styles;
+- explicit drop, break and reject policies for non-finite mapped values;
 - numeric size and alpha mappings with explicit output ranges;
 - line, point, bar, area and text layers, plus histogram recipes;
 - Cartesian axes, ticks, labels, titles and themes;

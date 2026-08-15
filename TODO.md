@@ -70,7 +70,7 @@ silently claimed by the focused 1.0 publication contract.
   quantiles and confidence intervals.
 - [ ] Annotations, reference lines/bands, arrows and rich text.
 - [ ] Image marks and raster layers.
-- [ ] Missing-value policies and intentional line breaks.
+- [x] Missing-value policies and intentional line breaks.
 - [ ] Theme inheritance, reusable style sheets and publication presets.
 - [ ] Deterministic PDF output through a lower-level Uni* backend.
 - [ ] Declarative JSON serialization with a versioned schema.
@@ -97,8 +97,8 @@ than introducing competing geometry or text implementations.
 
 - [x] Train continuous and band scale domains incrementally without retaining
   or sorting concatenated samples.
-- [ ] Avoid materialising finite-row index sequences while preserving explicit
-  missing-value and line-break semantics.
+- [x] Compile layers through allocation-light row filters while preserving the
+  materialising `finiteRows` compatibility helper.
 - [x] Expose reusable prepared scenes that retain shaped and tessellated paths.
 - [ ] Add bounded automatic prepared-scene caching by stable semantic key.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.

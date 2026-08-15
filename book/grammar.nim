@@ -171,6 +171,47 @@ exceeding either visual capacity is a typed error rather than silent recycling.
 `color` and `fill` cannot both be mapped on one layer because the current scene
 stores one paint per filled path.
 
+## Missing values and intentional gaps
+
+Every layer has an explicit `MissingValuePolicy`. Lines and areas default to
+`BreakOnMissing`, so a `NaN` or infinity starts a new subpath instead of
+drawing a misleading bridge across absent observations. Points, bars and text
+default to `DropMissing`. Pass `DropMissing` to reconnect the remaining line
+samples, or `RejectMissing` when incomplete input must be a typed error.
+"""
+
+nbCode:
+  var gapData = initDataFrame()
+  gapData.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
+  gapData.addColumn("y", [1.0, 2.5, NaN, 2.2, 3.8])
+
+  var broken = plot(gapData)
+  broken.geomLine(aes("x", "y"), width = 3)
+  broken.geomPoint(aes("x", "y"), radius = 5)
+  broken.labels(title = "BreakOnMissing", x = "x", y = "y")
+
+  var reconnected = plot(gapData)
+  reconnected.geomLine(aes("x", "y"), width = 3,
+    missingValues = DropMissing)
+  reconnected.geomPoint(aes("x", "y"), radius = 5)
+  reconnected.labels(title = "DropMissing", x = "x", y = "y")
+
+  let missingSvgs = [
+    broken.compileScene(Size(width: 500, height: 320)).toSvg(font),
+    reconnected.compileScene(Size(width: 500, height: 320)).toSvg(font)
+  ]
+
+nbRawHtml gallery([
+  svgFigure(missingSvgs[0], "The default retains the observational gap."),
+  svgFigure(missingSvgs[1], "DropMissing deliberately reconnects finite rows.")
+])
+
+nbText: """
+Scale training ignores non-finite values in all three modes. The policy applies
+when marks are compiled: `RejectMissing` fails at that boundary, while drop and
+break remain deterministic across SVG, PNG and WGPU because the resulting
+scene contains the resolved UniVector paths.
+
 ## Numeric size and alpha mappings
 
 The `size` and `alpha` aesthetics map numeric columns through the existing
