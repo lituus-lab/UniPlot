@@ -55,13 +55,15 @@ wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 
 `prepareWgpuScene(scene, font)` uses the same UniGlyph layouts and UniVector
 tessellation as the CPU backends. Its first submission uploads and enqueues the
-retained indexed geometry. Reusing that exact prepared handle keeps the last
-vertex/index pair resident; switching prepared handles or issuing a direct mesh
-render invalidates the slot. `renderWgpuPrepared` additionally returns unpadded
-RGBA8 pixels. The convenience scene overloads prepare on every call. The
-headless validation task checks individual pixels, exact CPU/GPU parity and
-upload invalidation. Run `nimble wgpuBenchmark` to measure preparation,
-upload-plus-submit, resident submission and publication separately.
+retained indexed geometry. Reusing that exact prepared handle keeps its
+vertex/index pair resident. A backend retains four prepared handles by default;
+call `openWgpuBackend(path, preparedCacheCapacity = n)` to choose 1 through 64.
+Eviction is least-recently-used, while direct mesh rendering has separate
+streaming buffers. `renderWgpuPrepared` additionally returns unpadded RGBA8
+pixels. The convenience scene overloads prepare on every call. The headless
+validation task checks individual pixels, exact CPU/GPU parity, direct uploads,
+cache hits and LRU eviction. Run `nimble wgpuBenchmark` to measure preparation,
+forced misses, alternating resident submission and publication separately.
 
 ## Typed failures
 

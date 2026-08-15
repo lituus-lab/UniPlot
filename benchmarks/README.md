@@ -311,15 +311,15 @@ UNIPLOT_WGPU_LIBRARY="$PWD/.deps/wgpu/29.0.1.1/macos-aarch64/lib/libwgpu_native.
   benchmarks/baselines/apple-m4-metal.json
 ```
 
-It reports preparation, alternating-identity upload plus submission,
-same-identity resident submission and publication separately. Preparation
-shapes UniGlyph text and tessellates UniVector paths. The upload stage
-alternates two prepared handles so every iteration performs a real buffer
-write. Warm submission reuses the resident vertex/index pair, while publication
-also reads the 800×500 RGBA8 texture back. Enqueue timing is CPU-side
-submission latency, not guaranteed GPU completion or a universal frame-rate
-claim. The harness checks the backend's issued-upload counter so a skipped
-write cannot be mislabeled as an upload measurement.
+It reports preparation, forced-miss upload plus submission, multi-scene
+resident submission and publication separately. Preparation shapes UniGlyph
+text and tessellates UniVector paths. The upload stage cycles three prepared
+handles through a two-entry LRU so every iteration performs a real buffer
+write. Warm submission alternates two handles in those two slots, while
+publication also reads the 800×500 RGBA8 texture back. Enqueue timing is
+CPU-side submission latency, not guaranteed GPU completion or a universal
+frame-rate claim. The harness checks uploads, hits, misses and evictions so a
+cache hit cannot be mislabeled as an upload measurement.
 
 On the 2026-08-16 Apple M4 Metal run, three alternating before/after runs of 50
 iterations measured 0.9784 ms for the former upload-on-every-submit path and
@@ -332,9 +332,18 @@ this adapter, runtime, dependency state and 1,000-point workload.
 
 The earlier 3.13 ms preparation entry in the checked-in baseline was stale:
 the immediately preceding UniPlot revision measured 74.04 ms against the same
-current local UniGlyph/UniVector dependencies. The baseline now records the
-controlled 3×50 result and includes a residency-version field so incompatible
-semantics fail instead of being compared.
+current local UniGlyph/UniVector dependencies.
+
+The bounded-LRU follow-up uses the same Apple M4 Metal protocol. Across three
+50-iteration runs, cycling three handles through two slots averaged 0.9807 ms
+and produced exactly 53 misses, 53 uploads and 51 evictions per process.
+Alternating two resident handles averaged 0.0855 ms with no additional upload,
+91.3% below the forced-miss stage. Preparation averaged 73.9401 ms and
+publication 3.0842 ms, both within the preceding run's variation. This proves
+two-handle residency for this workload; it does not establish a universal
+cache capacity or GPU frame rate. The baseline records this controlled result
+and includes a residency-version field so incompatible semantics fail instead
+of being compared.
 
 The optional fourth argument compares the current means with a baseline only
 after adapter, backend, workload, canvas and residency semantics match. Each
