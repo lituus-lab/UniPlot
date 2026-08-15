@@ -64,6 +64,23 @@ int main(void) {
   uplot_buffer_free(svg, svg_len);
   uplot_buffer_free(png, png_len);
 
+  const char *groups[] = {"west", "east", "west"};
+  assert(uplot_add_categorical_column(plot, "group", groups, 3) == UPLOT_OK);
+  assert(uplot_add_categorical_column(plot, "bad", groups, 2) ==
+         UPLOT_ERR_ARGUMENT);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_facet_grid_svg(plot, "group", 2, 656, 240, 16, 1, 1,
+                                     TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  svg = (uint8_t *)1;
+  svg_len = 1;
+  assert(uplot_render_facet_grid_svg(plot, "missing", 2, 656, 240, 16, 0, 0,
+                                     TEST_FONT, &svg, &svg_len) ==
+         UPLOT_ERR_RENDER);
+  assert(svg == NULL && svg_len == 0);
+
   uplot_plot *panels[] = {plot, plot};
   svg = NULL;
   svg_len = 0;

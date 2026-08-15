@@ -44,6 +44,8 @@ int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                      const char *color, float radius);
+int uplot_add_categorical_column(uplot_plot *, const char *name,
+                                 const char *const *values, size_t count);
 int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,
                           const char *color, float width, int line_style);
 int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
@@ -71,6 +73,14 @@ int uplot_render_grid_png_shared(uplot_plot *const *, size_t count, int columns,
                                  int width, int height, int gap, int shared_x,
                                  int shared_y, const char *font_path,
                                  uint8_t **, size_t *);
+int uplot_render_facet_grid_svg(uplot_plot *, const char *column, int columns,
+                                int width, int height, int gap, int shared_x,
+                                int shared_y, const char *font_path,
+                                uint8_t **, size_t *);
+int uplot_render_facet_grid_png(uplot_plot *, const char *column, int columns,
+                                int width, int height, int gap, int shared_x,
+                                int shared_y, const char *font_path,
+                                uint8_t **, size_t *);
 void uplot_buffer_free(void *, size_t);
 void uplot_plot_free(uplot_plot *);
 

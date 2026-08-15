@@ -114,6 +114,24 @@ proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
   addSeries(value, xs, ys, count, mkPoint, color, radius)
 
+proc uplot_add_categorical_column*(value: pointer; name: cstring;
+    values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or name.isNil or values.isNil or count == 0 or
+      count > csize_t(high(int)) or ($name).len == 0:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if int(count) != h.spec.data.rowCount: return UPLOT_ERR_ARGUMENT
+    let input = cast[ptr UncheckedArray[cstring]](values)
+    var copied = newSeqOfCap[string](int(count))
+    for index in 0 ..< int(count):
+      if input[index].isNil: return UPLOT_ERR_ARGUMENT
+      copied.add $input[index]
+    h.spec.data.addColumn($name, copied)
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; width: float32;
     lineStyle: cint): cint {.exportc, dynlib, cdecl.} =
@@ -274,6 +292,44 @@ proc uplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
   renderSharedGrid(values, count, columns, width, height, gap, sharedX,
+    sharedY, fontPath, output, outputLen, false)
+
+proc renderFacetGrid(value: pointer; column: cstring; columns, width, height,
+    gap, sharedX, sharedY: cint; fontPath: cstring; output: ptr ptr uint8;
+    outputLen: ptr csize_t; svg: bool): cint =
+  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  output[] = nil
+  outputLen[] = 0
+  if value.isNil or column.isNil or ($column).len == 0 or columns <= 0 or
+      width <= 0 or height <= 0 or gap < 0 or sharedX notin 0 .. 1 or
+      sharedY notin 0 .. 1 or fontPath.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let composed = compileFacetGrid(handle(value).spec, $column, int(columns),
+      Size(width: int(width), height: int(height)), int(gap), sharedX == 1,
+      sharedY == 1)
+    let font = loadTtf($fontPath)
+    if svg:
+      copyBuffer(composed.toSvg(font), output, outputLen)
+    else:
+      copyBuffer(composed.encodePng(font), output, outputLen)
+  except CatchableError, Defect:
+    output[] = nil
+    outputLen[] = 0
+    UPLOT_ERR_RENDER
+
+proc uplot_render_facet_grid_svg*(value: pointer; column: cstring; columns,
+    width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderFacetGrid(value, column, columns, width, height, gap, sharedX,
+    sharedY, fontPath, output, outputLen, true)
+
+proc uplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
+    width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderFacetGrid(value, column, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, false)
 
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
