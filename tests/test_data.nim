@@ -21,3 +21,13 @@ suite "data":
     var frame = initDataFrame()
     frame.addColumn("empty", newSeq[float64]())
     expect PlotError: frame.addColumn("nonempty", [1.0])
+
+  test "column access rejects empty names, missing columns and wrong kinds":
+    var frame = initDataFrame()
+    expect PlotError: frame.addColumn("", [1.0])
+    frame.addColumn("number", [1.0])
+    frame.addColumn("label", ["a"])
+    expect PlotError: discard frame.numeric("missing")
+    expect PlotError: discard frame.numeric("label")
+    expect PlotError: discard frame.categorical("number")
+    expect PlotError: discard frame.finiteRows(["missing"])

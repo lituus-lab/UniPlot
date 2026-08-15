@@ -13,3 +13,7 @@ suite "statistics":
     let spec = histogramPlot([0.0, 0.2, 0.8, 1.0], 2)
     check spec.layers.len == 1
     check spec.data.rowCount == 2
+
+  test "histograms reject invalid bin counts and ignore non-finite input":
+    expect PlotError: discard histogram([1.0], 0)
+    check histogram([NaN, Inf], 3).len == 0

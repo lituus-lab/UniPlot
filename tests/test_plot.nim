@@ -49,3 +49,13 @@ suite "plot compilation":
     var textSpec = plot(frame)
     textSpec.geomText(aes("x", "y", "missing"))
     expect PlotError: discard textSpec.compileScene()
+
+  test "layer and convenience constructors reject malformed input":
+    var spec = sample()
+    expect PlotError: spec.geomLine(aes("", "y"))
+    expect PlotError: spec.geomPoint(aes("x", "y"), radius = -1)
+    expect PlotError: spec.geomArea(aes("x", "y"), color = "not-a-color")
+    expect PlotError: discard linePlot([1.0], [1.0, 2.0])
+    expect PlotError: discard scatterPlot([1.0], [1.0, 2.0])
+    expect PlotError: discard barPlot(["a"], [1.0, 2.0])
+    expect PlotError: discard histogramPlot([1.0], 0)

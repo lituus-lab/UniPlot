@@ -17,3 +17,15 @@ suite "scales":
     let scale = trainBand(["b", "a", "b"], 0, 100)
     check scale.domain == @["b", "a"]
     check scale.map("b") < scale.map("a")
+
+  test "invalid domains, ranges, values and tick counts are rejected":
+    expect PlotError: discard continuousScale(1, 1, 0, 1)
+    expect PlotError: discard continuousScale(NaN, 1, 0, 1)
+    expect PlotError: discard continuousScale(0, 1, NaN, 1)
+    expect PlotError: discard continuousScale(1, 10, 0, 1, skLog10).map(0)
+    expect PlotError: discard continuousScale(0, 1, 0, 1).ticks(1)
+    expect PlotError: discard trainContinuous([], 0, 1)
+    expect PlotError: discard trainBand([], 0, 1)
+    expect PlotError: discard trainBand(["a"], 0, 0)
+    expect PlotError: discard trainBand(["a"], 0, 1, 1)
+    expect PlotError: discard trainBand(["a"], 0, 1).map("b")
