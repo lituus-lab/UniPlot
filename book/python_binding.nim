@@ -78,6 +78,9 @@ copying it.
   `annotate_arrow(x, y, x_end, y_end, color="#202124", width=2,
   head_size=8)` retain numeric data-coordinate annotations;
   `clear_annotations()` removes them.
+- `boxplot(groups, values, whisker_length=1.5, ...)` builds grouped type-7
+  summaries on an empty `Plot`. Calling it after another mark is rejected
+  instead of silently replacing or combining incompatible retained data.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
@@ -121,11 +124,16 @@ Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
+  pythonBoxSvg = readFile("../assets/generated/python_boxplot.svg")
+  pythonBoxPng = pngDataUri(readFile("../assets/generated/python_boxplot.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
-    "A categorical facet matrix rendered through the UniPlot Python binding")
+    "A categorical facet matrix rendered through the UniPlot Python binding"),
+  svgFigure(pythonBoxSvg, "A grouped boxplot built through `Plot.boxplot`."),
+  pngFigure(pythonBoxPng, "The same Python boxplot as an embedded PNG.",
+    "A grouped boxplot rendered through the UniPlot Python binding")
 ])
 
 nbSave
-validatePage("python_binding.html", minSvg = 1, requirePng = true)
+validatePage("python_binding.html", minSvg = 2, requirePng = true)

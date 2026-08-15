@@ -112,6 +112,10 @@ int main(void) {
   numeric data coordinates; `uplot_clear_annotations` removes them. They are
   included in schema-v1 JSON and therefore survive the C round trip shown
   above.
+- `uplot_add_box_plot` computes type-7 quartiles and Tukey whiskers from copied
+  grouped samples. It requires an otherwise empty handle, making replacement
+  semantics explicit; malformed groups, colours or whisker lengths are
+  argument errors.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
@@ -134,11 +138,16 @@ Next: [Python binding](python_binding.html).
 let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
+  cBoxSvg = readFile("../assets/generated/c_boxplot.svg")
+  cBoxPng = pngDataUri(readFile("../assets/generated/c_boxplot.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
-    "A categorical facet matrix rendered through the UniPlot C ABI")
+    "A categorical facet matrix rendered through the UniPlot C ABI"),
+  svgFigure(cBoxSvg, "A grouped boxplot built and rendered through the C ABI."),
+  pngFigure(cBoxPng, "The same C boxplot as an embedded PNG.",
+    "A grouped boxplot rendered through the UniPlot C ABI")
 ])
 
 nbSave
-validatePage("c_binding.html", minSvg = 1, requirePng = true)
+validatePage("c_binding.html", minSvg = 2, requirePng = true)

@@ -54,12 +54,16 @@ task bindingBookDemos, "Regenerate book plots through the C and Python bindings"
   exec cCompiler & " -Iinclude -O2 -Wall -Wextra -std=c11 -o " & cDemo &
        " examples/c/book_demo.c libUniPlot.a -lz"
   exec cDemo & " tests/DejaVuSans.ttf book/assets/generated/c_binding.svg" &
-       " book/assets/generated/c_binding.png"
+       " book/assets/generated/c_binding.png" &
+       " book/assets/generated/c_boxplot.svg" &
+       " book/assets/generated/c_boxplot.png"
   exec "nimble buildCython"
   withDir "py":
     exec "python3 -m examples.book_demo ../tests/DejaVuSans.ttf" &
          " ../book/assets/generated/python_binding.svg" &
-         " ../book/assets/generated/python_binding.png"
+         " ../book/assets/generated/python_binding.png" &
+         " ../book/assets/generated/python_boxplot.svg" &
+         " ../book/assets/generated/python_boxplot.png"
 
 task docs, "API reference + book into pages/ — what CI publishes":
   rmDir "pages"

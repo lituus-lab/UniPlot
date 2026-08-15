@@ -7,9 +7,11 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: book_demo.py FONT OUTPUT.svg OUTPUT.png")
-    font, svg_path, png_path = map(Path, sys.argv[1:])
+    if len(sys.argv) != 6:
+        raise SystemExit(
+            "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png")
+    font, svg_path, png_path, box_svg_path, box_png_path = map(
+        Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
     figure = (
@@ -34,6 +36,14 @@ def main() -> int:
     png_path.write_bytes(uniplot.facet_matrix_png(
         figure, "region", "phase", font, width=1000, height=700, gap=16,
         shared_x=True, shared_y=True))
+    boxes = (uniplot.Plot(760, 440)
+             .boxplot(
+                 ["control"] * 5 + ["treated"] * 5,
+                 [1.0, 1.4, 1.8, 2.1, 5.2, 2.0, 2.4, 2.7, 3.0, 3.3],
+                 color="#267a5e", outlier_color="#d64255")
+             .title("Python grouped boxplot"))
+    box_svg_path.write_bytes(boxes.svg(font))
+    box_png_path.write_bytes(boxes.png(font))
     return 0
 
 
