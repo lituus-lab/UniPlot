@@ -11,6 +11,15 @@ type
     mkArea
     mkText
 
+  LegendPosition* = enum
+    lpRight
+    lpNone
+
+  LegendSpec* = object
+    visible*: bool
+    title*: string
+    position*: LegendPosition
+
   Aes* = object
     x*, y*: string
     label*: string
@@ -20,6 +29,7 @@ type
     mapping*: Aes
     color*: Color
     size*: float32
+    legendLabel*: string
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -31,6 +41,7 @@ type
     layers*: seq[Layer]
     title*, xLabel*, yLabel*: string
     theme*: Theme
+    legendSpec*: LegendSpec
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -43,34 +54,45 @@ proc defaultTheme*(): Theme =
     right: 30, bottom: 60), pointSize: 4, lineWidth: 2)
 
 proc plot*(data: DataFrame): PlotSpec =
-  PlotSpec(data: data, theme: defaultTheme())
+  PlotSpec(data: data, theme: defaultTheme(),
+    legendSpec: LegendSpec(position: lpRight))
 
 proc aes*(x, y: string; label = ""): Aes = Aes(x: x, y: y, label: label)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
-    color = "#3366cc"; size = 0'f32) =
+    color = "#3366cc"; size = 0'f32; legend = "") =
   if mapping.x.len == 0 or mapping.y.len == 0:
     raise newException(PlotError, "x and y mappings are required")
   if size < 0 or not size.isFinite:
     raise newException(PlotError, "mark size must be finite and non-negative")
   spec.layers.add Layer(mark: mark, mapping: mapping, color: cssColor(color),
-    size: size)
+    size: size, legendLabel: legend)
 
 proc geomLine*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    width = 0'f32) = spec.addLayer(mkLine, mapping, color, width)
+    width = 0'f32; legend = "") =
+  spec.addLayer(mkLine, mapping, color, width, legend)
 proc geomPoint*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    radius = 0'f32) = spec.addLayer(mkPoint, mapping, color, radius)
-proc geomBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc") =
-  spec.addLayer(mkBar, mapping, color)
-proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd") =
-  spec.addLayer(mkArea, mapping, color)
+    radius = 0'f32; legend = "") =
+  spec.addLayer(mkPoint, mapping, color, radius, legend)
+proc geomBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
+    legend = "") =
+  spec.addLayer(mkBar, mapping, color, legend = legend)
+proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
+    legend = "") =
+  spec.addLayer(mkArea, mapping, color, legend = legend)
 proc geomText*(spec: var PlotSpec; mapping: Aes; color = "#202124";
-    size = 12'f32) = spec.addLayer(mkText, mapping, color, size)
+    size = 12'f32; legend = "") =
+  spec.addLayer(mkText, mapping, color, size, legend)
 
 proc labels*(spec: var PlotSpec; title = ""; x = ""; y = "") =
   spec.title = title
   spec.xLabel = x
   spec.yLabel = y
+
+proc legend*(spec: var PlotSpec; title = ""; position = lpRight) =
+  ## Configure a legend derived from layers carrying a non-empty legend label.
+  spec.legendSpec = LegendSpec(visible: position != lpNone, title: title,
+    position: position)
 
 proc linePlot*(x, y: openArray[float64]; color = "#3366cc"): PlotSpec =
   var frame = initDataFrame()
