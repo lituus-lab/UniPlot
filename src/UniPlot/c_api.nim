@@ -182,6 +182,23 @@ proc uplot_set_title*(value: pointer; title: cstring): cint {.
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
+    label: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or label.isNil or not scale.isFinite or scale == 0 or
+      not offset.isFinite:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    handle(value).spec.secondaryY(scale, offset, $label)
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_clear_secondary_y*(value: pointer): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil: return UPLOT_ERR_ARGUMENT
+  handle(value).spec.clearSecondaryY()
+  UPLOT_OK
+
 proc copyBuffer(bytes: openArray[byte]; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint =
   if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT

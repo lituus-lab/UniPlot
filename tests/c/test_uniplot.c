@@ -57,12 +57,19 @@ int main(void) {
                                      UPLOT_MARKER_CIRCLE, 999) ==
          UPLOT_ERR_ARGUMENT);
   assert(uplot_set_title(plot, "C plot") == UPLOT_OK);
+  assert(uplot_set_secondary_y(plot, 1.8, 32.0, "fahrenheit") == UPLOT_OK);
+  assert(uplot_set_secondary_y(plot, 0.0, 0.0, "invalid") ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_secondary_y(plot, 1.0, 0.0, NULL) ==
+         UPLOT_ERR_ARGUMENT);
   assert(uplot_render_svg(plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
   assert(uplot_render_png(plot, TEST_FONT, &png, &png_len) == UPLOT_OK);
   assert(png_len > 8 && png[0] == 137 && png[1] == 'P');
   uplot_buffer_free(svg, svg_len);
   uplot_buffer_free(png, png_len);
+  assert(uplot_clear_secondary_y(plot) == UPLOT_OK);
+  assert(uplot_clear_secondary_y(NULL) == UPLOT_ERR_ARGUMENT);
 
   const char *groups[] = {"west", "east", "west"};
   const char *sides[] = {"left", "right", "right"};

@@ -57,6 +57,9 @@ int uplot_add_points_configured(uplot_plot *, const double *, const double *,
                                 size_t, const char *color, float radius,
                                 int shape, int missing_policy);
 int uplot_set_title(uplot_plot *, const char *title);
+int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
+                          const char *label);
+int uplot_clear_secondary_y(uplot_plot *);
 int uplot_render_png(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_svg(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_grid_svg(uplot_plot *const *, size_t count, int columns,
