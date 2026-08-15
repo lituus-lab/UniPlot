@@ -48,8 +48,7 @@ Three stages are reported:
 - SVG serialization from a retained/constructed plot;
 - PNG serialization from the same plot.
 
-UniPlot also reports three internal diagnostics excluded from cross-library
-ranking:
+UniPlot also reports internal diagnostics excluded from cross-library ranking:
 
 - `continuous_scale_train` measures one-pass numeric-domain training;
 - `row_filter_scan` measures allocation-light numeric-column validation and
@@ -155,6 +154,18 @@ ranking:
   three warmups (14.56–14.89 ms). String/value construction, grouping,
   sorting, frame allocation and scene compilation are included; SVG/PNG/GPU
   rendering is not.
+- `aggregate_2d` groups prepared categorical x/y/value arrays into a complete
+  32-by-24 first-seen matrix. On the 2026-08-15 Darwin arm64 run, 100,000
+  observations averaged 9.89 ms over five iterations after three warmups
+  (9.68–10.11 ms). It includes hashing, finite filtering, per-cell allocation
+  and UniAccurate compensated means, but excludes construction of the prepared
+  input arrays.
+- `categorical_heatmap_construct_compile` constructs those 100,000 labels and
+  values, repeats the same aggregation, materialises the retained frame, trains
+  two band axes and a continuous UniColor guide, and compiles 96 observed
+  UniVector tiles. The same run averaged 14.42 ms (14.32–14.59 ms). SVG, PNG
+  and WGPU rendering are excluded; this stage is not compared with competitor
+  heatmaps whose aggregation and missing-cell contracts may differ.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

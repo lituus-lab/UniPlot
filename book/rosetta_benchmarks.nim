@@ -190,6 +190,15 @@ The reusable-theme diagnostic averaged 21.47 ms for the dark preset versus
 run. The 0.10 ms difference is within run-to-run noise; it records that preset
 application introduced no detected construction regression.
 
+Categorical heatmaps have two explicit stages. On the same 2026-08-15 Darwin
+arm64 protocol, aggregating 100,000 prepared observations into the complete
+32-by-24 matrix averaged 9.89 ms over five iterations (9.68–10.11 ms). Full
+input construction, aggregation, retained-frame creation, two band axes, a
+continuous UniColor guide and compilation of the 96 observed UniVector tiles
+averaged 14.42 ms (14.32–14.59 ms). Neither stage includes SVG, PNG or WGPU
+rendering, and neither is ranked against competitor heatmaps with different
+aggregation and missing-cell semantics.
+
 Versioned PlotSpec JSON is measured in two stages. For 100,000 rows on the
 same 2026-08-15 Darwin arm64 run, in-memory encoding averaged 8.04 ms and
 decoding averaged 17.80 ms over five measured iterations. The input JSON is
