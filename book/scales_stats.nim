@@ -176,6 +176,43 @@ An empty finite input returns no bins. A constant input expands to a unit-width
 domain. A non-positive bin count raises `PlotError`; the contractual postcondition
 ensures a non-empty result has exactly the requested number of bins.
 
+## Explicit histogram boundaries
+"""
+
+nbCode:
+  let explicitBins = histogramBreaks(
+    [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0, NaN],
+    [0.0, 0.5, 1.0, 2.0])
+  for bin in explicitBins:
+    echo "[", bin.lower, ", ", bin.upper, "] -> ", bin.count
+  var explicitHistogram = histogramBreaksPlot(
+    [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0, NaN],
+    [0.0, 0.5, 1.0, 2.0], color = "#267a5e")
+  explicitHistogram.labels(title = "Caller-defined bins", x = "interval",
+    y = "count")
+  let explicitHistogramSvg = explicitHistogram.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(explicitHistogramSvg,
+  "Caller-defined intervals shown as labelled categorical count bars.")
+
+nbText: """
+`histogramBreaks(values, breaks)` requires at least two finite, strictly
+increasing boundaries. Every interval is lower-inclusive and upper-exclusive,
+except the final interval, which includes the last boundary. Non-finite values
+and finite values outside the supplied domain are excluded. The function
+always returns one bin per adjacent boundary pair, including zero-count bins;
+`histogramBreaksPlot` turns that retained result into categorical bars.
+Those bars have equal screen width: their labels preserve the numeric
+boundaries, but an interval twice as wide does not receive a bar twice as wide
+and heights are raw counts rather than width-normalised densities. Numeric
+variable-width histogram geometry remains a separate roadmap item.
+
+Automatic Scott, Sturges and Freedman–Diaconis selection is intentionally not
+implemented locally: those rules need floating-point transcendental/root
+primitives that must first belong to UniMath.
+
 ## Quantiles and descriptive summaries
 
 `quantile(values, probability)` filters non-finite observations and uses the
@@ -274,4 +311,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 5)
+validatePage("scales_stats.html", minSvg = 6)
