@@ -61,8 +61,10 @@ themed or extended with additional layers.
 ## Core geometries
 
 `aes(x, y, label)` maps columns. `geomLine`, `geomPoint`, `geomBar`, `geomArea`
-and `geomText` append typed layers. Multiple layers share trained scales,
-guides and deterministic scene order.
+and `geomText` append typed layers. `geomRect` instead maps explicit numeric
+`xMin`, `xMax`, `yMin` and `yMax` bounds; x bounds increase strictly while y
+bounds may coincide for a zero-height rectangle. Multiple layers share trained
+scales, guides and deterministic scene order.
 """
 
 nbCode:
@@ -244,7 +246,8 @@ SVG, PNG and WGPU consume identical semantics.
 
 ## Fill, shape and line-style mappings
 
-`fill` maps categorical colours specifically for filled point and bar marks.
+`fill` maps categorical or continuous colours for supported filled point, bar,
+tile and rectangle marks.
 `shape` maps point categories to UniVector's circle, square, triangle, diamond,
 plus and cross paths. A line selects `SolidLine`, `DashedLine`, `DottedLine`,
 `DotDashLine` or `LongDashLine`; the non-solid forms are expanded by
