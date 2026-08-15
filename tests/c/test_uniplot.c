@@ -195,6 +195,33 @@ int main(void) {
   uplot_buffer_free(svg, svg_len);
   uplot_plot_free(box_plot);
 
+  uplot_plot *histogram = uplot_plot_new(320, 240);
+  assert(histogram != NULL);
+  const double histogram_values[] = {-1, 0, 0.5, 1, 2, 3, NAN};
+  const double histogram_breaks[] = {0, 1, 2};
+  assert(uplot_add_histogram_breaks(histogram, histogram_values, 7,
+                                    histogram_breaks, 3, "#267a5e") ==
+         UPLOT_OK);
+  assert(uplot_add_histogram_breaks(histogram, histogram_values, 7,
+                                    histogram_breaks, 3, "#267a5e") ==
+         UPLOT_ERR_ARGUMENT);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(histogram, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(histogram);
+  uplot_plot *invalid_histogram = uplot_plot_new(320, 240);
+  assert(invalid_histogram != NULL);
+  const double invalid_breaks[] = {0, 0};
+  assert(uplot_add_histogram_breaks(invalid_histogram, histogram_values, 7,
+                                    invalid_breaks, 2, "#267a5e") ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_histogram_breaks(NULL, histogram_values, 7,
+                                    histogram_breaks, 3, "#267a5e") ==
+         UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(invalid_histogram);
+
   uplot_plot *heatmap = uplot_plot_new(320, 360);
   assert(heatmap != NULL);
   const char *heat_x[] = {"left", "right", "left", "left"};

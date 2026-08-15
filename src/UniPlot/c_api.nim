@@ -140,6 +140,33 @@ proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
+    valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
+    color: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or values.isNil or valueCount == 0 or breaks.isNil or
+      breakCount < 2 or valueCount > csize_t(high(int)) or
+      breakCount > csize_t(high(int)) or color.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+      inputBreaks = cast[ptr UncheckedArray[float64]](breaks)
+    var
+      copiedValues = newSeqOfCap[float64](int(valueCount))
+      copiedBreaks = newSeqOfCap[float64](int(breakCount))
+    for index in 0 ..< int(valueCount):
+      copiedValues.add inputValues[index]
+    for index in 0 ..< int(breakCount):
+      copiedBreaks.add inputBreaks[index]
+    h.spec = histogramBreaksPlot(copiedValues, copiedBreaks, $color)
+    h.nextColumn = 0
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint): cint {.
     exportc, dynlib, cdecl.} =
