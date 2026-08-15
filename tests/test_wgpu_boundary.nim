@@ -4,6 +4,7 @@ import std/[os, unittest]
 import contracts
 import UniColor
 import UniPlot
+import UniVector
 import UniPlot/render/wgpu
 
 suite "WGPU boundary":
@@ -39,5 +40,12 @@ suite "WGPU boundary":
       check pixels.len == 17 * 9 * 4
       for offset in countup(0, pixels.high, 4):
         check pixels[offset .. offset + 3] == @[32'u8, 64, 96, 255]
+      let mesh = parsePath("M 2 2 L 8 2 L 8 8 L 2 8 Z")
+        .preparePath().tessellateFill()
+      let meshPixels = backend.readWgpuMeshTarget(Size(width: 10, height: 10),
+        parseColor("#ffffff").get, mesh, parseColor("#ff0000").get)
+      let center = (5 * 10 + 5) * 4
+      check meshPixels[center .. center + 3] == @[255'u8, 0, 0, 255]
+      check meshPixels[0 .. 3] == @[255'u8, 255, 255, 255]
       backend.close()
       check backend.state == wbsUnavailable

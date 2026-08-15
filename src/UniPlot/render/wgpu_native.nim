@@ -64,6 +64,77 @@ type
     origin: WgpuOrigin3D
     aspect: uint32
 
+  WgpuChainedStruct {.bycopy.} = object
+    next: pointer
+    sType: uint32
+
+  WgpuShaderSourceWgsl {.bycopy.} = object
+    chain: WgpuChainedStruct
+    code: WgpuStringView
+
+  WgpuShaderModuleDescriptor {.bycopy.} = object
+    nextInChain: ptr WgpuChainedStruct
+    label: WgpuStringView
+
+  WgpuVertexAttribute {.bycopy.} = object
+    nextInChain: pointer
+    format: uint32
+    offset: uint64
+    shaderLocation: uint32
+
+  WgpuVertexBufferLayout {.bycopy.} = object
+    nextInChain: pointer
+    stepMode: uint32
+    arrayStride: uint64
+    attributeCount: csize_t
+    attributes: ptr WgpuVertexAttribute
+
+  WgpuVertexState {.bycopy.} = object
+    nextInChain, module: pointer
+    entryPoint: WgpuStringView
+    constantCount: csize_t
+    constants: pointer
+    bufferCount: csize_t
+    buffers: ptr WgpuVertexBufferLayout
+
+  WgpuBlendComponent {.bycopy.} = object
+    operation, srcFactor, dstFactor: uint32
+
+  WgpuBlendState {.bycopy.} = object
+    color, alpha: WgpuBlendComponent
+
+  WgpuColorTargetState {.bycopy.} = object
+    nextInChain: pointer
+    format: uint32
+    blend: ptr WgpuBlendState
+    writeMask: uint64
+
+  WgpuFragmentState {.bycopy.} = object
+    nextInChain, module: pointer
+    entryPoint: WgpuStringView
+    constantCount: csize_t
+    constants: pointer
+    targetCount: csize_t
+    targets: ptr WgpuColorTargetState
+
+  WgpuPrimitiveState {.bycopy.} = object
+    nextInChain: pointer
+    topology, stripIndexFormat, frontFace, cullMode, unclippedDepth: uint32
+
+  WgpuMultisampleState {.bycopy.} = object
+    nextInChain: pointer
+    count, mask, alphaToCoverageEnabled: uint32
+
+  WgpuRenderPipelineDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+    layout: pointer
+    vertex: WgpuVertexState
+    primitive: WgpuPrimitiveState
+    depthStencil: pointer
+    multisample: WgpuMultisampleState
+    fragment: ptr WgpuFragmentState
+
   WgpuRequestDeviceCallback = proc(status: uint32; device: pointer;
       message: WgpuStringView; userdata1, userdata2: pointer) {.cdecl.}
 
@@ -115,6 +186,19 @@ type
   GetMappedRangeProc = proc(buffer: pointer; offset,
       size: csize_t): pointer {.cdecl.}
   UnmapBufferProc = proc(buffer: pointer) {.cdecl.}
+  CreateShaderModuleProc = proc(device: pointer;
+      descriptor: ptr WgpuShaderModuleDescriptor): pointer {.cdecl.}
+  CreateRenderPipelineProc = proc(device: pointer;
+      descriptor: ptr WgpuRenderPipelineDescriptor): pointer {.cdecl.}
+  WriteBufferProc = proc(queue, buffer: pointer; offset: uint64; data: pointer;
+      size: csize_t) {.cdecl.}
+  SetPipelineProc = proc(renderPass, pipeline: pointer) {.cdecl.}
+  SetVertexBufferProc = proc(renderPass: pointer; slot: uint32; buffer: pointer;
+      offset, size: uint64) {.cdecl.}
+  SetIndexBufferProc = proc(renderPass, buffer: pointer; format: uint32;
+      offset, size: uint64) {.cdecl.}
+  DrawIndexedProc = proc(renderPass: pointer; indexCount, instanceCount,
+      firstIndex: uint32; baseVertex: int32; firstInstance: uint32) {.cdecl.}
 
   DeviceRequest = object
     status: Atomic[uint32]
@@ -145,6 +229,21 @@ const
   MapModeRead = 0x1'u64
   MapSuccess = 1'u32
   TextureAspectAll = 1'u32
+  BufferUsageIndex = 0x10'u64
+  BufferUsageVertex = 0x20'u64
+  STypeShaderSourceWgsl = 2'u32
+  VertexFormatFloat32x2 = 0x1D'u32
+  VertexFormatFloat32x4 = 0x1F'u32
+  VertexStepModeVertex = 1'u32
+  PrimitiveTopologyTriangleList = 4'u32
+  FrontFaceCcw = 1'u32
+  CullModeNone = 1'u32
+  IndexFormatUint32 = 2'u32
+  BlendOperationAdd = 1'u32
+  BlendFactorOne = 2'u32
+  BlendFactorSrcAlpha = 5'u32
+  BlendFactorOneMinusSrcAlpha = 6'u32
+  ColorWriteMaskAll = 0xF'u64
 
 proc loadSymbol[T](library: LibHandle; name: string): T =
   let address = library.symAddr(name)
@@ -260,8 +359,10 @@ proc supportsTimestampQueries*(runtime: NativeWgpuRuntime): bool =
   not runtime.isNil and runtime.adapter != nil and runtime.hasFeature != nil and
     runtime.hasFeature(runtime.adapter, FeatureTimestampQuery) != 0
 
-proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
-                        red, green, blue, alpha: float64): seq[byte] =
+proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
+                  red, green, blue, alpha: float64;
+                  meshVertices: openArray[float32];
+                  meshIndices: openArray[uint32]): seq[byte] =
   ## Render, read back, and remove WebGPU's per-row copy padding.
   if runtime.isNil or runtime.device == nil or runtime.queue == nil:
     raise newException(LibraryError, "wgpu-native runtime is not ready")
@@ -305,6 +406,24 @@ proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
         "wgpuInstanceProcessEvents")
     releaseBuffer = loadSymbol[ReleaseProc](runtime.library,
         "wgpuBufferRelease")
+    createShader = loadSymbol[CreateShaderModuleProc](runtime.library,
+        "wgpuDeviceCreateShaderModule")
+    createPipeline = loadSymbol[CreateRenderPipelineProc](runtime.library,
+        "wgpuDeviceCreateRenderPipeline")
+    writeBuffer = loadSymbol[WriteBufferProc](runtime.library,
+        "wgpuQueueWriteBuffer")
+    setPipeline = loadSymbol[SetPipelineProc](runtime.library,
+        "wgpuRenderPassEncoderSetPipeline")
+    setVertexBuffer = loadSymbol[SetVertexBufferProc](runtime.library,
+        "wgpuRenderPassEncoderSetVertexBuffer")
+    setIndexBuffer = loadSymbol[SetIndexBufferProc](runtime.library,
+        "wgpuRenderPassEncoderSetIndexBuffer")
+    drawIndexed = loadSymbol[DrawIndexedProc](runtime.library,
+        "wgpuRenderPassEncoderDrawIndexed")
+    releaseShader = loadSymbol[ReleaseProc](runtime.library,
+        "wgpuShaderModuleRelease")
+    releasePipeline = loadSymbol[ReleaseProc](runtime.library,
+        "wgpuRenderPipelineRelease")
   let emptyLabel = WgpuStringView(data: "".cstring, length: 0)
   var textureDescriptor = WgpuTextureDescriptor(
     label: emptyLabel,
@@ -340,6 +459,94 @@ proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
   let renderPass = beginPass(encoder, addr passDescriptor)
   if renderPass == nil:
     raise newException(LibraryError, "wgpu-native did not create a render pass")
+  if meshIndices.len > 0:
+    if meshVertices.len == 0 or meshVertices.len mod 6 != 0:
+      raise newException(LibraryError, "invalid WGPU mesh vertex layout")
+    const shaderCode = """
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f,
+}
+@vertex fn vs_main(@location(0) position: vec2f,
+                   @location(1) color: vec4f) -> VertexOut {
+  var out: VertexOut;
+  out.position = vec4f(position, 0.0, 1.0);
+  out.color = color;
+  return out;
+}
+@fragment fn fs_main(input: VertexOut) -> @location(0) vec4f {
+  return input.color;
+}
+"""
+    var shaderSource = WgpuShaderSourceWgsl(
+      chain: WgpuChainedStruct(sType: STypeShaderSourceWgsl),
+      code: WgpuStringView(data: shaderCode.cstring,
+        length: csize_t(shaderCode.len)))
+    var shaderDescriptor = WgpuShaderModuleDescriptor(
+      nextInChain: addr shaderSource.chain, label: emptyLabel)
+    let shader = createShader(runtime.device, addr shaderDescriptor)
+    if shader == nil:
+      raise newException(LibraryError, "wgpu-native did not create a shader")
+    defer: releaseShader(shader)
+    var attributes = [
+      WgpuVertexAttribute(format: VertexFormatFloat32x2, shaderLocation: 0),
+      WgpuVertexAttribute(format: VertexFormatFloat32x4, offset: 8,
+        shaderLocation: 1)]
+    var vertexLayout = WgpuVertexBufferLayout(
+      stepMode: VertexStepModeVertex, arrayStride: 24,
+      attributeCount: csize_t(attributes.len), attributes: addr attributes[0])
+    let vertexEntry = "vs_main"
+    let fragmentEntry = "fs_main"
+    var blend = WgpuBlendState(
+      color: WgpuBlendComponent(operation: BlendOperationAdd,
+        srcFactor: BlendFactorSrcAlpha,
+        dstFactor: BlendFactorOneMinusSrcAlpha),
+      alpha: WgpuBlendComponent(operation: BlendOperationAdd,
+        srcFactor: BlendFactorOne,
+        dstFactor: BlendFactorOneMinusSrcAlpha))
+    var target = WgpuColorTargetState(format: TextureFormatRgba8Unorm,
+      blend: addr blend, writeMask: ColorWriteMaskAll)
+    var fragment = WgpuFragmentState(module: shader,
+      entryPoint: WgpuStringView(data: fragmentEntry.cstring,
+        length: csize_t(fragmentEntry.len)), targetCount: 1,
+      targets: addr target)
+    var pipelineDescriptor = WgpuRenderPipelineDescriptor(label: emptyLabel,
+      vertex: WgpuVertexState(module: shader,
+        entryPoint: WgpuStringView(data: vertexEntry.cstring,
+          length: csize_t(vertexEntry.len)), bufferCount: 1,
+        buffers: addr vertexLayout),
+      primitive: WgpuPrimitiveState(
+        topology: PrimitiveTopologyTriangleList,
+        frontFace: FrontFaceCcw, cullMode: CullModeNone),
+      multisample: WgpuMultisampleState(count: 1, mask: high(uint32)),
+      fragment: addr fragment)
+    let pipeline = createPipeline(runtime.device, addr pipelineDescriptor)
+    if pipeline == nil:
+      raise newException(LibraryError, "wgpu-native did not create a pipeline")
+    defer: releasePipeline(pipeline)
+    let
+      vertexSize = uint64(meshVertices.len * sizeof(float32))
+      indexSize = uint64(meshIndices.len * sizeof(uint32))
+    var vertexDescriptor = WgpuBufferDescriptor(label: emptyLabel,
+      usage: BufferUsageCopyDst or BufferUsageVertex, size: vertexSize)
+    var indexDescriptor = WgpuBufferDescriptor(label: emptyLabel,
+      usage: BufferUsageCopyDst or BufferUsageIndex, size: indexSize)
+    let vertexBuffer = createBuffer(runtime.device, addr vertexDescriptor)
+    if vertexBuffer == nil:
+      raise newException(LibraryError, "wgpu-native did not create a vertex buffer")
+    defer: releaseBuffer(vertexBuffer)
+    let indexBuffer = createBuffer(runtime.device, addr indexDescriptor)
+    if indexBuffer == nil:
+      raise newException(LibraryError, "wgpu-native did not create an index buffer")
+    defer: releaseBuffer(indexBuffer)
+    writeBuffer(runtime.queue, vertexBuffer, 0,
+      unsafeAddr meshVertices[0], csize_t(vertexSize))
+    writeBuffer(runtime.queue, indexBuffer, 0,
+      unsafeAddr meshIndices[0], csize_t(indexSize))
+    setPipeline(renderPass, pipeline)
+    setVertexBuffer(renderPass, 0, vertexBuffer, 0, vertexSize)
+    setIndexBuffer(renderPass, indexBuffer, IndexFormatUint32, 0, indexSize)
+    drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
   endPass(renderPass)
   releasePass(renderPass)
   let unpaddedRow = uint64(width) * 4'u64
@@ -395,3 +602,14 @@ proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
   for row in 0 ..< int(height):
     copyMem(addr result[row * int(unpaddedRow)],
       unsafeAddr sourceBytes[row * int(paddedRow)], int(unpaddedRow))
+
+proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
+                        red, green, blue, alpha: float64): seq[byte] =
+  runtime.renderPixels(width, height, red, green, blue, alpha, [], [])
+
+proc renderMeshPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
+                       red, green, blue, alpha: float64;
+                       vertices: openArray[float32];
+                       indices: openArray[uint32]): seq[byte] =
+  runtime.renderPixels(width, height, red, green, blue, alpha,
+    vertices, indices)
