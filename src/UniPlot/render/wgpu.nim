@@ -3,6 +3,7 @@
 ## Optional WGPU backend. Importing it does not load wgpu-native; opening a
 ## backend dynamically loads the caller-selected native library.
 import contracts
+import UniColor
 import UniPlot/[common, scene]
 import UniPlot/render/wgpu_native
 
@@ -81,3 +82,28 @@ proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
     result.available = true
     result.storageBuffers = true
     result.timestampQueries = backend.runtime.supportsTimestampQueries()
+
+proc clearWgpuTarget*(backend: WgpuBackend; size: Size;
+    color: Color) {.contractual.} =
+  ## Submit a real offscreen render pass that clears an RGBA8 texture.
+  require:
+    not backend.isNil and backend.state == wbsReady
+    size.width > 0 and size.height > 0
+    uint64(size.width) <= uint64(high(uint32))
+    uint64(size.height) <= uint64(high(uint32))
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    size.validate()
+    if uint64(size.width) > uint64(high(uint32)) or
+        uint64(size.height) > uint64(high(uint32)):
+      raise newException(WgpuError, "WGPU target dimensions exceed uint32")
+    let converted = color.to(tagSRGB)
+    if converted.isErr:
+      raise newException(WgpuError, "cannot convert WGPU clear color to sRGB")
+    let rgba = converted.get
+    try:
+      backend.runtime.submitClear(uint32(size.width), uint32(size.height),
+        rgba.comp(0), rgba.comp(1), rgba.comp(2), rgba.alpha)
+    except LibraryError as error:
+      raise newException(WgpuError, error.msg)

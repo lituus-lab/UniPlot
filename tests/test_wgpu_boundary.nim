@@ -25,7 +25,7 @@ suite "WGPU boundary":
       expect PreConditionDefect:
         discard openWgpuBackend("")
 
-  test "a configured native runtime creates a device and queue":
+  test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
     if libraryPath.len == 0:
       skip()
@@ -34,5 +34,7 @@ suite "WGPU boundary":
       check backend.state == wbsReady
       check wgpuCapabilities(backend).available
       check wgpuCapabilities(backend).storageBuffers
+      backend.clearWgpuTarget(Size(width: 17, height: 9),
+        parseColor("#204060").get)
       backend.close()
       check backend.state == wbsUnavailable
