@@ -19,6 +19,20 @@ suite "statistics":
     expect PlotError: discard histogram([1.0], 0)
     check histogram([NaN, Inf], 3).len == 0
 
+  test "explicit histogram breaks define half-open bins and a closed end":
+    let bins = histogramBreaks(
+      [-1.0, 0.0, 0.5, 1.0, 2.0, 3.0, NaN], [0.0, 1.0, 2.0])
+    check bins == @[
+      HistogramBin(lower: 0.0, upper: 1.0, count: 2),
+      HistogramBin(lower: 1.0, upper: 2.0, count: 2)]
+    check histogramBreaks([], [0.0, 1.0]).len == 1
+    expect PlotError: discard histogramBreaks([1.0], [0.0, 0.0])
+    expect PlotError: discard histogramBreaks([1.0], [0.0, Inf])
+    when defined(release):
+      expect PlotError: discard histogramBreaks([1.0], [0.0])
+    else:
+      expect PreConditionDefect: discard histogramBreaks([1.0], [0.0])
+
   test "quantiles use type-seven interpolation and ignore non-finite values":
     let values = [4.0, 1.0, NaN, 3.0, 2.0, Inf]
     check quantile(values, 0.0) == 1.0

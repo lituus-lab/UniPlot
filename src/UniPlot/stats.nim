@@ -194,3 +194,40 @@ proc histogram*(values: openArray[float64]; binCount = 30): seq[HistogramBin] {.
     for value in finite:
       let index = min(binCount - 1, int(floor((value - lo) / step)))
       inc result[index].count
+
+proc histogramBreaks*(values, breaks: openArray[float64]):
+    seq[HistogramBin] {.contractual.} =
+  ## Count finite in-domain samples using caller-supplied ordered boundaries.
+  require:
+    breaks.len >= 2
+  ensure:
+    result.len == breaks.len - 1
+  body:
+    if breaks.len < 2:
+      raise newException(PlotError,
+        "explicit histogram breaks require at least two boundaries")
+    for index, boundary in breaks:
+      if not boundary.isFinite or
+          (index > 0 and boundary <= breaks[index - 1]):
+        raise newException(PlotError,
+          "explicit histogram breaks must be finite and strictly increasing")
+    result = newSeq[HistogramBin](breaks.len - 1)
+    for index in 0 ..< result.len:
+      result[index] = HistogramBin(lower: breaks[index],
+        upper: breaks[index + 1])
+    for value in values:
+      if not value.isFinite or value < breaks[0] or value > breaks[^1]:
+        continue
+      if value == breaks[^1]:
+        inc result[^1].count
+        continue
+      var
+        lower = 0
+        upper = breaks.high
+      while lower < upper:
+        let middle = lower + (upper - lower) div 2
+        if value < breaks[middle]:
+          upper = middle
+        else:
+          lower = middle + 1
+      inc result[lower - 1].count
