@@ -65,6 +65,16 @@ proc train*(domain: ContinuousDomain; rangeMin,
     if domain.kind == skLog10: lo = max(lo, domain.minimum * 0.5)
   continuousScale(lo, hi, rangeMin, rangeMax, domain.kind)
 
+proc train*(domain: ContinuousDomain; rangeMin, rangeMax: float32;
+    domainMin, domainMax: float64): ContinuousScale =
+  ## Train against an explicit domain that contains every accumulated value.
+  if not domain.hasValues:
+    raise newException(PlotError, "cannot train a scale from empty finite data")
+  if domain.minimum < domainMin or domain.maximum > domainMax:
+    raise newException(PlotError,
+      "explicit scale domain must contain every rendered value")
+  continuousScale(domainMin, domainMax, rangeMin, rangeMax, domain.kind)
+
 proc map*(scale: ContinuousScale; value: float64): float32 =
   if not value.isFinite or (scale.kind == skLog10 and value <= 0):
     raise newException(PlotError, "value is outside the scale domain")

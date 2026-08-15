@@ -346,9 +346,21 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     xRangeMax = if spec.xScaleSpec.reversed: area.xMin else: area.xMax
     yRangeMin = if spec.yScaleSpec.reversed: area.yMin else: area.yMax
     yRangeMax = if spec.yScaleSpec.reversed: area.yMax else: area.yMin
-  if xKind == ckNumeric: xScale = xDomain.train(xRangeMin, xRangeMax)
-  else: xBand = xBandDomain.train(xRangeMin, xRangeMax)
-  let yScale = yDomain.train(yRangeMin, yRangeMax)
+  if xKind == ckCategorical and spec.xScaleSpec.domain.configured:
+    raise newException(PlotError,
+      "numeric x limits cannot be applied to categorical coordinates")
+  if xKind == ckNumeric and spec.xScaleSpec.domain.configured:
+    xScale = xDomain.train(xRangeMin, xRangeMax,
+      spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
+  elif xKind == ckNumeric:
+    xScale = xDomain.train(xRangeMin, xRangeMax)
+  else:
+    xBand = xBandDomain.train(xRangeMin, xRangeMax)
+  let yScale = if spec.yScaleSpec.domain.configured:
+    yDomain.train(yRangeMin, yRangeMax, spec.yScaleSpec.domain.minimum,
+      spec.yScaleSpec.domain.maximum)
+  else:
+    yDomain.train(yRangeMin, yRangeMax)
   var nodeId = 1'u64
   if xKind == ckNumeric:
     for value in xScale.ticks():

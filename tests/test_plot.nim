@@ -53,6 +53,37 @@ suite "plot compilation":
     check abs((positions[0].x - positions[1].x) -
       (positions[1].x - positions[2].x)) < 0.01
 
+  test "explicit numeric limits are strict and safe":
+    var spec = sample()
+    spec.xLimits(-1.0, 4.0)
+    spec.yLimits(0.0, 5.0)
+    check spec.compileScene().nodes.len > 0
+    spec.scaleX(reversed = true)
+    check spec.xScaleSpec.domain.configured
+    expect PlotError:
+      var outside = sample()
+      outside.xLimits(0.5, 3.0)
+      discard outside.compileScene()
+    expect PlotError:
+      var categorical = barPlot(["a", "b"], [1.0, 2.0])
+      categorical.xLimits(0.0, 2.0)
+      discard categorical.compileScene()
+    expect PlotError:
+      var logarithmic = sample()
+      logarithmic.scaleX(skLog10)
+      logarithmic.xLimits(-1.0, 4.0)
+      discard logarithmic.compileScene()
+    spec.clearXLimits()
+    spec.clearYLimits()
+    check not spec.xScaleSpec.domain.configured
+    check not spec.yScaleSpec.domain.configured
+    when defined(release):
+      expect PlotError: spec.xLimits(1.0, 1.0)
+      expect PlotError: spec.yLimits(NaN, 1.0)
+    else:
+      expect PreConditionDefect: spec.xLimits(1.0, 1.0)
+      expect PreConditionDefect: spec.yLimits(NaN, 1.0)
+
   test "incompatible transformed coordinates fail explicitly":
     var categorical = barPlot(["a", "b"], [1.0, 2.0])
     categorical.scaleX(skLog10)

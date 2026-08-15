@@ -42,9 +42,14 @@ type
   AestheticRange* = object
     minimum*, maximum*: float32
 
+  AxisDomainSpec* = object
+    configured*: bool
+    minimum*, maximum*: float64
+
   AxisScaleSpec* = object
     kind*: ScaleKind
     reversed*: bool
+    domain*: AxisDomainSpec
 
   ReferenceKind* = enum
     rkXLine
@@ -284,11 +289,45 @@ proc alphaRange*(spec: var PlotSpec; minimum,
 proc scaleX*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric x transform and the direction of numeric or
   ## categorical x coordinates.
-  spec.xScaleSpec = AxisScaleSpec(kind: kind, reversed: reversed)
+  spec.xScaleSpec.kind = kind
+  spec.xScaleSpec.reversed = reversed
 
 proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric y transform and coordinate direction.
-  spec.yScaleSpec = AxisScaleSpec(kind: kind, reversed: reversed)
+  spec.yScaleSpec.kind = kind
+  spec.yScaleSpec.reversed = reversed
+
+proc xLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
+  ## Fix the numeric x domain. The limits must contain every rendered value.
+  require:
+    minimum.isFinite and maximum.isFinite
+    minimum < maximum
+  body:
+    if not minimum.isFinite or not maximum.isFinite or minimum >= maximum:
+      raise newException(PlotError,
+        "x limits must be finite and strictly increasing")
+    spec.xScaleSpec.domain = AxisDomainSpec(configured: true,
+      minimum: minimum, maximum: maximum)
+
+proc yLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
+  ## Fix the numeric y domain. The limits must contain every rendered value.
+  require:
+    minimum.isFinite and maximum.isFinite
+    minimum < maximum
+  body:
+    if not minimum.isFinite or not maximum.isFinite or minimum >= maximum:
+      raise newException(PlotError,
+        "y limits must be finite and strictly increasing")
+    spec.yScaleSpec.domain = AxisDomainSpec(configured: true,
+      minimum: minimum, maximum: maximum)
+
+proc clearXLimits*(spec: var PlotSpec) =
+  ## Restore automatic x-domain training.
+  spec.xScaleSpec.domain = AxisDomainSpec()
+
+proc clearYLimits*(spec: var PlotSpec) =
+  ## Restore automatic y-domain training.
+  spec.yScaleSpec.domain = AxisDomainSpec()
 
 proc addReference(spec: var PlotSpec; kind: ReferenceKind; minimum,
     maximum: float64; color: string; width: float32; label: string) =

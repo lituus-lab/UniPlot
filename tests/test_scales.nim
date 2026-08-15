@@ -39,6 +39,17 @@ suite "scales":
     logDomain.addValues([-1.0, 10.0, 100.0])
     check logDomain.train(0, 1).domainMin == 10.0
 
+  test "explicit domains must contain accumulated values":
+    var domain = initContinuousDomain()
+    domain.addValues([2.0, 4.0, 6.0])
+    let scale = domain.train(0, 100, 0.0, 10.0)
+    check scale.domainMin == 0.0
+    check scale.domainMax == 10.0
+    expect PlotError: discard domain.train(0, 100, 3.0, 10.0)
+    expect PlotError: discard domain.train(0, 100, 0.0, 5.0)
+    expect PlotError: discard domain.train(0, 100, 10.0, 0.0)
+    expect PlotError: discard domain.train(0, 100, NaN, 10.0)
+
   test "band domains retain unique categories across batches":
     var domain = initBandDomain()
     domain.addValues(["b", "a"])
