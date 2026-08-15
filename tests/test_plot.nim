@@ -84,6 +84,26 @@ suite "plot compilation":
       expect PreConditionDefect: spec.xLimits(1.0, 1.0)
       expect PreConditionDefect: spec.yLimits(NaN, 1.0)
 
+  test "explicit categorical x domains are strict and ordered":
+    var spec = barPlot(["b", "a"], [2.0, 1.0])
+    spec.xCategories(["c", "a", "b"])
+    check spec.compileScene().nodes.len > 0
+    spec.xLimits(0.0, 1.0)
+    check not spec.xScaleSpec.categories.configured
+    spec.xCategories(["a", "b"])
+    check not spec.xScaleSpec.domain.configured
+    expect PlotError:
+      var missing = barPlot(["b", "a"], [2.0, 1.0])
+      missing.xCategories(["a"])
+      discard missing.compileScene()
+    expect PlotError:
+      var numeric = sample()
+      numeric.xCategories(["a", "b"])
+      discard numeric.compileScene()
+    expect PlotError: spec.xCategories(["a", "a"])
+    spec.clearXCategories()
+    check not spec.xScaleSpec.categories.configured
+
   test "incompatible transformed coordinates fail explicitly":
     var categorical = barPlot(["a", "b"], [1.0, 2.0])
     categorical.scaleX(skLog10)

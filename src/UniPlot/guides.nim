@@ -375,13 +375,20 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if xKind == ckCategorical and spec.xScaleSpec.domain.configured:
     raise newException(PlotError,
       "numeric x limits cannot be applied to categorical coordinates")
+  if xKind == ckNumeric and spec.xScaleSpec.categories.configured:
+    raise newException(PlotError,
+      "categorical x domain cannot be applied to numeric coordinates")
   if xKind == ckNumeric and spec.xScaleSpec.domain.configured:
     xScale = domains.xContinuous.train(xRangeMin, xRangeMax,
       spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
   elif xKind == ckNumeric:
     xScale = domains.xContinuous.train(xRangeMin, xRangeMax)
   else:
-    xBand = domains.xBand.train(xRangeMin, xRangeMax)
+    xBand = if spec.xScaleSpec.categories.configured:
+      domains.xBand.train(xRangeMin, xRangeMax,
+        spec.xScaleSpec.categories.values)
+    else:
+      domains.xBand.train(xRangeMin, xRangeMax)
   let yScale = if spec.yScaleSpec.domain.configured:
     domains.yContinuous.train(yRangeMin, yRangeMax,
         spec.yScaleSpec.domain.minimum,

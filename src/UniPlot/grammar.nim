@@ -46,10 +46,15 @@ type
     configured*: bool
     minimum*, maximum*: float64
 
+  AxisCategoryDomainSpec* = object
+    configured*: bool
+    values*: seq[string]
+
   AxisScaleSpec* = object
     kind*: ScaleKind
     reversed*: bool
     domain*: AxisDomainSpec
+    categories*: AxisCategoryDomainSpec
 
   ReferenceKind* = enum
     rkXLine
@@ -308,6 +313,25 @@ proc xLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
         "x limits must be finite and strictly increasing")
     spec.xScaleSpec.domain = AxisDomainSpec(configured: true,
       minimum: minimum, maximum: maximum)
+    spec.xScaleSpec.categories = AxisCategoryDomainSpec()
+
+proc xCategories*(spec: var PlotSpec; values: openArray[string]) {.
+    contractual.} =
+  ## Fix categorical x order while retaining categories absent from the data.
+  require:
+    values.len > 0
+  body:
+    if values.len == 0:
+      raise newException(PlotError, "x category domain cannot be empty")
+    var copied = newSeqOfCap[string](values.len)
+    for value in values:
+      if value in copied:
+        raise newException(PlotError,
+          "x category domain cannot contain duplicates")
+      copied.add value
+    spec.xScaleSpec.categories = AxisCategoryDomainSpec(configured: true,
+      values: copied)
+    spec.xScaleSpec.domain = AxisDomainSpec()
 
 proc yLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
   ## Fix the numeric y domain. The limits must contain every rendered value.
@@ -324,6 +348,10 @@ proc yLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
 proc clearXLimits*(spec: var PlotSpec) =
   ## Restore automatic x-domain training.
   spec.xScaleSpec.domain = AxisDomainSpec()
+
+proc clearXCategories*(spec: var PlotSpec) =
+  ## Restore automatic categorical x-domain training.
+  spec.xScaleSpec.categories = AxisCategoryDomainSpec()
 
 proc clearYLimits*(spec: var PlotSpec) =
   ## Restore automatic y-domain training.

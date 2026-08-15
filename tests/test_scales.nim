@@ -59,6 +59,15 @@ suite "scales":
     check scale.domain == @["b", "a", "c"]
     check scale.map("b") < scale.map("c")
 
+  test "explicit band domains preserve order and contain observed values":
+    var domain = initBandDomain()
+    domain.addValues(["b", "a"])
+    check domain.train(0, 100, ["c", "a", "b"]).domain ==
+      @["c", "a", "b"]
+    expect PlotError: discard domain.train(0, 100, ["a"])
+    expect PlotError: discard domain.train(0, 100, ["a", "a", "b"])
+    expect PlotError: discard domain.train(0, 100, newSeq[string]())
+
   test "invalid domains, ranges, values and tick counts are rejected":
     expect PlotError: discard continuousScale(1, 1, 0, 1)
     expect PlotError: discard continuousScale(NaN, 1, 0, 1)

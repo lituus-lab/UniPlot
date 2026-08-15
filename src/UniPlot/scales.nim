@@ -126,6 +126,10 @@ proc addValues*(domain: var BandDomain; values: openArray[string]) =
       domain.seen[value] = true
       domain.values.add value
 
+proc merge*(domain: var BandDomain; other: BandDomain) =
+  ## Merge categories while preserving first appearance across both domains.
+  domain.addValues(other.values)
+
 proc train*(domain: BandDomain; rangeMin, rangeMax: float32;
     padding = 0.1'f32): BandScale =
   if not rangeMin.isFinite or not rangeMax.isFinite or rangeMin == rangeMax:
@@ -145,6 +149,23 @@ proc train*(domain: BandDomain; rangeMin, rangeMax: float32;
   result.bandwidth = abs(step) * (1 - padding)
   for index, value in result.domain:
     result.positions[value] = rangeMin + (float32(index) + 0.5) * step
+
+proc train*(domain: BandDomain; rangeMin, rangeMax: float32;
+    categories: openArray[string]; padding = 0.1'f32): BandScale =
+  ## Train in an explicit category order containing every accumulated value.
+  if categories.len == 0:
+    raise newException(PlotError, "explicit category domain cannot be empty")
+  var explicit = initBandDomain()
+  for category in categories:
+    if category in explicit.seen:
+      raise newException(PlotError,
+        "explicit category domain cannot contain duplicates")
+    explicit.addValues([category])
+  for category in domain.values:
+    if category notin explicit.seen:
+      raise newException(PlotError,
+        "explicit category domain must contain every rendered value")
+  explicit.train(rangeMin, rangeMax, padding)
 
 proc trainBand*(values: openArray[string]; rangeMin, rangeMax: float32;
     padding = 0.1'f32): BandScale =
