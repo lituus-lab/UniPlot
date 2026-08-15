@@ -16,6 +16,10 @@ cdef extern from "UniPlot.h":
                        const char *, float)
     int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                          const char *, float)
+    int uplot_add_line_styled(uplot_plot *, const double *, const double *,
+                              size_t, const char *, float, int)
+    int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
+                                size_t, const char *, float, int)
     int uplot_set_title(uplot_plot *, const char *)
     int uplot_render_png(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_svg(uplot_plot *, const char *, uint8_t **, size_t *)
@@ -23,6 +27,18 @@ cdef extern from "UniPlot.h":
     void uplot_plot_free(uplot_plot *)
 
 uplot_init()
+
+LINE_SOLID = 0
+LINE_DASHED = 1
+LINE_DOTTED = 2
+LINE_DOT_DASH = 3
+LINE_LONG_DASH = 4
+MARKER_CIRCLE = 0
+MARKER_SQUARE = 1
+MARKER_TRIANGLE = 2
+MARKER_DIAMOND = 3
+MARKER_PLUS = 4
+MARKER_CROSS = 5
 
 cdef class Plot:
     cdef uplot_plot *_handle
@@ -36,7 +52,7 @@ cdef class Plot:
         if self._handle != NULL:
             uplot_plot_free(self._handle)
 
-    cdef _series(self, x, y, color, float size, bint points):
+    cdef _series(self, x, y, color, float size, bint points, int style):
         if len(x) != len(y) or len(x) == 0:
             raise ValueError("x and y must have equal non-zero lengths")
         cdef size_t n = len(x)
@@ -52,19 +68,23 @@ cdef class Plot:
             for i in range(n):
                 xs[i] = float(x[i]); ys[i] = float(y[i])
             if points:
-                status = uplot_add_points(self._handle, xs, ys, n, encoded, size)
+                status = uplot_add_points_shaped(
+                    self._handle, xs, ys, n, encoded, size, style)
             else:
-                status = uplot_add_line(self._handle, xs, ys, n, encoded, size)
+                status = uplot_add_line_styled(
+                    self._handle, xs, ys, n, encoded, size, style)
         finally:
             free(xs); free(ys)
         if status != 0: raise ValueError("invalid series")
         return self
 
-    def line(self, x, y, color="#3366cc", width=2.0):
-        return self._series(x, y, color, width, False)
+    def line(self, x, y, color="#3366cc", width=2.0,
+             style=LINE_SOLID):
+        return self._series(x, y, color, width, False, style)
 
-    def scatter(self, x, y, color="#3366cc", radius=4.0):
-        return self._series(x, y, color, radius, True)
+    def scatter(self, x, y, color="#3366cc", radius=4.0,
+                shape=MARKER_CIRCLE):
+        return self._series(x, y, color, radius, True, shape)
 
     def title(self, value):
         cdef bytes encoded = str(value).encode("utf-8")

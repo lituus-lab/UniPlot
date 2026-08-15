@@ -20,3 +20,12 @@ def test_series_shape_is_checked():
     with pytest.raises(ValueError):
         uniplot.Plot().line([1], [1, 2])
 
+def test_line_styles_and_marker_shapes_are_exposed():
+    plot = uniplot.Plot().line(
+        [0, 1, 2], [1, 2, 1], style=uniplot.LINE_DOT_DASH).scatter(
+            [0, 1], [1, 2], shape=uniplot.MARKER_DIAMOND)
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        uniplot.Plot().line([0, 1], [1, 2], style=999)
+    with pytest.raises(ValueError):
+        uniplot.Plot().scatter([0, 1], [1, 2], shape=999)
