@@ -244,6 +244,39 @@ proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
+    xBreakCount: csize_t; yBreaks: ptr float64; yBreakCount: csize_t;
+    values: ptr float64; valueCount: csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or xBreaks.isNil or yBreaks.isNil or values.isNil or
+      xBreakCount < 2 or yBreakCount < 2 or valueCount == 0 or
+      xBreakCount > csize_t(high(int)) or
+      yBreakCount > csize_t(high(int)) or valueCount > csize_t(high(int)):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputXBreaks = cast[ptr UncheckedArray[float64]](xBreaks)
+      inputYBreaks = cast[ptr UncheckedArray[float64]](yBreaks)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+    var
+      copiedXBreaks = newSeqOfCap[float64](int(xBreakCount))
+      copiedYBreaks = newSeqOfCap[float64](int(yBreakCount))
+      copiedValues = newSeqOfCap[float64](int(valueCount))
+    for index in 0 ..< int(xBreakCount):
+      copiedXBreaks.add inputXBreaks[index]
+    for index in 0 ..< int(yBreakCount):
+      copiedYBreaks.add inputYBreaks[index]
+    for index in 0 ..< int(valueCount):
+      copiedValues.add inputValues[index]
+    h.spec = numericHeatmapPlot(copiedXBreaks, copiedYBreaks, copiedValues)
+    h.nextColumn = 0
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_categorical_column*(value: pointer; name: cstring;
     values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
   if value.isNil or name.isNil or values.isNil or count == 0 or

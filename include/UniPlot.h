@@ -68,6 +68,10 @@ int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
 int uplot_add_heatmap(uplot_plot *, const char *const *xs,
                       const char *const *ys, const double *values,
                       size_t count, int aggregation);
+int uplot_add_numeric_heatmap(uplot_plot *, const double *x_breaks,
+                              size_t x_break_count, const double *y_breaks,
+                              size_t y_break_count, const double *values,
+                              size_t value_count);
 int uplot_add_categorical_column(uplot_plot *, const char *name,
                                  const char *const *values, size_t count);
 int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,
