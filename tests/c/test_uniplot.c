@@ -222,6 +222,25 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   uplot_plot_free(invalid_histogram);
 
+  uplot_plot *numeric_histogram = uplot_plot_new(320, 240);
+  assert(numeric_histogram != NULL);
+  assert(uplot_add_numeric_histogram(
+           numeric_histogram, histogram_values, 7, histogram_breaks, 3, 1,
+           "#267a5e") == UPLOT_OK);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(numeric_histogram, TEST_FONT, &svg, &svg_len) ==
+         UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(numeric_histogram);
+  uplot_plot *invalid_numeric_histogram = uplot_plot_new(320, 240);
+  assert(invalid_numeric_histogram != NULL);
+  assert(uplot_add_numeric_histogram(
+           invalid_numeric_histogram, histogram_values, 7, histogram_breaks,
+           3, 2, "#267a5e") == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(invalid_numeric_histogram);
+
   uplot_plot *grouped = uplot_plot_new(320, 240);
   assert(grouped != NULL);
   const char *aggregate_groups[] = {"beta", "alpha", "beta", "empty"};

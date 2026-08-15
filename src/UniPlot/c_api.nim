@@ -140,9 +140,9 @@ proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
-proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
+proc addHistogram(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
-    color: cstring): cint {.exportc, dynlib, cdecl.} =
+    color: cstring; numeric, density: bool): cint =
   if value.isNil or values.isNil or valueCount == 0 or breaks.isNil or
       breakCount < 2 or valueCount > csize_t(high(int)) or
       breakCount > csize_t(high(int)) or color.isNil:
@@ -161,11 +161,27 @@ proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
       copiedValues.add inputValues[index]
     for index in 0 ..< int(breakCount):
       copiedBreaks.add inputBreaks[index]
-    h.spec = histogramBreaksPlot(copiedValues, copiedBreaks, $color)
+    h.spec = if numeric:
+      histogramPlot(copiedValues, copiedBreaks, density, $color)
+    else:
+      histogramBreaksPlot(copiedValues, copiedBreaks, $color)
     h.nextColumn = 0
     UPLOT_OK
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
+
+proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
+    valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
+    color: cstring): cint {.exportc, dynlib, cdecl.} =
+  addHistogram(value, values, valueCount, breaks, breakCount, color,
+    numeric = false, density = false)
+
+proc uplot_add_numeric_histogram*(value: pointer; values: ptr float64;
+    valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
+    density: cint; color: cstring): cint {.exportc, dynlib, cdecl.} =
+  if density notin [cint(0), cint(1)]: return UPLOT_ERR_ARGUMENT
+  addHistogram(value, values, valueCount, breaks, breakCount, color,
+    numeric = true, density = density == 1)
 
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
