@@ -31,6 +31,38 @@ suite "plot compilation":
     let scene = spec.compileScene()
     check scene.nodes.len > 10
 
+  test "numeric rectangles use explicit ordered data bounds":
+    var frame = initDataFrame()
+    frame.addColumn("left", [0.0, 2.0, 4.0])
+    frame.addColumn("right", [1.0, 3.5, 5.0])
+    frame.addColumn("bottom", [0.0, 1.0, NaN])
+    frame.addColumn("top", [2.0, 1.0, 6.0])
+    frame.addColumn("intensity", [1.0, 2.0, 3.0])
+    var spec = plot(frame)
+    spec.geomRect(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top", fill = "intensity"))
+    let scene = spec.compileScene()
+    var rectangles = 0
+    var rectangleColors: seq[Color]
+    for node in scene.nodes:
+      if node.kind == snPath and node.id != 0:
+        inc rectangles
+        rectangleColors.add node.color
+    check rectangles == 2
+    check rectangleColors[0] != rectangleColors[1]
+
+    var inverted = frame
+    inverted.addColumn("badRight", [-1.0, 3.5, 5.0])
+    var invalid = plot(inverted)
+    invalid.geomRect(aes("", "", xMin = "left", xMax = "badRight",
+      yMin = "bottom", yMax = "top"))
+    expect PlotError: discard invalid.compileScene()
+
+    var rejected = plot(frame)
+    rejected.geomRect(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top"), missingValues = RejectMissing)
+    expect PlotError: discard rejected.compileScene()
+
   test "numeric axes support logarithmic transforms and reversal":
     var frame = initDataFrame()
     frame.addColumn("x", [1.0, 10.0, 100.0])

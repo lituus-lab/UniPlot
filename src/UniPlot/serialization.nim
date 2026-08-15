@@ -116,6 +116,9 @@ proc aesNode(value: Aes): JsonNode =
   if value.yQ1.len > 0 or value.yQ3.len > 0:
     result["yQ1"] = %value.yQ1
     result["yQ3"] = %value.yQ3
+  if value.xMin.len > 0 or value.xMax.len > 0:
+    result["xMin"] = %value.xMin
+    result["xMax"] = %value.xMax
 
 proc decodeAes(node: JsonNode): Aes =
   for name in ["x", "y", "yMin", "yMax", "label", "color", "fill",
@@ -130,6 +133,9 @@ proc decodeAes(node: JsonNode): Aes =
   if node.hasKey("yQ1") or node.hasKey("yQ3"):
     result.yQ1 = node.field("yQ1", JString).getStr
     result.yQ3 = node.field("yQ3", JString).getStr
+  if node.hasKey("xMin") or node.hasKey("xMax"):
+    result.xMin = node.field("xMin", JString).getStr
+    result.xMax = node.field("xMax", JString).getStr
 
 proc dataNode(frame: DataFrame): JsonNode =
   var columns = newJArray()

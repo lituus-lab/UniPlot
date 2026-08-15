@@ -30,6 +30,21 @@ proc completeSpec(): PlotSpec =
   result.applyTheme(darkTheme())
 
 suite "PlotSpec JSON schema":
+  test "numeric rectangle bounds round trip as optional mappings":
+    var frame = initDataFrame()
+    frame.addColumn("left", [0.0])
+    frame.addColumn("right", [2.0])
+    frame.addColumn("bottom", [1.0])
+    frame.addColumn("top", [3.0])
+    var spec = plot(frame)
+    spec.geomRect(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top"))
+    let restored = fromJson(spec.toJson)
+    check restored.toJson == spec.toJson
+    check restored.layers[0].mark == mkRect
+    check restored.layers[0].mapping.xMin == "left"
+    check restored.layers[0].mapping.xMax == "right"
+
   test "complete public semantics round trip deterministically":
     let encoded = completeSpec().toJson
     let decoded = fromJson(encoded)

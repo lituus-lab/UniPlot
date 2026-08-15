@@ -20,6 +20,7 @@ type
     mkRibbon
     mkBoxPlot
     mkTile
+    mkRect
 
   LineStyle* = enum
     SolidLine
@@ -90,6 +91,7 @@ type
 
   Aes* = object
     x*, y*: string
+    xMin*, xMax*: string
     yMin*, yMax*: string
     yQ1*, yQ3*: string
     label*: string
@@ -201,19 +203,23 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
-    shape = ""; lineStyle = ""; fill = ""; yMin = ""; yMax = "";
-    yQ1 = ""; yQ3 = ""): Aes =
+    shape = ""; lineStyle = ""; fill = ""; xMin = ""; xMax = "";
+    yMin = ""; yMax = ""; yQ1 = ""; yQ3 = ""): Aes =
   Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
-    alpha: alpha, shape: shape, lineStyle: lineStyle, yMin: yMin, yMax: yMax,
-    yQ1: yQ1, yQ3: yQ3)
+    alpha: alpha, shape: shape, lineStyle: lineStyle, xMin: xMin, xMax: xMax,
+    yMin: yMin, yMax: yMax, yQ1: yQ1, yQ3: yQ3)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
     shape = CircleMarker; lineStyle = SolidLine;
     missingValues = DropMissing) =
-  if mapping.x.len == 0 or
-      (mark notin {mkErrorBar, mkRibbon} and mapping.y.len == 0):
+  if (mark != mkRect and mapping.x.len == 0) or
+      (mark notin {mkErrorBar, mkRibbon, mkRect} and mapping.y.len == 0):
     raise newException(PlotError, "required position mappings are missing")
+  if mark == mkRect and (mapping.xMin.len == 0 or mapping.xMax.len == 0 or
+      mapping.yMin.len == 0 or mapping.yMax.len == 0):
+    raise newException(PlotError,
+      "rectangles require xMin, xMax, yMin and yMax mappings")
   if mark in {mkErrorBar, mkRibbon} and
       (mapping.yMin.len == 0 or mapping.yMax.len == 0):
     raise newException(PlotError,
@@ -241,6 +247,11 @@ proc geomPoint*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
 proc geomBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
     legend = ""; missingValues = DropMissing) =
   spec.addLayer(mkBar, mapping, color, legend = legend,
+    missingValues = missingValues)
+proc geomRect*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
+    legend = ""; missingValues = DropMissing) =
+  ## Add numeric rectangles with increasing x and nondecreasing y bounds.
+  spec.addLayer(mkRect, mapping, color, legend = legend,
     missingValues = missingValues)
 proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
     legend = ""; missingValues = BreakOnMissing) =
