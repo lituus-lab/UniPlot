@@ -49,7 +49,7 @@ scene without weakening its deterministic CPU semantics.
   submission, and readback publication throughput.
 - [ ] Establish regression thresholds from repeated same-machine runs; never
   encode cross-machine marketing claims.
-- [ ] Exercise Linux Vulkan and Windows DX12 in CI in addition to Metal.
+- [x] Exercise Linux Vulkan and Windows DX12 in CI in addition to Metal.
 
 ## Functional parity after 1.0
 
