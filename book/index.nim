@@ -1,78 +1,128 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
+import std/[base64, strutils]
 import nimib
 
+proc pngDataUri(data: openArray[byte]): string =
+  "data:image/png;base64," & base64.encode(data)
+
+proc svgFigure(svg, caption: string): string =
+  "<figure class=\"uniplot-demo\">" & svg &
+    "<figcaption>" & caption & "</figcaption></figure>"
+
+proc pngFigure(uri, caption, alt: string): string =
+  "<figure class=\"uniplot-demo\"><img src=\"" & uri & "\" alt=\"" & alt &
+    "\"><figcaption>" & caption & "</figcaption></figure>"
+
 nbInit
-nb.title = "UniPlot 1.0"
+nb.title = "UniPlot 1.0 — executable gallery"
+
+nbRawHtml: """
+<style>
+  .uniplot-intro { font-size: 1.08rem; max-width: 70ch; }
+  .uniplot-demo { margin: 1.5rem 0 2.5rem; }
+  .uniplot-demo svg, .uniplot-demo img {
+    display: block; width: 100%; height: auto; border: 1px solid #d9dde3;
+    border-radius: .5rem; background: #fff;
+  }
+  .uniplot-demo figcaption { margin-top: .6rem; color: #5f6368; }
+</style>
+"""
 
 nbText: """
 # UniPlot 1.0
 
-UniPlot compiles typed data and a plotting grammar into a retained scene. The
-same scene feeds vector and raster backends, so layout, guides and layer order
-do not drift between export formats.
+<span class="uniplot-intro">This gallery is an executable Nim program. Every
+figure below is compiled from the displayed UniPlot code when `nimble book`
+runs. The final HTML embeds every image: SVG is inline and PNG uses a Base64
+`data:` URL, so no plot asset has to be copied or hosted separately.</span>
 
-## Data and grammar
+## Layered grammar — line and points
 """
 
 nbCode:
   import UniPlot
-
-  var frame = initDataFrame()
-  frame.addColumn("time", [0.0, 1.0, 2.0, 3.0])
-  frame.addColumn("value", [1.0, 3.0, 2.0, 4.0])
-
-  var figure = plot(frame)
-  figure.geomLine(aes("time", "value"), color = "#3366cc")
-  figure.geomPoint(aes("time", "value"), color = "#cc3344")
-  figure.labels(title = "Measured value", x = "time", y = "value")
-
-  let scene = figure.compileScene(Size(width: 640, height: 400))
-  echo "version ", UniPlotVersion
-  echo "layers ", figure.layers.len
-  echo "scene nodes ", scene.nodes.len
-
-nbText: """
-Finite values train the shared scales. Grid lines, tick labels and data marks
-become ordered scene nodes. Each data mark receives a stable identifier that a
-future interactive backend can reuse for picking.
-
-## Statistics
-"""
-
-nbCode:
-  let bins = histogram([0.1, 0.2, 0.8, 1.0, 1.1, 1.8], 3)
-  var total = 0
-  for bin in bins: total += bin.count
-  echo "bins ", bins.len
-  echo "samples ", total
-
-nbText: """
-Statistics run in data space before scale transformation. Invalid bin counts
-and empty scale-training inputs are explicit errors.
-
-## Rendering
-
-Text is shaped and outlined by UniGlyph. Paths are filled by UniVector and PNG
-encoding belongs to UniImage. A caller supplies the font, making the result
-reproducible and avoiding platform font discovery.
-"""
-
-nbCode:
   import UniGlyph
+
   let font = loadTtf("tests/DejaVuSans.ttf")
-  let svg = scene.toSvg(font)
-  let png = scene.encodePng(font)
-  echo "svg prefix ", svg[0 .. 3]
-  echo "png signature ", png[0 .. 3]
+
+  var observations = initDataFrame()
+  observations.addColumn("time", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+  observations.addColumn("value", [1.0, 2.8, 2.1, 4.2, 3.7, 5.1])
+
+  var layered = plot(observations)
+  layered.geomLine(aes("time", "value"), color = "#3366cc")
+  layered.geomPoint(aes("time", "value"), color = "#cc3344", radius = 5)
+  layered.labels(title = "Measured value", x = "time", y = "value")
+
+  let layeredScene = layered.compileScene(Size(width: 720, height: 420))
+  let layeredSvg = layeredScene.toSvg(font)
+
+nbRawHtml svgFigure(layeredSvg,
+  "One retained scene, composed from line and point layers, rendered as inline SVG.")
 
 nbText: """
-## Backend boundary
+The typed data frame and plotting grammar compile to a retained scene. Stable
+mark identifiers survive in the SVG as `data-uplot-id` attributes and are ready
+for a future interactive backend.
 
-The core scene contains paths, text runs, colours and stable identifiers but no
-window, device, queue or shader handle. SVG and PNG are the 1.0 reference
-backends. WGPU consumes the same scene through an optional package and never
-becomes a dependency of the default import.
+## Statistics and raster output — histogram
+"""
+
+nbCode:
+  let measurements = [
+    0.2, 0.3, 0.4, 0.8, 1.0, 1.1, 1.2, 1.4,
+    1.7, 1.8, 2.0, 2.1, 2.4, 2.8, 3.0, 3.2
+  ]
+  var distribution = histogramPlot(measurements, binCount = 6,
+    color = "#5b8def")
+  distribution.labels(title = "Measurement distribution", x = "range",
+    y = "count")
+  let distributionScene = distribution.compileScene(
+    Size(width: 720, height: 420))
+  let distributionPng = distributionScene.encodePng(font)
+  let distributionUri = pngDataUri(distributionPng)
+
+nbRawHtml pngFigure(distributionUri,
+  "Histogram statistics and PNG rasterisation executed during the book build.",
+  "Histogram generated by UniPlot")
+
+nbText: """
+Histogram bins are computed in data space before scale training. The PNG bytes
+are produced through the same scene as SVG, then embedded directly in this file.
+
+## Categorical scales — bars
+"""
+
+nbCode:
+  var categories = barPlot(["Nim", "Python", "Julia", "R"],
+    [9.0, 7.0, 8.0, 6.0], color = "#2a9d8f")
+  categories.labels(title = "Backend parity target", x = "ecosystem",
+    y = "coverage")
+  let categoryScene = categories.compileScene(Size(width: 720, height: 420))
+  let categorySvg = categoryScene.toSvg(font)
+
+nbRawHtml svgFigure(categorySvg,
+  "Categorical band scales and a zero baseline, rendered as inline SVG.")
+
+nbText: """
+## Rendering architecture
+
+UniGlyph shapes and outlines text, UniVector supplies paths, and UniImage owns
+raster encoding. SVG and PNG are the deterministic reference backends. The
+optional WGPU boundary consumes the same retained scene without introducing a
+GPU dependency into the default `import UniPlot` path.
+
+This page itself is the demo environment: its snippets are compiled and run,
+its plots are regenerated from the current API, and its final output carries
+the resulting images with it.
 """
 
 nbSave
+
+let generatedHtml = readFile("book/index.html")
+doAssert generatedHtml.contains("<svg"), "book must contain inline SVG plots"
+doAssert generatedHtml.contains("data:image/png;base64,iVBORw0KGgo"),
+  "book must contain an embedded PNG plot"
+doAssert not generatedHtml.contains("src=\"book/"),
+  "book plot images must not depend on book-relative files"
