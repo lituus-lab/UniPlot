@@ -90,7 +90,8 @@ changes rather than introducing competing geometry or text implementations.
 ## Performance investigations
 
 - [ ] Remove repeated allocations in scale training and finite-row selection.
-- [ ] Cache compiled text layouts and prepared/tessellated paths by stable key.
+- [x] Expose reusable prepared scenes that retain shaped and tessellated paths.
+- [ ] Add bounded automatic prepared-scene caching by stable semantic key.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
 - [ ] Measure SIMD opportunities through UniMath/UniLinalg rather than local
   vector kernels.

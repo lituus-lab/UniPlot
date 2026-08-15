@@ -36,18 +36,24 @@ proc main() =
     scene = sampleSpec(pointCount).compileScene(size)
     backend = openWgpuBackend(libraryPath)
   defer: backend.close()
-  var submitTimes, frameTimes: RunningStat
+  var preparationTimes, submitTimes, frameTimes: RunningStat
+  var prepared: WgpuPreparedScene
+  for iteration in 0 ..< iterations + 3:
+    let started = getMonoTime()
+    prepared = scene.prepareWgpuScene(font)
+    let preparationMs = elapsedMs(started)
+    if iteration >= 3: preparationTimes.push(preparationMs)
   var consumed = 0'u8
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
-    backend.submitWgpuScene(scene, font)
+    backend.submitWgpuPrepared(prepared)
     let submitMs = elapsedMs(started)
     if iteration >= 3: submitTimes.push(submitMs)
   # The first publication frame drains the ordered submissions above.
-  discard backend.renderWgpuScene(scene, font)
+  discard backend.renderWgpuPrepared(prepared)
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
-    let pixels = backend.renderWgpuScene(scene, font)
+    let pixels = backend.renderWgpuPrepared(prepared)
     let frameMs = elapsedMs(started)
     consumed = consumed xor pixels[(iteration * 4) mod pixels.len]
     if iteration >= 3: frameTimes.push(frameMs)
@@ -59,9 +65,11 @@ proc main() =
     "points": pointCount,
     "canvas": "800x500",
     "semantics": {
-      "submit": "compile paths, tessellate, upload and enqueue without readback",
-      "publication_frame": "compile, tessellate, upload, submit and read back RGBA8"
+      "preparation": "shape UniGlyph text and tessellate UniVector paths",
+      "submit": "upload retained geometry and enqueue without readback",
+      "publication_frame": "upload retained geometry, submit and read back RGBA8"
     },
+    "preparation": summary(preparationTimes),
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
     "guard": consumed

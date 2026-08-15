@@ -46,7 +46,8 @@ nimble wgpuDeps
 nimble wgpuBenchmark
 ```
 
-It reports both enqueue-only frames and publication frames. Both still compile
-paths, tessellate through UniVector and upload buffers; publication additionally
-reads the 800×500 RGBA8 texture back. Enqueue timing is CPU-side submission
-latency, not guaranteed GPU completion or a universal frame-rate claim.
+It reports preparation, enqueue-only frames and publication frames separately.
+Preparation shapes UniGlyph text and tessellates UniVector paths. Warm frames
+reuse that geometry; publication additionally reads the 800×500 RGBA8 texture
+back. Enqueue timing is CPU-side submission latency, not guaranteed GPU
+completion or a universal frame-rate claim.
