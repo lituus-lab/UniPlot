@@ -7,12 +7,13 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 10:
         raise SystemExit(
             "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
-            "HEAT.svg HEAT.png")
+            "HEAT.svg HEAT.png HIST.svg HIST.png")
     (font, svg_path, png_path, box_svg_path, box_png_path,
-     heat_svg_path, heat_png_path) = map(
+     heat_svg_path, heat_png_path, histogram_svg_path,
+     histogram_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -55,6 +56,13 @@ def main() -> int:
                .title("Python categorical heatmap"))
     heat_svg_path.write_bytes(heatmap.svg(font))
     heat_png_path.write_bytes(heatmap.png(font))
+    histogram = (uniplot.Plot(760, 440)
+                 .histogram(
+                     [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0],
+                     [0.0, 0.5, 1.0, 2.0], color="#267a5e")
+                 .title("Python explicit histogram breaks"))
+    histogram_svg_path.write_bytes(histogram.svg(font))
+    histogram_png_path.write_bytes(histogram.png(font))
     return 0
 
 

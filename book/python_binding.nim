@@ -84,6 +84,9 @@ copying it.
 - `heatmap(x, y, values, aggregation=AGG_MEAN)` builds a complete categorical
   matrix on an empty `Plot`. `AGG_COUNT`, `AGG_SUM`, `AGG_MEAN`,
   `AGG_MINIMUM` and `AGG_MAXIMUM` expose the native aggregation choices.
+- `histogram(values, breaks, color="#3366cc")` builds explicit lower-inclusive
+  bins on an empty `Plot`; the last supplied boundary is included. Interval
+  labels retain the boundaries while categorical bars use equal screen widths.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
@@ -131,6 +134,9 @@ let
   pythonBoxPng = pngDataUri(readFile("../assets/generated/python_boxplot.png"))
   pythonHeatSvg = readFile("../assets/generated/python_heatmap.svg")
   pythonHeatPng = pngDataUri(readFile("../assets/generated/python_heatmap.png"))
+  pythonHistogramSvg = readFile("../assets/generated/python_histogram.svg")
+  pythonHistogramPng = pngDataUri(
+    readFile("../assets/generated/python_histogram.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
@@ -140,8 +146,13 @@ nbRawHtml gallery([
     "A grouped boxplot rendered through the UniPlot Python binding"),
   svgFigure(pythonHeatSvg, "A categorical heatmap built through `Plot.heatmap`."),
   pngFigure(pythonHeatPng, "The same Python heatmap as an embedded PNG.",
-    "A categorical heatmap rendered through the UniPlot Python binding")
+    "A categorical heatmap rendered through the UniPlot Python binding"),
+  svgFigure(pythonHistogramSvg,
+    "An explicit-break histogram built through `Plot.histogram`."),
+  pngFigure(pythonHistogramPng,
+    "The same Python histogram as an embedded PNG.",
+    "An explicit-break histogram rendered through the Python binding")
 ])
 
 nbSave
-validatePage("python_binding.html", minSvg = 3, requirePng = true)
+validatePage("python_binding.html", minSvg = 4, requirePng = true)

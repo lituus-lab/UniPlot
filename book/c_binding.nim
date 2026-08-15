@@ -120,6 +120,10 @@ int main(void) {
   `UPLOT_AGG_COUNT`, `SUM`, `MEAN`, `MINIMUM` or `MAXIMUM`. It also requires an
   otherwise empty handle. First-seen axis order and missing Cartesian cells
   follow the Nim `aggregate2D` contract.
+- `uplot_add_histogram_breaks` copies samples and finite, strictly increasing
+  boundaries into a categorical histogram on an empty handle. Values outside
+  the supplied domain are excluded and the final boundary is included. Bars
+  have equal screen width even when numeric intervals differ.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
@@ -146,6 +150,8 @@ let
   cBoxPng = pngDataUri(readFile("../assets/generated/c_boxplot.png"))
   cHeatSvg = readFile("../assets/generated/c_heatmap.svg")
   cHeatPng = pngDataUri(readFile("../assets/generated/c_heatmap.png"))
+  cHistogramSvg = readFile("../assets/generated/c_histogram.svg")
+  cHistogramPng = pngDataUri(readFile("../assets/generated/c_histogram.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
@@ -155,8 +161,12 @@ nbRawHtml gallery([
     "A grouped boxplot rendered through the UniPlot C ABI"),
   svgFigure(cHeatSvg, "A categorical heatmap built through `uplot_add_heatmap`."),
   pngFigure(cHeatPng, "The same C heatmap as an embedded PNG.",
-    "A categorical heatmap rendered through the UniPlot C ABI")
+    "A categorical heatmap rendered through the UniPlot C ABI"),
+  svgFigure(cHistogramSvg,
+    "An explicit-break histogram built through the C ABI."),
+  pngFigure(cHistogramPng, "The same C histogram as an embedded PNG.",
+    "An explicit-break histogram rendered through the UniPlot C ABI")
 ])
 
 nbSave
-validatePage("c_binding.html", minSvg = 3, requirePng = true)
+validatePage("c_binding.html", minSvg = 4, requirePng = true)

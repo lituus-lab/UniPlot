@@ -12,9 +12,9 @@ static int write_bytes(const char *path, const uint8_t *data, size_t length) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 8) {
+  if (argc != 10) {
     fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg "
-                    "BOX.png HEAT.svg HEAT.png\n");
+                    "BOX.png HEAT.svg HEAT.png HIST.svg HIST.png\n");
     return EXIT_FAILURE;
   }
   const double x[] = {0, 1, 2, 3, 4, 5};
@@ -28,6 +28,8 @@ int main(int argc, char **argv) {
   uint8_t *box_png = NULL;
   uint8_t *heat_svg = NULL;
   uint8_t *heat_png = NULL;
+  uint8_t *histogram_svg = NULL;
+  uint8_t *histogram_png = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
   size_t json_length = 0;
@@ -35,7 +37,10 @@ int main(int argc, char **argv) {
   size_t box_png_length = 0;
   size_t heat_svg_length = 0;
   size_t heat_png_length = 0;
+  size_t histogram_svg_length = 0;
+  size_t histogram_png_length = 0;
   uplot_plot *heatmap = NULL;
+  uplot_plot *histogram = NULL;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -105,6 +110,21 @@ int main(int argc, char **argv) {
       !write_bytes(argv[6], heat_svg, heat_svg_length) ||
       !write_bytes(argv[7], heat_png, heat_png_length))
     goto cleanup;
+  const double histogram_values[] = {-1.0, 0.0, 0.3, 0.9, 1.0,
+                                     1.4, 2.0, 3.0};
+  const double histogram_breaks[] = {0.0, 0.5, 1.0, 2.0};
+  histogram = uplot_plot_new(760, 440);
+  if (histogram == NULL ||
+      uplot_add_histogram_breaks(histogram, histogram_values, 8,
+                                 histogram_breaks, 4, "#267a5e") != UPLOT_OK ||
+      uplot_set_title(histogram, "C explicit histogram breaks") != UPLOT_OK ||
+      uplot_render_svg(histogram, argv[1], &histogram_svg,
+                       &histogram_svg_length) != UPLOT_OK ||
+      uplot_render_png(histogram, argv[1], &histogram_png,
+                       &histogram_png_length) != UPLOT_OK ||
+      !write_bytes(argv[8], histogram_svg, histogram_svg_length) ||
+      !write_bytes(argv[9], histogram_png, histogram_png_length))
+    goto cleanup;
   result = EXIT_SUCCESS;
 
 cleanup:
@@ -115,7 +135,10 @@ cleanup:
   uplot_buffer_free(box_png, box_png_length);
   uplot_buffer_free(heat_svg, heat_svg_length);
   uplot_buffer_free(heat_png, heat_png_length);
+  uplot_buffer_free(histogram_svg, histogram_svg_length);
+  uplot_buffer_free(histogram_png, histogram_png_length);
   uplot_plot_free(heatmap);
+  uplot_plot_free(histogram);
   uplot_plot_free(plot);
   return result;
 }
