@@ -3,6 +3,7 @@
 import std/[unittest, strutils]
 import contracts
 import UniGlyph
+from UniVector import lineTo
 import UniPlot
 
 suite "rendering":
@@ -38,3 +39,32 @@ suite "rendering":
         scene.addText("x", Point(x: NaN, y: 1), 12, white)
     expect PlotError: discard scene.toSvg(nil)
     expect PlotError: discard scene.renderImage(nil)
+
+  test "prepared CPU scenes preserve exact SVG and PNG output":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 3.0, 2.0])
+    var spec = plot(frame)
+    spec.geomLine(aes("x", "y"))
+    spec.geomPoint(aes("x", "y"), radius = 4)
+    spec.labels(title = "Prepared")
+    var scene = spec.compileScene(Size(width: 320, height: 240))
+    let
+      font = loadTtf("tests/DejaVuSans.ttf")
+      prepared = scene.prepareScene(font)
+    check prepared.size == scene.size
+    check prepared.toSvg == scene.toSvg(font)
+    check prepared.encodePng == scene.encodePng(font)
+    check prepared.toSvg == prepared.toSvg
+    check prepared.encodePng == prepared.encodePng
+    let stableSvg = prepared.toSvg
+    scene.nodes[0].path.lineTo(319, 239)
+    check prepared.toSvg == stableSvg
+    expect PlotError: discard scene.prepareScene(nil)
+    let absent: PreparedScene = nil
+    when defined(release):
+      expect PlotError: discard absent.size
+    else:
+      expect PreConditionDefect: discard absent.size
+    expect PlotError: discard absent.toSvg
+    expect PlotError: discard absent.renderImage
