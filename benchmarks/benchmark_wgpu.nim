@@ -36,8 +36,15 @@ proc main() =
     scene = sampleSpec(pointCount).compileScene(size)
     backend = openWgpuBackend(libraryPath)
   defer: backend.close()
-  var frameTimes: RunningStat
+  var submitTimes, frameTimes: RunningStat
   var consumed = 0'u8
+  for iteration in 0 ..< iterations + 3:
+    let started = getMonoTime()
+    backend.submitWgpuScene(scene, font)
+    let submitMs = elapsedMs(started)
+    if iteration >= 3: submitTimes.push(submitMs)
+  # The first publication frame drains the ordered submissions above.
+  discard backend.renderWgpuScene(scene, font)
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
     let pixels = backend.renderWgpuScene(scene, font)
@@ -51,8 +58,12 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "semantics": "compile paths, tessellate, upload, submit and read back RGBA8",
-    "frame": summary(frameTimes),
+    "semantics": {
+      "submit": "compile paths, tessellate, upload and enqueue without readback",
+      "publication_frame": "compile, tessellate, upload, submit and read back RGBA8"
+    },
+    "submit": summary(submitTimes),
+    "publication_frame": summary(frameTimes),
     "guard": consumed
   })
 

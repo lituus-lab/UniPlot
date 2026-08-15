@@ -46,7 +46,7 @@ nimble wgpuDeps
 nimble wgpuBenchmark
 ```
 
-It measures a warm retained backend while each frame still compiles paths,
-tessellates through UniVector, uploads buffers, submits work and reads the
-800×500 RGBA8 texture back. This is deliberately an end-to-end publication
-cost, not a claim about presentation-only frame rate.
+It reports both enqueue-only frames and publication frames. Both still compile
+paths, tessellate through UniVector and upload buffers; publication additionally
+reads the 800×500 RGBA8 texture back. Enqueue timing is CPU-side submission
+latency, not guaranteed GPU completion or a universal frame-rate claim.

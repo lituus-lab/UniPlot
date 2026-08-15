@@ -37,7 +37,7 @@ scene without weakening its deterministic CPU semantics.
   UniVector tessellation path.
 - [x] Shader and render pipeline retained across frames.
 - [x] Cache or pool vertex, index, texture and readback buffers by capacity.
-- [ ] Separate submission from optional readback so interactive frames do not
+- [x] Separate submission from optional readback so interactive frames do not
   pay a synchronous CPU transfer.
 - [ ] Handle uncaptured validation errors and asynchronous device loss.
 - [ ] Expose adapter identity and limits without leaking WGPU ABI types.
