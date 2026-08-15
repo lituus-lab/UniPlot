@@ -63,6 +63,26 @@ suite "WGPU boundary":
       for index, value in meshPixels:
         if value != cpuPixels[index]: inc differentChannels
       check differentChannels == 0
+      let antialiasedPath = parsePath(
+        "M 2.25 2.25 L 7.75 2.25 L 7.75 7.75 L 2.25 7.75 Z")
+      let antialiasedMesh = antialiasedPath.preparePath().tessellateFill()
+      let antialiasedGpu = backend.readWgpuMeshTarget(
+        Size(width: 10, height: 10), parseColor("#ffffff").get,
+        antialiasedMesh, parseColor("#ff0000").get)
+      var antialiasedScene = initScene(Size(width: 10, height: 10),
+        parseColor("#ffffff").get)
+      antialiasedScene.addPath(antialiasedPath, parseColor("#ff0000").get)
+      let antialiasedCpu = antialiasedScene.renderImage(
+        loadTtf("tests/DejaVuSans.ttf")).data
+      var differingEdgePixels = 0
+      for y in 0 ..< 10:
+        for x in 0 ..< 10:
+          let offset = (y * 10 + x) * 4
+          if antialiasedGpu[offset .. offset + 3] !=
+              antialiasedCpu[offset .. offset + 3]:
+            inc differingEdgePixels
+            check x in {2, 7} or y in {2, 7}
+      check differingEdgePixels <= 20
       var scene = initScene(Size(width: 64, height: 32),
         parseColor("#ffffff").get)
       scene.addPath(parsePath("M 2 2 L 20 2 L 20 20 L 2 20 Z"),

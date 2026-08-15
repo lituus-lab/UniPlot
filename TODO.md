@@ -43,7 +43,8 @@ scene without weakening its deterministic CPU semantics.
 - [x] Expose adapter identity and relevant limits without leaking WGPU ABI
   types.
 - [x] Add an exact CPU/GPU pixel-parity fixture for pixel-aligned geometry.
-- [ ] Add antialiased CPU/GPU edge fixtures with a documented tolerance.
+- [x] Add an antialiased CPU/GPU fixture whose tolerance is confined to the
+  one-pixel cells intersected by the geometric edge.
 - [x] Add release benchmarks separating scene preparation, retained upload and
   submission, and readback publication throughput.
 - [ ] Establish regression thresholds from repeated same-machine runs; never
