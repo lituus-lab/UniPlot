@@ -39,12 +39,13 @@ scene without weakening its deterministic CPU semantics.
 - [x] Cache or pool vertex, index, texture and readback buffers by capacity.
 - [x] Separate submission from optional readback so interactive frames do not
   pay a synchronous CPU transfer.
-- [ ] Handle uncaptured validation errors and asynchronous device loss.
-- [ ] Expose adapter identity and limits without leaking WGPU ABI types.
+- [x] Handle uncaptured validation errors and asynchronous device loss.
+- [x] Expose adapter identity and relevant limits without leaking WGPU ABI
+  types.
 - [x] Add an exact CPU/GPU pixel-parity fixture for pixel-aligned geometry.
 - [ ] Add antialiased CPU/GPU edge fixtures with a documented tolerance.
-- [ ] Add release benchmarks for scene compilation, tessellation, upload,
-  submission, readback and retained-frame throughput.
+- [x] Add release benchmarks separating scene preparation, retained upload and
+  submission, and readback publication throughput.
 - [ ] Establish regression thresholds from repeated same-machine runs; never
   encode cross-machine marketing claims.
 - [ ] Exercise Linux Vulkan and Windows DX12 in CI in addition to Metal.
