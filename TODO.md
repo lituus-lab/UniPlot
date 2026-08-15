@@ -1,0 +1,101 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright 2026 lituus-lab -->
+# UniPlot implementation roadmap
+
+This file distinguishes the production 1.0 contract from later competitor
+parity. Checked items are implemented and must remain covered by tests.
+Unchecked 1.0 items are release blockers. Later items may extend the retained
+scene without weakening its deterministic CPU semantics.
+
+## 1.0 foundation
+
+- [x] Typed numeric and categorical columns with finite-row filtering.
+- [x] Layered, value-oriented plot specifications and stable scene node IDs.
+- [x] Linear, logarithmic and band scales with deterministic ticks.
+- [x] Line, point, bar, area and text marks; histogram recipe.
+- [x] Axes, grid, tick labels, titles, axis labels and themes.
+- [x] UniColor styling, UniGlyph text, UniVector paths and UniImage output.
+- [x] Deterministic SVG and PNG backends consuming the same scene.
+- [x] CLI plus versioned C and Python bindings.
+- [x] Multipage executable nimib manual, including C and Python pages.
+- [x] Rosetta examples and same-machine Matplotlib, Plotly, ggplot2 and
+  Plots.jl benchmark harness.
+- [x] Debug contracts, release tests, import-layer validation and lint gates.
+- [ ] Add direct regression tests for every public constructor and rejection
+  path, including release-mode runtime guards where contracts compile away.
+- [ ] Record a clean full-suite debug/release/C/Python/book result for the
+  release candidate.
+
+## 1.0 GPU and performance
+
+- [x] Optional runtime loading with no WGPU dependency in the core import.
+- [x] Pure-Nim installer pinned to wgpu-native 29.0.1.1.
+- [x] Real adapter, device and queue creation.
+- [x] Offscreen RGBA8 render passes and aligned GPU-to-CPU readback.
+- [x] WGSL pipeline rendering UniVector indexed triangle meshes.
+- [x] UniGlyph text and ordered retained scenes rendered through the same
+  UniVector tessellation path.
+- [x] Shader and render pipeline retained across frames.
+- [ ] Cache or pool vertex, index, texture and readback buffers by capacity.
+- [ ] Separate submission from optional readback so interactive frames do not
+  pay a synchronous CPU transfer.
+- [ ] Handle uncaptured validation errors and asynchronous device loss.
+- [ ] Expose adapter identity and limits without leaking WGPU ABI types.
+- [ ] Add CPU/GPU pixel-parity fixtures with documented edge tolerance.
+- [ ] Add release benchmarks for scene compilation, tessellation, upload,
+  submission, readback and retained-frame throughput.
+- [ ] Establish regression thresholds from repeated same-machine runs; never
+  encode cross-machine marketing claims.
+- [ ] Exercise Linux Vulkan and Windows DX12 in CI in addition to Metal.
+
+## Functional parity after 1.0
+
+These are required for broad Matplotlib/ggplot2/Plotly parity, but are not
+silently claimed by the focused 1.0 publication contract.
+
+- [ ] Legends derived from mapped aesthetics and explicit legend control.
+- [ ] Facets, subplot grids, shared axes and secondary axes.
+- [ ] Colour, fill, size, shape, alpha and line-style aesthetic mappings.
+- [ ] Continuous colour maps, discrete palettes and colour bars.
+- [ ] Date/time, duration, transformed, reversed and polar coordinates.
+- [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.
+- [ ] Statistical transforms: binning variants, smoothing, aggregation,
+  quantiles and confidence intervals.
+- [ ] Annotations, reference lines/bands, arrows and rich text.
+- [ ] Image marks and raster layers.
+- [ ] Missing-value policies and intentional line breaks.
+- [ ] Theme inheritance, reusable style sheets and publication presets.
+- [ ] Deterministic PDF output through a lower-level Uni* backend.
+- [ ] Declarative JSON serialization with a versioned schema.
+
+Dash arrays and marker placement belong in UniVector before UniPlot can expose
+them consistently across CPU and GPU. Advanced shaping, fallback and glyph
+atlas policy belong in UniGlyph. UniPlot must stop and propose those lower-level
+changes rather than introducing competing geometry or text implementations.
+
+## Interactive and large-data parity after 1.0
+
+- [ ] Window/surface integration isolated from headless rendering.
+- [ ] Picking buffer keyed by stable scene-node IDs.
+- [ ] Pan, zoom, selection, hover and linked-view event contracts.
+- [ ] Observable data updates and incremental scene diffs.
+- [ ] Persistent GPU resources keyed by semantic resource IDs.
+- [ ] Chunked uploads, streaming/ring buffers and bounded memory policies.
+- [ ] Level-of-detail, decimation and visibility culling for large series.
+- [ ] Instanced points, lines and rectangles; indirect draws where supported.
+- [ ] Timestamp-query instrumentation with wall-clock fallback.
+- [ ] Notebook/web embedding and an explicit remote-rendering protocol.
+
+## Performance investigations
+
+- [ ] Remove repeated allocations in scale training and finite-row selection.
+- [ ] Cache compiled text layouts and prepared/tessellated paths by stable key.
+- [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
+- [ ] Measure SIMD opportunities through UniMath/UniLinalg rather than local
+  vector kernels.
+- [ ] Measure parallel scene compilation before adding concurrency.
+- [ ] Track peak resident memory and bytes allocated per rendered frame.
+- [ ] Add 10³, 10⁵ and 10⁶-point workloads with explicit output semantics.
+- [ ] Compare warm and cold paths separately for every provider.
+- [ ] Keep benchmark dependency installation explicit and outside library
+  installation.
