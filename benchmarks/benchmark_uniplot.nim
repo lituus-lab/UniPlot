@@ -11,6 +11,26 @@ proc summary(samples: RunningStat): JsonNode =
   %*{"mean_ms": samples.mean, "stdev_ms": samples.standardDeviationS,
     "min_ms": samples.min, "max_ms": samples.max}
 
+proc measureSvg(scene: Scene; font: Font): tuple[ms: float64; bytes: int] =
+  let started = getMonoTime()
+  let output = scene.toSvg(font)
+  (elapsedMs(started), output.len)
+
+proc measureSvg(scene: PreparedScene): tuple[ms: float64; bytes: int] =
+  let started = getMonoTime()
+  let output = scene.toSvg()
+  (elapsedMs(started), output.len)
+
+proc measurePng(scene: Scene; font: Font): tuple[ms: float64; bytes: int] =
+  let started = getMonoTime()
+  let output = scene.encodePng(font)
+  (elapsedMs(started), output.len)
+
+proc measurePng(scene: PreparedScene): tuple[ms: float64; bytes: int] =
+  let started = getMonoTime()
+  let output = scene.encodePng()
+  (elapsedMs(started), output.len)
+
 proc sampleSpec(count: int): PlotSpec =
   var x = newSeq[float64](count)
   var y = newSeq[float64](count)
@@ -97,13 +117,15 @@ when isMainModule:
   let size = Size(width: 800, height: 500)
   let referenceSpec = sampleSpec(pointCount)
   let reference = referenceSpec.compileScene(size)
+  let referencePrepared = reference.prepareScene(font)
   let referenceX = referenceSpec.data.numeric("x")
   let referenceJson = referenceSpec.toJson
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
-      jsonDecodeTimes, pngTimes: RunningStat
+      jsonDecodeTimes, prepareSceneTimes, preparedSvgTimes,
+      preparedPngTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -151,16 +173,28 @@ when isMainModule:
     let jsonDecodeMs = elapsedMs(started)
 
     started = getMonoTime()
-    let svg = reference.toSvg(font)
-    let svgMs = elapsedMs(started)
+    let preparedScene = reference.prepareScene(font)
+    let prepareSceneMs = elapsedMs(started)
+    let preparedWidth = preparedScene.size.width
 
-    started = getMonoTime()
-    let png = reference.encodePng(font)
-    let pngMs = elapsedMs(started)
-    consumed += svg.len + png.len + scene.nodes.len + styledScene.nodes.len +
+    var svgResult, preparedSvgResult, pngResult, preparedPngResult:
+      tuple[ms: float64; bytes: int]
+    if (iteration and 1) == 0:
+      svgResult = reference.measureSvg(font)
+      preparedSvgResult = referencePrepared.measureSvg()
+      pngResult = reference.measurePng(font)
+      preparedPngResult = referencePrepared.measurePng()
+    else:
+      preparedSvgResult = referencePrepared.measureSvg()
+      svgResult = reference.measureSvg(font)
+      preparedPngResult = referencePrepared.measurePng()
+      pngResult = reference.measurePng(font)
+    consumed += svgResult.bytes + pngResult.bytes + scene.nodes.len +
+      styledScene.nodes.len +
       continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
       uncertaintyScene.nodes.len + themedScene.nodes.len +
-      encodedSpec.len + decodedSpec.data.rowCount + int(trained.domainMax)
+      encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
+      preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
@@ -173,8 +207,11 @@ when isMainModule:
       themedCompileTimes.push themedCompileMs
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
-      svgTimes.push svgMs
-      pngTimes.push pngMs
+      prepareSceneTimes.push prepareSceneMs
+      svgTimes.push svgResult.ms
+      pngTimes.push pngResult.ms
+      preparedSvgTimes.push preparedSvgResult.ms
+      preparedPngTimes.push preparedPngResult.ms
 
   echo $(%*{
     "provider": "UniPlot",
@@ -197,8 +234,11 @@ when isMainModule:
       "themed_construct_compile": summary(themedCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
+      "cpu_prepare_scene": summary(prepareSceneTimes),
       "svg_from_compiled_scene": summary(svgTimes),
-      "png_from_compiled_scene": summary(pngTimes)
+      "png_from_compiled_scene": summary(pngTimes),
+      "svg_from_prepared_scene": summary(preparedSvgTimes),
+      "png_from_prepared_scene": summary(preparedPngTimes)
     },
     "guard": consumed
   })

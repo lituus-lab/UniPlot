@@ -93,6 +93,18 @@ ranking:
   17.80 ms over five measured iterations for a 2,582,339-byte compact payload.
   These are in-memory, uncompressed schema costs; filesystem, compression and
   network I/O are not included.
+- `cpu_prepare_scene` shapes text, independently copies paths and flattens
+  UniVector geometry once. `svg_from_prepared_scene` and
+  `png_from_prepared_scene` reuse that immutable result; the existing compiled
+  scene stages remain alongside them so preparation cost is never hidden. The
+  paired stages alternate direct/prepared execution order to reduce ordering
+  and allocator bias. On the 2026-08-15 Darwin arm64 run at 100,000 points,
+  five iterations after three warmups measured 28.73 ms preparation,
+  683.52/679.79 ms direct/prepared SVG and 1047.30/1031.56 ms direct/prepared
+  PNG. That is only 0.5% lower SVG time and 1.5% lower PNG time after
+  preparation; including preparation, reuse breaks even after roughly eight
+  SVG renders or two PNG renders on this workload. These local figures do not
+  establish a universal speedup.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other
