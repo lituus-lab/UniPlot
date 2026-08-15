@@ -43,6 +43,23 @@ task book, "Build the multipage nimib book (needs nimib + nimibook)":
     exec "nim c -r --hints:off -o:../build/nbook nbook.nim build"
     cpFile "__site/preface.html", "__site/index.html"
 
+task bindingBookDemos, "Regenerate book plots through the C and Python bindings":
+  mkDir "book/assets"
+  mkDir "book/assets/generated"
+  exec "nimble clibStatic"
+  let cDemo = when defined(windows): "build/book_demo.exe" else:
+    "build/book_demo"
+  let cCompiler = when defined(windows): "gcc" else: "cc"
+  exec cCompiler & " -Iinclude -O2 -Wall -Wextra -std=c11 -o " & cDemo &
+       " examples/c/book_demo.c libUniPlot.a -lz"
+  exec cDemo & " tests/DejaVuSans.ttf book/assets/generated/c_binding.svg" &
+       " book/assets/generated/c_binding.png"
+  exec "nimble buildCython"
+  withDir "py":
+    exec "python3 -m examples.book_demo ../tests/DejaVuSans.ttf" &
+         " ../book/assets/generated/python_binding.svg" &
+         " ../book/assets/generated/python_binding.png"
+
 task docs, "API reference + book into pages/ — what CI publishes":
   rmDir "pages"
   # Generate each public module explicitly. `--project` forces a JS search

@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2026 lituus-lab */
+#include "UniPlot.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+static int write_bytes(const char *path, const uint8_t *data, size_t length) {
+  FILE *stream = fopen(path, "wb");
+  if (stream == NULL) return 0;
+  const size_t written = fwrite(data, 1, length, stream);
+  return fclose(stream) == 0 && written == length;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 4) {
+    fprintf(stderr, "usage: book_demo FONT OUTPUT.svg OUTPUT.png\n");
+    return EXIT_FAILURE;
+  }
+  const double x[] = {0, 1, 2, 3, 4, 5};
+  const double y[] = {1.0, 2.8, 2.1, 4.2, 3.4, 5.0};
+  uint8_t *svg = NULL;
+  uint8_t *png = NULL;
+  size_t svg_length = 0;
+  size_t png_length = 0;
+  int result = EXIT_FAILURE;
+
+  if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
+  uplot_plot *plot = uplot_plot_new(800, 500);
+  if (plot == NULL) return EXIT_FAILURE;
+  if (uplot_add_line_styled(plot, x, y, 6, "#2457c5", 2.5f,
+                            UPLOT_LINE_DOT_DASH) != UPLOT_OK ||
+      uplot_add_points_shaped(plot, x + 1, y + 1, 4, "#d64255", 5.0f,
+                              UPLOT_MARKER_DIAMOND) != UPLOT_OK ||
+      uplot_set_title(plot, "Rendered through the UniPlot C ABI") != UPLOT_OK)
+    goto cleanup;
+  if (uplot_render_svg(plot, argv[1], &svg, &svg_length) != UPLOT_OK ||
+      uplot_render_png(plot, argv[1], &png, &png_length) != UPLOT_OK)
+    goto cleanup;
+  if (!write_bytes(argv[2], svg, svg_length) ||
+      !write_bytes(argv[3], png, png_length))
+    goto cleanup;
+  result = EXIT_SUCCESS;
+
+cleanup:
+  uplot_buffer_free(svg, svg_length);
+  uplot_buffer_free(png, png_length);
+  uplot_plot_free(plot);
+  return result;
+}
