@@ -40,7 +40,7 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
     let handle = PlotHandle(spec: plot(frame), size: size)
     GC_ref(handle)
     cast[pointer](handle)
-  except CatchableError: nil
+  except CatchableError, Defect: nil
 
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
 
@@ -48,6 +48,8 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     mark: MarkKind; color: cstring; size: float32;
     lineStyle = SolidLine; shape = CircleMarker): cint =
   if value.isNil or xs.isNil or ys.isNil or count == 0 or color.isNil:
+    return UPLOT_ERR_ARGUMENT
+  if count > csize_t(high(int)):
     return UPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
@@ -65,7 +67,7 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     h.spec.addLayer(mark, aes(xName, yName), $color, size,
       lineStyle = lineStyle, shape = shape)
     UPLOT_OK
-  except CatchableError: UPLOT_ERR_ARGUMENT
+  except CatchableError, Defect: UPLOT_ERR_ARGUMENT
 
 proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; width: float32): cint {.exportc, dynlib, cdecl.} =
@@ -96,8 +98,11 @@ proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
 proc uplot_set_title*(value: pointer; title: cstring): cint {.
     exportc, dynlib, cdecl.} =
   if value.isNil or title.isNil: return UPLOT_ERR_ARGUMENT
-  handle(value).spec.title = $title
-  UPLOT_OK
+  try:
+    handle(value).spec.title = $title
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
 
 proc copyBuffer(bytes: openArray[byte]; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint =
@@ -118,7 +123,7 @@ proc uplot_render_png*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     copyBuffer(h.spec.compileScene(h.size).encodePng(loadTtf($fontPath)),
         output,
       outputLen)
-  except CatchableError: UPLOT_ERR_RENDER
+  except CatchableError, Defect: UPLOT_ERR_RENDER
 
 proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
@@ -127,7 +132,7 @@ proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     let h = handle(value)
     let svg = h.spec.compileScene(h.size).toSvg(loadTtf($fontPath))
     copyBuffer(svg.toOpenArrayByte(0, svg.high), output, outputLen)
-  except CatchableError: UPLOT_ERR_RENDER
+  except CatchableError, Defect: UPLOT_ERR_RENDER
 
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =

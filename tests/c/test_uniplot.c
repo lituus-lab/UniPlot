@@ -30,6 +30,8 @@ int main(void) {
   assert(plot != NULL);
   assert(uplot_add_line(plot, x, y, 0, "#3366cc", 2.0f) ==
          UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_line(plot, x, y, SIZE_MAX, "#3366cc", 2.0f) ==
+         UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "invalid", 2.0f) ==
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
