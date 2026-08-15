@@ -43,10 +43,19 @@ type
     runtime: NativeWgpuRuntime
 
   WgpuPreparedScene* = ref object
-    size*: Size
+    size: Size
     clear: array[4, float32]
     vertices: seq[float32]
     indices: seq[uint32]
+
+func size*(prepared: WgpuPreparedScene): Size {.contractual.} =
+  ## Return the immutable render target dimensions of a prepared scene.
+  require:
+    not prepared.isNil
+  body:
+    if prepared.isNil:
+      raise newException(WgpuError, "prepared WGPU scene is nil")
+    prepared.size
 
 proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
   ## Extract stable semantic resource identifiers before any device is needed.
@@ -174,6 +183,8 @@ proc prepareWgpuScene*(scene: Scene;
   require:
     not font.isNil
     scene.size.width > 0 and scene.size.height > 0
+    uint64(scene.size.width) <= uint64(high(uint32))
+    uint64(scene.size.height) <= uint64(high(uint32))
   ensure:
     not result.isNil
     result.size == scene.size
