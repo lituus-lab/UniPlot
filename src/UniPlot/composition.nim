@@ -47,14 +47,16 @@ proc facetSpecs*(spec: PlotSpec; column: string): seq[PlotSpec] {.
         facetTitle
       result.add panel
 
-proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
+proc shareDomains(specs: openArray[PlotSpec]; shareX,
     shareY: bool): seq[PlotSpec] =
   result = @specs
   if not shareX and not shareY: return
   var
     xDomain = initContinuousDomain()
+    xBand = initBandDomain()
     yDomain = initContinuousDomain()
     initialized = false
+    xCoordinateKind = ckNumeric
     xKind = skLinear
     yKind = skLinear
     xReversed = false
@@ -63,6 +65,7 @@ proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
     let domains = collectAxisDomains(spec)
     if not initialized:
       xKind = spec.xScaleSpec.kind
+      xCoordinateKind = domains.xKind
       yKind = spec.yScaleSpec.kind
       xReversed = spec.xScaleSpec.reversed
       yReversed = spec.yScaleSpec.reversed
@@ -70,20 +73,33 @@ proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
       yDomain = initContinuousDomain(yKind)
       initialized = true
     if shareX:
-      if domains.xKind != ckNumeric:
+      if domains.xKind != xCoordinateKind:
         raise newException(PlotError,
-          "shared x axes currently require numeric coordinates")
+          "shared x axes require matching coordinate kinds")
       if spec.xScaleSpec.kind != xKind or
           spec.xScaleSpec.reversed != xReversed:
         raise newException(PlotError,
           "shared x axes require matching scale kinds and directions")
-      if spec.xScaleSpec.domain.configured:
-        discard domains.xContinuous.train(0, 1,
-          spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
-      xDomain.merge(domains.xContinuous)
-      if spec.xScaleSpec.domain.configured:
-        xDomain.addValues([spec.xScaleSpec.domain.minimum,
-          spec.xScaleSpec.domain.maximum])
+      if domains.xKind == ckNumeric:
+        if spec.xScaleSpec.categories.configured:
+          raise newException(PlotError,
+            "categorical x domain cannot be applied to numeric coordinates")
+        if spec.xScaleSpec.domain.configured:
+          discard domains.xContinuous.train(0, 1,
+            spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
+        xDomain.merge(domains.xContinuous)
+        if spec.xScaleSpec.domain.configured:
+          xDomain.addValues([spec.xScaleSpec.domain.minimum,
+            spec.xScaleSpec.domain.maximum])
+      else:
+        if spec.xScaleSpec.domain.configured:
+          raise newException(PlotError,
+            "numeric x limits cannot be applied to categorical coordinates")
+        if spec.xScaleSpec.categories.configured:
+          discard domains.xBand.train(0, 1,
+            spec.xScaleSpec.categories.values)
+          xBand.addValues(spec.xScaleSpec.categories.values)
+        xBand.merge(domains.xBand)
     if shareY:
       if spec.yScaleSpec.kind != yKind or
           spec.yScaleSpec.reversed != yReversed:
@@ -97,8 +113,12 @@ proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
         yDomain.addValues([spec.yScaleSpec.domain.minimum,
           spec.yScaleSpec.domain.maximum])
   if shareX:
-    let bounds = xDomain.fittedBounds()
-    for spec in result.mitems: spec.xLimits(bounds.minimum, bounds.maximum)
+    if xCoordinateKind == ckNumeric:
+      let bounds = xDomain.fittedBounds()
+      for spec in result.mitems: spec.xLimits(bounds.minimum, bounds.maximum)
+    else:
+      let categories = xBand.train(0, 1).domain
+      for spec in result.mitems: spec.xCategories(categories)
   if shareY:
     let bounds = yDomain.fittedBounds()
     for spec in result.mitems: spec.yLimits(bounds.minimum, bounds.maximum)
@@ -142,7 +162,7 @@ proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
       extraWidth = availableWidth mod columns
       extraHeight = availableHeight mod rows
     result = initScene(size, specs[0].theme.background)
-    let preparedSpecs = shareNumericDomains(specs, sharedX, sharedY)
+    let preparedSpecs = shareDomains(specs, sharedX, sharedY)
     for panel, spec in preparedSpecs:
       let
         column = panel mod columns

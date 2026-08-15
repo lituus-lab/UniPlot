@@ -123,6 +123,28 @@ suite "plot composition":
     expect PlotError:
       discard compileGrid([clipped, numeric], 2, sharedX = true)
 
+  test "share categorical x domains in first-seen panel order":
+    let
+      first = barPlot(["b", "a"], [2.0, 1.0])
+      second = barPlot(["c", "b"], [3.0, 2.0])
+    var expectedFirst = first
+    var expectedSecond = second
+    expectedFirst.xCategories(["b", "a", "c"])
+    expectedSecond.xCategories(["b", "a", "c"])
+    let
+      shared = compileGrid([first, second], 2,
+        Size(width: 816, height: 300), sharedX = true)
+      expected = compileGrid([expectedFirst, expectedSecond], 2,
+        Size(width: 816, height: 300))
+    check shared.nodes.len == expected.nodes.len
+    for index in 0 ..< shared.nodes.len:
+      check shared.nodes[index].kind == expected.nodes[index].kind
+      case shared.nodes[index].kind
+      of snPath: check $shared.nodes[index].path == $expected.nodes[index].path
+      of snText:
+        check shared.nodes[index].text == expected.nodes[index].text
+        check shared.nodes[index].position == expected.nodes[index].position
+
   test "facet specifications retain category order and complete semantics":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0, 3.0])
