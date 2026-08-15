@@ -40,6 +40,9 @@ nbCode:
 nbText: """
 `SceneNodeKind` distinguishes `snPath` and `snText`. Non-zero IDs identify data
 marks and survive into SVG as `data-uplot-id`, providing a future picking key.
+Text nodes also retain `textStart`, `textMiddle` or `textEnd` anchoring.
+The renderer resolves the anchor from UniGlyph's shaped advance, so CPU, SVG
+and WGPU place centered tick labels and axis titles identically.
 
 ## Construct a scene directly
 
@@ -57,7 +60,7 @@ nbCode:
   rectangle.rect(60, 80, 380, 70)
   direct.addPath(rectangle, parseColor("#457b9d").get, id = 42)
   direct.addText("Direct retained scene", Point(x: 130, y: 55), 20,
-    parseColor("#1d3557").get, id = 43)
+    parseColor("#1d3557").get, id = 43, anchor = textStart)
   let directSvg = direct.toSvg(font)
 
 nbRawHtml svgFigure(directSvg,
