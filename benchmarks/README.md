@@ -100,6 +100,14 @@ ranking:
   domains in the same process. The measured 1.74 ms (5.39%) is the cost of the
   additional domain scans and contract-preserving union on this workload; it
   is neither a rendering measurement nor a cross-library comparison.
+- `categorical_grid_construct_compile` and
+  `categorical_shared_grid_construct_compile` compile two 100-bar panels with
+  a 50-category overlap, first independently and then with a deterministic
+  categorical union. On the 2026-08-15 Darwin arm64 run they averaged
+  0.129 ms and 0.229 ms over five iterations after three warmups. Sharing adds
+  0.100 ms (78.14% relative) on this deliberately small workload; the large
+  percentage reflects a sub-millisecond baseline and must not be presented as
+  a general plotting slowdown.
 - `facet_construct_compile` partitions one 100,000-row, three-column
   specification into four categorical panels, copies each panel's complete
   typed frame, derives shared numeric domains and compiles the grid. On the

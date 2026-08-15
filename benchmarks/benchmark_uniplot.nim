@@ -120,6 +120,15 @@ proc facetedSpec(count: int): PlotSpec =
   for index in 0 ..< count: groups.add "panel-" & $(index mod 4)
   result.data.addColumn("facet", groups)
 
+proc categoricalSpec(offset, count: int): PlotSpec =
+  var
+    categories = newSeqOfCap[string](count)
+    values = newSeqOfCap[float64](count)
+  for index in 0 ..< count:
+    categories.add "category-" & $(offset + index)
+    values.add float64((index mod 17) + 1)
+  barPlot(categories, values)
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -134,6 +143,9 @@ when isMainModule:
   let gridSpecs = [sampleSpec(panelPointCount), sampleSpec(panelPointCount),
     sampleSpec(panelPointCount), sampleSpec(panelPointCount)]
   let facetSpec = facetedSpec(pointCount)
+  let categoryCount = min(100, max(1, pointCount div 4))
+  let categoricalGridSpecs = [categoricalSpec(0, categoryCount),
+    categoricalSpec(categoryCount div 2, categoryCount)]
   let referenceX = referenceSpec.data.numeric("x")
   let referenceJson = referenceSpec.toJson
 
@@ -141,6 +153,7 @@ when isMainModule:
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
+      categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
       facetCompileTimes, prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
       pngTimes: RunningStat
   var consumed = 0
@@ -170,6 +183,10 @@ when isMainModule:
       gap = 12, sharedX = true, sharedY = true))
     let facetResult = measureScene(compileFacetGrid(facetSpec, "facet", 2,
       size, gap = 12, sharedX = true, sharedY = true))
+    let categoricalGridResult = measureScene(compileGrid(
+      categoricalGridSpecs, 2, size, gap = 12))
+    let categoricalSharedGridResult = measureScene(compileGrid(
+      categoricalGridSpecs, 2, size, gap = 12, sharedX = true))
 
     started = getMonoTime()
     let encodedSpec = referenceSpec.toJson
@@ -200,7 +217,8 @@ when isMainModule:
       styledResult.nodes + continuousColorResult.nodes +
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + gridResult.nodes +
-      sharedGridResult.nodes + facetResult.nodes +
+      sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
+      categoricalSharedGridResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
       preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
@@ -215,6 +233,8 @@ when isMainModule:
       themedCompileTimes.push themedResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
+      categoricalGridCompileTimes.push categoricalGridResult.ms
+      categoricalSharedGridCompileTimes.push categoricalSharedGridResult.ms
       facetCompileTimes.push facetResult.ms
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
@@ -245,6 +265,10 @@ when isMainModule:
       "themed_construct_compile": summary(themedCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
+      "categorical_grid_construct_compile": summary(
+          categoricalGridCompileTimes),
+      "categorical_shared_grid_construct_compile": summary(
+        categoricalSharedGridCompileTimes),
       "facet_construct_compile": summary(facetCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
