@@ -27,15 +27,21 @@ suite "WGPU boundary":
       expect PreConditionDefect:
         discard openWgpuBackend("")
 
-  test "prepared cache capacity is bounded":
+  test "prepared cache entry and byte bounds are contractual":
     when defined(release):
       expect WgpuError: discard openWgpuBackend("/unused", 0)
       expect WgpuError:
         discard openWgpuBackend("/unused", MaxPreparedCacheEntries + 1)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", preparedCacheByteBudget =
+          MinPreparedCacheByteBudget - 1)
     else:
       expect PreConditionDefect: discard openWgpuBackend("/unused", 0)
       expect PreConditionDefect:
         discard openWgpuBackend("/unused", MaxPreparedCacheEntries + 1)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", preparedCacheByteBudget =
+          MinPreparedCacheByteBudget - 1)
 
   test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
@@ -46,6 +52,8 @@ suite "WGPU boundary":
       check backend.state == wbsReady
       check backend.wgpuDiagnostics.preparedCacheCapacity == 2
       check backend.wgpuDiagnostics.preparedCacheEntries == 0
+      check backend.wgpuDiagnostics.preparedCacheByteBudget ==
+        DefaultPreparedCacheByteBudget
       let capabilities = wgpuCapabilities(backend)
       check capabilities.available
       check capabilities.storageBuffers
@@ -107,6 +115,9 @@ suite "WGPU boundary":
       let uploadsBeforePrepared = backend.wgpuDiagnostics.meshUploads
       backend.submitWgpuPrepared(prepared)
       check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 1
+      let oneSceneBytes = backend.wgpuDiagnostics.preparedCacheBytes
+      check oneSceneBytes > MinPreparedCacheByteBudget
+      check backend.wgpuDiagnostics.preparedCachePeakBytes == oneSceneBytes
       backend.submitWgpuPrepared(prepared)
       let scenePixels = backend.renderWgpuPrepared(prepared)
       check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 1
@@ -150,3 +161,21 @@ suite "WGPU boundary":
       check backend.wgpuDiagnostics.preparedCacheHits == 3
       backend.close()
       check backend.state == wbsUnavailable
+
+      let samePrepared = scene.prepareWgpuScene(font)
+      let byteLimited = openWgpuBackend(libraryPath,
+        preparedCacheCapacity = 2, preparedCacheByteBudget = oneSceneBytes)
+      byteLimited.submitWgpuPrepared(prepared)
+      byteLimited.submitWgpuPrepared(samePrepared)
+      check byteLimited.wgpuDiagnostics.preparedCacheEntries == 1
+      check byteLimited.wgpuDiagnostics.preparedCacheEvictions == 1
+      check byteLimited.wgpuDiagnostics.preparedCacheBytes <= oneSceneBytes
+      byteLimited.close()
+
+      let tooSmall = openWgpuBackend(libraryPath,
+        preparedCacheCapacity = 2,
+        preparedCacheByteBudget = oneSceneBytes - 1)
+      expect WgpuError: tooSmall.submitWgpuPrepared(prepared)
+      check tooSmall.wgpuDiagnostics.preparedCacheEntries == 0
+      check tooSmall.wgpuDiagnostics.preparedCacheBytes == 0
+      tooSmall.close()

@@ -12,6 +12,8 @@ import UniPlot/render/wgpu_native
 
 const WgpuNativeTargetVersion* = "29.0.1.1"
 const MaxPreparedCacheEntries* = 64
+const MinPreparedCacheByteBudget* = 512'u64
+const DefaultPreparedCacheByteBudget* = 256'u64 * 1024'u64 * 1024'u64
 
 type
   WgpuError* = object of CatchableError
@@ -48,6 +50,8 @@ type
     meshUploads*: uint64
     preparedCacheHits*, preparedCacheMisses*: uint64
     preparedCacheEvictions*: uint64
+    preparedCacheBytes*, preparedCachePeakBytes*: uint64
+    preparedCacheByteBudget*: uint64
     preparedCacheEntries*, preparedCacheCapacity*: int
 
   WgpuBackend* = ref object
@@ -92,11 +96,14 @@ proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
       result.resources.add WgpuResource(id: node.id, kind: kind)
 
 proc openWgpuBackend*(libraryPath: string;
-    preparedCacheCapacity = 4): WgpuBackend {.contractual.} =
+    preparedCacheCapacity = 4;
+    preparedCacheByteBudget = DefaultPreparedCacheByteBudget): WgpuBackend {.
+    contractual.} =
   ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
     libraryPath.len > 0
     preparedCacheCapacity in 1 .. MaxPreparedCacheEntries
+    preparedCacheByteBudget >= MinPreparedCacheByteBudget
   ensure:
     not result.isNil and result.state == wbsReady
   body:
@@ -106,9 +113,14 @@ proc openWgpuBackend*(libraryPath: string;
       raise newException(WgpuError,
         "prepared WGPU cache capacity must be in 1.." &
         $MaxPreparedCacheEntries)
+    if preparedCacheByteBudget < MinPreparedCacheByteBudget:
+      raise newException(WgpuError,
+        "prepared WGPU cache byte budget must be at least " &
+        $MinPreparedCacheByteBudget)
     result = WgpuBackend(state: wbsUnavailable)
     try:
-      result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity)
+      result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity,
+        preparedCacheByteBudget)
       result.state = wbsReady
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
@@ -153,6 +165,9 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
       preparedCacheHits: cache.hits,
       preparedCacheMisses: cache.misses,
       preparedCacheEvictions: cache.evictions,
+      preparedCacheBytes: cache.bytes,
+      preparedCachePeakBytes: cache.peakBytes,
+      preparedCacheByteBudget: cache.byteBudget,
       preparedCacheEntries: cache.entries,
       preparedCacheCapacity: cache.capacity)
 

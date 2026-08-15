@@ -292,6 +292,8 @@ type
     targetWidth, targetHeight: uint32
     vertexCapacity, indexCapacity, readbackCapacity: uint64
     preparedCacheCapacity: int
+    preparedCacheByteBudget, preparedCacheBytes: uint64
+    preparedCachePeakBytes: uint64
     preparedMeshes: seq[PreparedMeshBuffers]
     preparedUseClock: uint64
     meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
@@ -398,6 +400,7 @@ proc close*(runtime: NativeWgpuRuntime) =
         runtime.releaseBuffer(entry.vertexBuffer)
         entry.vertexBuffer = nil
   runtime.preparedMeshes.setLen(0)
+  runtime.preparedCacheBytes = 0
   if runtime.indexBuffer != nil and runtime.releaseBuffer != nil:
     runtime.releaseBuffer(runtime.indexBuffer)
     runtime.indexBuffer = nil
@@ -461,16 +464,21 @@ proc backendName(value: uint32): string =
   else: "unknown"
 
 proc openNativeWgpu*(libraryPath: string;
-                     preparedCacheCapacity: int): NativeWgpuRuntime =
+                     preparedCacheCapacity: int;
+                     preparedCacheByteBudget: uint64): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
   if preparedCacheCapacity <= 0:
     raise newException(LibraryError,
       "prepared WGPU cache capacity must be positive")
+  if preparedCacheByteBudget < 512'u64:
+    raise newException(LibraryError,
+      "prepared WGPU cache byte budget must be at least 512")
   let library = loadLib(libraryPath)
   if library == nil:
     raise newException(LibraryError, "cannot load wgpu-native: " & libraryPath)
   result = NativeWgpuRuntime(library: library,
-    preparedCacheCapacity: preparedCacheCapacity)
+    preparedCacheCapacity: preparedCacheCapacity,
+    preparedCacheByteBudget: preparedCacheByteBudget)
   try:
     let
       createInstance = loadSymbol[CreateInstanceProc](library,
@@ -601,12 +609,14 @@ proc meshUploadCount*(runtime: NativeWgpuRuntime): uint64 =
   if runtime.isNil: 0'u64 else: runtime.meshUploadCount
 
 proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
-    hits, misses, evictions: uint64; entries, capacity: int] =
+    hits, misses, evictions, bytes, peakBytes, byteBudget: uint64;
+    entries, capacity: int] =
   if runtime.isNil:
-    return (0'u64, 0'u64, 0'u64, 0, 0)
+    return (0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0, 0)
   (runtime.preparedCacheHits, runtime.preparedCacheMisses,
-    runtime.preparedCacheEvictions, runtime.preparedMeshes.len,
-    runtime.preparedCacheCapacity)
+    runtime.preparedCacheEvictions, runtime.preparedCacheBytes,
+    runtime.preparedCachePeakBytes, runtime.preparedCacheByteBudget,
+    runtime.preparedMeshes.len, runtime.preparedCacheCapacity)
 
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
@@ -724,6 +734,11 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
   let renderPass = beginPass(encoder, addr passDescriptor)
   if renderPass == nil:
     raise newException(LibraryError, "wgpu-native did not create a render pass")
+  var renderPassOpen = true
+  defer:
+    if renderPassOpen:
+      endPass(renderPass)
+      releasePass(renderPass)
   if meshIndices.len > 0:
     if meshVertices.len == 0 or meshVertices.len mod 6 != 0:
       raise newException(LibraryError, "invalid WGPU mesh vertex layout")
@@ -841,22 +856,50 @@ struct VertexOut {
         inc runtime.preparedCacheHits
       else:
         inc runtime.preparedCacheMisses
-        if runtime.preparedMeshes.len < runtime.preparedCacheCapacity:
-          runtime.preparedMeshes.add PreparedMeshBuffers()
-          entryIndex = runtime.preparedMeshes.high
-        else:
-          entryIndex = 0
+        let
+          requiredVertexCapacity = grownCapacity(0, vertexSize)
+          requiredIndexCapacity = grownCapacity(0, indexSize)
+        if requiredVertexCapacity > high(uint64) - requiredIndexCapacity:
+          raise newException(LibraryError,
+            "prepared WGPU buffer capacities overflow uint64")
+        let requiredBytes = requiredVertexCapacity + requiredIndexCapacity
+        if requiredBytes > runtime.preparedCacheByteBudget:
+          raise newException(LibraryError,
+            "prepared WGPU scene exceeds the cache byte budget")
+        while runtime.preparedMeshes.len >= runtime.preparedCacheCapacity or
+            runtime.preparedCacheBytes >
+              runtime.preparedCacheByteBudget - requiredBytes:
+          var victim = 0
           for index in 1 ..< runtime.preparedMeshes.len:
             if runtime.preparedMeshes[index].lastUse <
-                runtime.preparedMeshes[entryIndex].lastUse:
-              entryIndex = index
+                runtime.preparedMeshes[victim].lastUse:
+              victim = index
+          let released = runtime.preparedMeshes[victim].vertexCapacity +
+            runtime.preparedMeshes[victim].indexCapacity
+          if runtime.preparedMeshes[victim].indexBuffer != nil:
+            releaseBuffer(runtime.preparedMeshes[victim].indexBuffer)
+          if runtime.preparedMeshes[victim].vertexBuffer != nil:
+            releaseBuffer(runtime.preparedMeshes[victim].vertexBuffer)
+          runtime.preparedMeshes.delete(victim)
+          runtime.preparedCacheBytes -= released
           inc runtime.preparedCacheEvictions
+        runtime.preparedMeshes.add PreparedMeshBuffers()
+        entryIndex = runtime.preparedMeshes.high
         var entry = addr runtime.preparedMeshes[entryIndex]
-        entry.token = 0
-        ensureBuffer(entry.vertexBuffer, entry.vertexCapacity, vertexSize,
-          BufferUsageVertex, "prepared vertex")
-        ensureBuffer(entry.indexBuffer, entry.indexCapacity, indexSize,
-          BufferUsageIndex, "prepared index")
+        try:
+          ensureBuffer(entry.vertexBuffer, entry.vertexCapacity, vertexSize,
+            BufferUsageVertex, "prepared vertex")
+          ensureBuffer(entry.indexBuffer, entry.indexCapacity, indexSize,
+            BufferUsageIndex, "prepared index")
+        except:
+          if entry.indexBuffer != nil: releaseBuffer(entry.indexBuffer)
+          if entry.vertexBuffer != nil: releaseBuffer(entry.vertexBuffer)
+          runtime.preparedMeshes.delete(entryIndex)
+          raise
+        runtime.preparedCacheBytes += entry.vertexCapacity +
+          entry.indexCapacity
+        runtime.preparedCachePeakBytes = max(runtime.preparedCachePeakBytes,
+          runtime.preparedCacheBytes)
         writeBuffer(runtime.queue, entry.vertexBuffer, 0,
           unsafeAddr meshVertices[0], csize_t(vertexSize))
         writeBuffer(runtime.queue, entry.indexBuffer, 0,
@@ -880,6 +923,7 @@ struct VertexOut {
     drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
   endPass(renderPass)
   releasePass(renderPass)
+  renderPassOpen = false
   var unpaddedRow, paddedRow, bufferSize: uint64
   if readback:
     unpaddedRow = uint64(width) * 4'u64
