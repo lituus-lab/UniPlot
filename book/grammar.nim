@@ -18,6 +18,7 @@ ggplot2-like workflow. Both return the same `PlotSpec` type.
 nbCode:
   import UniPlot
   import UniGlyph
+  import UniColor
 
   let font = loadTtf("../../tests/DejaVuSans.ttf")
 
@@ -140,6 +141,36 @@ nbText: """
 Point, bar, text and line layers support categorical colours. A line segment
 uses the category of its ending row. An area is one polygon and therefore
 rejects per-row colour mappings instead of silently choosing one colour.
+
+## Continuous colour and fill
+
+A numeric `color` or `fill` mapping trains a continuous scale and samples an
+ordered immutable UniColor palette. The default is UniColor's scientific
+viridis ramp. `continuousPalette` accepts `palOrdered`, `palScientific` or
+`palContinuous`; unordered categorical palettes are rejected. Enabling the
+legend derives one color bar per distinct numeric mapping.
+"""
+
+nbCode:
+  var heatData = initDataFrame()
+  heatData.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+  heatData.addColumn("y", [1.0, 2.6, 1.9, 3.7, 3.0, 4.4, 4.0])
+  heatData.addColumn("temperature", [12.0, 14.0, 17.0, 21.0, 25.0,
+    29.0, 33.0])
+  var heat = plot(heatData)
+  heat.geomPoint(aes("x", "y", color = "temperature"), radius = 8)
+  heat.continuousPalette(viridis(7).get)
+  heat.labels(title = "Continuous UniColor mapping", x = "sample", y = "value")
+  heat.legend(title = "Measurement")
+  let heatSvg = heat.compileScene(Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(heatSvg,
+  "Numeric values sample an ordered UniColor ramp and derive one color bar.")
+
+nbText: """
+Non-finite colour values participate in the layer's missing-value policy. The
+resolved colours and color-bar swatches are ordinary retained scene paths, so
+SVG, PNG and WGPU consume identical semantics.
 
 ## Fill, shape and line-style mappings
 

@@ -18,6 +18,7 @@ rendering engines.
 - linear, logarithmic and categorical scales;
 - CSS colour styling through UniColor;
 - categorical colour mappings backed by immutable UniColor palettes;
+- numeric colour and fill mappings with UniColor ramps and color bars;
 - categorical fill and marker-shape mappings with semantic legends;
 - solid, dashed, dotted, dot-dash and long-dash line styles;
 - explicit drop, break and reject policies for non-finite mapped values;
