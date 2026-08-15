@@ -48,6 +48,11 @@ def configure_c_api():
                                              ctypes.c_size_t, ctypes.c_int,
                                              ctypes.c_int]
     library.uplot_plot_from_json.restype = ctypes.c_void_p
+    library.uplot_render_grid_svg.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p), ctypes.c_size_t, ctypes.c_int,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
+    library.uplot_render_grid_svg.restype = ctypes.c_int
     library.uplot_buffer_free.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
     library.uplot_plot_free.argtypes = [ctypes.c_void_p]
     if library.uplot_init() != 0:
@@ -75,6 +80,20 @@ def c_payload(library, xs, ys):
         library.uplot_plot_free(handle)
 
 
+def c_grid_svg(library, handles, font):
+    output = ctypes.c_void_p()
+    length = ctypes.c_size_t()
+    if library.uplot_render_grid_svg(
+            handles, len(handles), 2, 800, 500, 12,
+            str(font).encode("utf-8"), ctypes.byref(output),
+            ctypes.byref(length)):
+        raise RuntimeError("uplot_render_grid_svg failed")
+    try:
+        return ctypes.string_at(output, length.value)
+    finally:
+        library.uplot_buffer_free(output, length)
+
+
 def main():
     iterations = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     point_count = int(sys.argv[2]) if len(sys.argv) > 2 else 100_000
@@ -92,7 +111,27 @@ def main():
     python_payload = python_plot.to_json()
     if raw_payload != python_payload.encode("utf-8"):
         raise RuntimeError("C and Python bindings produced different PlotSpec JSON")
+    panel_points = max(1, point_count // 4)
+    panel_array_type = ctypes.c_double * panel_points
+    panel_xs = panel_array_type(*values_x[:panel_points])
+    panel_ys = panel_array_type(*values_y[:panel_points])
+    c_panel_values = []
+    for _ in range(4):
+        panel = library.uplot_plot_new(800, 500)
+        if not panel or library.uplot_add_line(
+                panel, panel_xs, panel_ys, panel_points, b"#3366cc", 2.0):
+            raise RuntimeError("C grid benchmark setup failed")
+        c_panel_values.append(panel)
+    c_panels = (ctypes.c_void_p * len(c_panel_values))(*c_panel_values)
+    python_panels = [uniplot.Plot(800, 500).line(
+        values_x[:panel_points], values_y[:panel_points]) for _ in range(4)]
+    font = ROOT / "tests" / "DejaVuSans.ttf"
+    if c_grid_svg(library, c_panels, font) != uniplot.grid_svg(
+            python_panels, font, columns=2, width=800, height=500, gap=12):
+        raise RuntimeError("C and Python grid SVG output differs")
+
     c_encode, c_decode, py_encode, py_decode = [], [], [], []
+    c_grid, py_grid = [], []
     guard = 0
 
     for iteration in range(iterations + warmups):
@@ -126,9 +165,31 @@ def main():
         py_decode_ms = (time.perf_counter_ns() - started) / 1_000_000
         guard += len(encoded) + int(restored is not None)
 
+        if iteration % 2 == 0:
+            started = time.perf_counter_ns()
+            c_svg = c_grid_svg(library, c_panels, font)
+            c_grid_ms = (time.perf_counter_ns() - started) / 1_000_000
+            started = time.perf_counter_ns()
+            py_svg = uniplot.grid_svg(python_panels, font, columns=2,
+                                      width=800, height=500, gap=12)
+            py_grid_ms = (time.perf_counter_ns() - started) / 1_000_000
+        else:
+            started = time.perf_counter_ns()
+            py_svg = uniplot.grid_svg(python_panels, font, columns=2,
+                                      width=800, height=500, gap=12)
+            py_grid_ms = (time.perf_counter_ns() - started) / 1_000_000
+            started = time.perf_counter_ns()
+            c_svg = c_grid_svg(library, c_panels, font)
+            c_grid_ms = (time.perf_counter_ns() - started) / 1_000_000
+        guard += len(c_svg) + len(py_svg)
+
         if iteration >= warmups:
             c_encode.append(c_encode_ms); c_decode.append(c_decode_ms)
             py_encode.append(py_encode_ms); py_decode.append(py_decode_ms)
+            c_grid.append(c_grid_ms); py_grid.append(py_grid_ms)
+
+    for panel in c_panel_values:
+        library.uplot_plot_free(panel)
 
     print(json.dumps({
         "iterations": iterations, "points": point_count,
@@ -140,6 +201,8 @@ def main():
             "ctypes_c_abi_json_decode": summary(c_decode),
             "python_json_encode": summary(py_encode),
             "python_json_decode": summary(py_decode),
+            "ctypes_c_abi_grid_svg": summary(c_grid),
+            "python_grid_svg": summary(py_grid),
         },
         "guard": guard,
     }))

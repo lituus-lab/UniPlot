@@ -158,6 +158,13 @@ observed wrapper differences of 0.11 ms and 0.15 ms are machine-local and
 within a very small sample; they are regression evidence, not general claims
 about language overhead.
 
+The same harness also verifies byte-identical C/Python SVG output for a
+two-by-two grid containing 100,000 points in total. Five measured iterations
+after three warmups averaged 217.35 ms through ctypes and 217.74 ms through
+Cython on the same reference machine. The 0.39 ms difference is 0.18% of the
+render time and is within this small run's variability; scene compilation,
+UniGlyph path generation and SVG serialization dominate the wrapper crossing.
+
 The real WGPU path has a separate pure-Nim benchmark:
 
 ```bash
