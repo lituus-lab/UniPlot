@@ -236,11 +236,8 @@ type
     status: Atomic[uint32]
     device: pointer
 
-  MapRequest = object
-    status: Atomic[uint32]
-
   DeviceEvents = object
-    lostReason, errorType: Atomic[uint32]
+    lostReason, errorType, mapStatus: Atomic[uint32]
 
   NativeWgpuRuntime* = ref object
     library: LibHandle
@@ -315,7 +312,7 @@ proc receiveMap(status: uint32; message: WgpuStringView;
                 userdata1, userdata2: pointer) {.cdecl.} =
   discard message
   discard userdata2
-  cast[ptr MapRequest](userdata1).status.store(status, moRelease)
+  cast[ptr DeviceEvents](userdata1).mapStatus.store(status, moRelease)
 
 proc receiveDeviceLost(device: pointer; reason: uint32; message: WgpuStringView;
                        userdata1, userdata2: pointer) {.cdecl.} =
@@ -334,6 +331,10 @@ proc receiveUncapturedError(device: pointer; errorType: uint32;
 
 proc close*(runtime: NativeWgpuRuntime) =
   if runtime.isNil: return
+  if runtime.device != nil and runtime.pollDevice != nil:
+    discard runtime.pollDevice(runtime.device, 1'u32, nil)
+  if runtime.processEvents != nil and runtime.instance != nil:
+    runtime.processEvents(runtime.instance)
   if runtime.readbackBuffer != nil and runtime.releaseBuffer != nil:
     runtime.releaseBuffer(runtime.readbackBuffer)
     runtime.readbackBuffer = nil
@@ -359,8 +360,6 @@ proc close*(runtime: NativeWgpuRuntime) =
     runtime.releaseQueue(runtime.queue)
     runtime.queue = nil
   if runtime.device != nil and runtime.releaseDevice != nil:
-    if runtime.pollDevice != nil:
-      discard runtime.pollDevice(runtime.device, 1'u32, nil)
     if runtime.destroyDevice != nil:
       runtime.destroyDevice(runtime.device)
     if runtime.processEvents != nil and runtime.instance != nil:
@@ -480,9 +479,7 @@ proc deviceLostReason*(runtime: NativeWgpuRuntime): uint32 =
 
 proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
   if runtime.isNil or runtime.events == nil: result = 0'u32
-  else:
-    result = runtime.events.errorType.load(moAcquire)
-    runtime.events.errorType.store(0'u32, moRelease)
+  else: result = runtime.events.errorType.exchange(0'u32, moAcquireRelease)
 
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
@@ -755,19 +752,17 @@ struct VertexOut {
       raise newException(LibraryError,
         "wgpu-native reported an uncaptured error")
     return @[]
-  let request = cast[ptr MapRequest](allocShared0(sizeof(MapRequest)))
-  if request == nil:
-    raise newException(LibraryError, "cannot allocate WGPU map state")
+  runtime.events.mapStatus.store(0'u32, moRelease)
   discard mapBuffer(runtime.readbackBuffer, MapModeRead, 0, csize_t(bufferSize),
     WgpuBufferMapCallbackInfo(mode: CallbackAllowProcessEvents,
-      callback: receiveMap, userdata1: request))
+      callback: receiveMap, userdata1: runtime.events))
   var attempts = 0
-  while request.status.load(moAcquire) == 0'u32 and attempts < 10_000:
+  while runtime.events.mapStatus.load(moAcquire) == 0'u32 and
+      attempts < 10_000:
     processEvents(runtime.instance)
     inc attempts
     sleep(1)
-  let mapStatus = request.status.load(moAcquire)
-  deallocShared(request)
+  let mapStatus = runtime.events.mapStatus.load(moAcquire)
   if mapStatus == 0'u32:
     raise newException(LibraryError, "wgpu-native buffer mapping timed out")
   if mapStatus != MapSuccess:
