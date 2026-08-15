@@ -14,8 +14,22 @@ int main(void) {
   assert(uplot_init() == UPLOT_OK);
   assert(strcmp(uplot_version(), UNIPLOT_VERSION) == 0);
   assert(uplot_abi_version() == UNIPLOT_ABI_VERSION);
+  assert(uplot_plot_new(0, 240) == NULL);
+  assert(uplot_add_line(NULL, x, y, 3, "#3366cc", 2.0f) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_points(NULL, x, y, 3, "#cc3333", 4.0f) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_title(NULL, "title") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_render_svg(NULL, TEST_FONT, &svg, &svg_len) ==
+         UPLOT_ERR_ARGUMENT);
+  uplot_buffer_free(NULL, 0);
+  uplot_plot_free(NULL);
   uplot_plot *plot = uplot_plot_new(320, 240);
   assert(plot != NULL);
+  assert(uplot_add_line(plot, x, y, 0, "#3366cc", 2.0f) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_line(plot, x, y, 3, "invalid", 2.0f) ==
+         UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
   assert(uplot_set_title(plot, "C plot") == UPLOT_OK);
