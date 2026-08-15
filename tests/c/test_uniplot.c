@@ -62,6 +62,12 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   assert(uplot_set_secondary_y(plot, 1.0, 0.0, NULL) ==
          UPLOT_ERR_ARGUMENT);
+  assert(uplot_annotate_text(plot, 1.0, 3.0, "peak", "#7a3db8", 14.0f) ==
+         UPLOT_OK);
+  assert(uplot_annotate_arrow(plot, 0.5, 1.5, 1.0, 3.0, "#d65f2d", 2.0f,
+                              8.0f) == UPLOT_OK);
+  assert(uplot_annotate_arrow(plot, 1.0, 1.0, 1.0, 1.0, "#d65f2d", 2.0f,
+                              8.0f) == UPLOT_ERR_ARGUMENT);
   assert(uplot_render_svg(plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
   assert(uplot_render_png(plot, TEST_FONT, &png, &png_len) == UPLOT_OK);
@@ -70,6 +76,8 @@ int main(void) {
   uplot_buffer_free(png, png_len);
   assert(uplot_clear_secondary_y(plot) == UPLOT_OK);
   assert(uplot_clear_secondary_y(NULL) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_clear_annotations(plot) == UPLOT_OK);
+  assert(uplot_clear_annotations(NULL) == UPLOT_ERR_ARGUMENT);
 
   const char *groups[] = {"west", "east", "west"};
   const char *sides[] = {"left", "right", "right"};

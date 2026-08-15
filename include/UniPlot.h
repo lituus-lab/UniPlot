@@ -60,6 +60,12 @@ int uplot_set_title(uplot_plot *, const char *title);
 int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
                           const char *label);
 int uplot_clear_secondary_y(uplot_plot *);
+int uplot_annotate_text(uplot_plot *, double x, double y, const char *text,
+                        const char *color, float font_size);
+int uplot_annotate_arrow(uplot_plot *, double x, double y, double x_end,
+                         double y_end, const char *color, float width,
+                         float head_size);
+int uplot_clear_annotations(uplot_plot *);
 int uplot_render_png(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_svg(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_grid_svg(uplot_plot *const *, size_t count, int columns,

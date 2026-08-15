@@ -199,6 +199,31 @@ proc uplot_clear_secondary_y*(value: pointer): cint {.
   handle(value).spec.clearSecondaryY()
   UPLOT_OK
 
+proc uplot_annotate_text*(value: pointer; x, y: float64; text,
+    color: cstring; fontSize: float32): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or text.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
+  try:
+    handle(value).spec.annotateText(x, y, $text, $color, fontSize)
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_annotate_arrow*(value: pointer; x, y, xEnd, yEnd: float64;
+    color: cstring; width, headSize: float32): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
+  try:
+    handle(value).spec.annotateArrow(x, y, xEnd, yEnd, $color, width, headSize)
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_clear_annotations*(value: pointer): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil: return UPLOT_ERR_ARGUMENT
+  handle(value).spec.clearAnnotations()
+  UPLOT_OK
+
 proc copyBuffer(bytes: openArray[byte]; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint =
   if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
