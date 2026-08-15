@@ -82,6 +82,24 @@ def test_grouped_boxplots_render_and_validate_empty_plot_contract():
     with pytest.raises(ValueError):
         uniplot.Plot().boxplot(["a"], [float("nan")])
 
+def test_categorical_heatmaps_render_and_validate_empty_plot_contract():
+    plot = uniplot.Plot().heatmap(
+        ["left", "right", "left", "left"],
+        ["north", "north", "south", "north"],
+        [1, 4, float("nan"), 3])
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.heatmap(["left"], ["north"], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().heatmap(["left"], ["north", "south"], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().heatmap(["left"], ["north"], [1], aggregation=999)
+    all_missing = uniplot.Plot().heatmap(
+        ["left"], ["north"], [float("nan")])
+    with pytest.raises(RuntimeError):
+        all_missing.svg(FONT)
+
 def test_line_styles_and_marker_shapes_are_exposed():
     plot = uniplot.Plot().line(
         [0, 1, 2], [1, 2, 1], style=uniplot.LINE_DOT_DASH).scatter(

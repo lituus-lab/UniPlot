@@ -20,6 +20,8 @@ cdef extern from "UniPlot.h":
                          const char *, float)
     int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
                            double, const char *, const char *)
+    int uplot_add_heatmap(uplot_plot *, const char **, const char **,
+                          const double *, size_t, int)
     int uplot_add_categorical_column(uplot_plot *, const char *,
                                       const char **, size_t)
     int uplot_add_line_styled(uplot_plot *, const double *, const double *,
@@ -82,6 +84,11 @@ MARKER_CROSS = 5
 MISSING_DROP = 0
 MISSING_BREAK = 1
 MISSING_REJECT = 2
+AGG_COUNT = 0
+AGG_SUM = 1
+AGG_MEAN = 2
+AGG_MINIMUM = 3
+AGG_MAXIMUM = 4
 
 cdef class Plot:
     cdef uplot_plot *_handle
@@ -190,6 +197,38 @@ cdef class Plot:
             free(group_items); free(number_items)
         if status != 0:
             raise ValueError("invalid box plot or non-empty plot")
+        return self
+
+    def heatmap(self, x, y, values, int aggregation=AGG_MEAN):
+        x = list(x)
+        y = list(y)
+        values = list(values)
+        if len(x) != len(y) or len(x) != len(values) or len(x) == 0:
+            raise ValueError("x, y and values must have equal non-zero lengths")
+        cdef list encoded_x = [str(item).encode("utf-8") for item in x]
+        cdef list encoded_y = [str(item).encode("utf-8") for item in y]
+        cdef size_t count = len(values)
+        cdef const char **x_items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef const char **y_items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef double *number_items = <double *>malloc(count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if x_items == NULL or y_items == NULL or number_items == NULL:
+            free(x_items); free(y_items); free(number_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                x_items[index] = encoded_x[index]
+                y_items[index] = encoded_y[index]
+                number_items[index] = float(values[index])
+            status = uplot_add_heatmap(self._handle, x_items, y_items,
+                                       number_items, count, aggregation)
+        finally:
+            free(x_items); free(y_items); free(number_items)
+        if status != 0:
+            raise ValueError("invalid heatmap or non-empty plot")
         return self
 
     def categorical_column(self, name, values):

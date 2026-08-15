@@ -2,6 +2,11 @@
 # Copyright 2026 lituus-lab
 """Python interface to the UniPlot pure-Nim plotting engine."""
 from ._core import (
+    AGG_COUNT,
+    AGG_MAXIMUM,
+    AGG_MEAN,
+    AGG_MINIMUM,
+    AGG_SUM,
     LINE_DASHED,
     LINE_DOT_DASH,
     LINE_DOTTED,
@@ -29,6 +34,7 @@ from ._core import (
 
 __version__ = version()
 __all__ = [
+    "AGG_COUNT", "AGG_MAXIMUM", "AGG_MEAN", "AGG_MINIMUM", "AGG_SUM",
     "LINE_DASHED", "LINE_DOT_DASH", "LINE_DOTTED", "LINE_LONG_DASH",
     "LINE_SOLID", "MARKER_CIRCLE", "MARKER_CROSS", "MARKER_DIAMOND",
     "MARKER_PLUS", "MARKER_SQUARE", "MARKER_TRIANGLE", "Plot",
