@@ -57,6 +57,12 @@ int uplot_add_points_configured(uplot_plot *, const double *, const double *,
 int uplot_set_title(uplot_plot *, const char *title);
 int uplot_render_png(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_svg(uplot_plot *, const char *font_path, uint8_t **, size_t *);
+int uplot_render_grid_svg(uplot_plot *const *, size_t count, int columns,
+                          int width, int height, int gap,
+                          const char *font_path, uint8_t **, size_t *);
+int uplot_render_grid_png(uplot_plot *const *, size_t count, int columns,
+                          int width, int height, int gap,
+                          const char *font_path, uint8_t **, size_t *);
 void uplot_buffer_free(void *, size_t);
 void uplot_plot_free(uplot_plot *);
 

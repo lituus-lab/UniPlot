@@ -63,6 +63,23 @@ int main(void) {
   assert(png_len > 8 && png[0] == 137 && png[1] == 'P');
   uplot_buffer_free(svg, svg_len);
   uplot_buffer_free(png, png_len);
+
+  uplot_plot *panels[] = {plot, plot};
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_grid_svg(panels, 2, 2, 656, 240, 16, TEST_FONT,
+                               &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  svg = (uint8_t *)1;
+  svg_len = 1;
+  assert(uplot_render_grid_svg(NULL, 2, 2, 656, 240, 16, TEST_FONT,
+                               &svg, &svg_len) == UPLOT_ERR_ARGUMENT);
+  assert(svg == NULL && svg_len == 0);
+  panels[1] = NULL;
+  assert(uplot_render_grid_png(panels, 2, 2, 656, 240, 16, TEST_FONT,
+                               &png, &png_len) == UPLOT_ERR_ARGUMENT);
+  assert(png == NULL && png_len == 0);
   uplot_plot_free(plot);
 
   const char *json_source =

@@ -209,6 +209,49 @@ proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     copyBuffer(svg.toOpenArrayByte(0, svg.high), output, outputLen)
   except CatchableError, Defect: UPLOT_ERR_RENDER
 
+proc renderGrid(values: ptr pointer; count: csize_t; columns, width, height,
+    gap: cint; fontPath: cstring; output: ptr ptr uint8;
+    outputLen: ptr csize_t; svg: bool): cint =
+  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  output[] = nil
+  outputLen[] = 0
+  if values.isNil or count == 0 or count > csize_t(high(int)) or
+      columns <= 0 or width <= 0 or height <= 0 or gap < 0 or fontPath.isNil:
+    return UPLOT_ERR_ARGUMENT
+  if csize_t(columns) > count:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let handles = cast[ptr UncheckedArray[pointer]](values)
+    var specs = newSeqOfCap[PlotSpec](int(count))
+    for index in 0 ..< int(count):
+      if handles[index].isNil: return UPLOT_ERR_ARGUMENT
+      specs.add handle(handles[index]).spec
+    let composed = compileGrid(specs, int(columns),
+      Size(width: int(width), height: int(height)), int(gap))
+    let font = loadTtf($fontPath)
+    if svg:
+      copyBuffer(composed.toSvg(font), output, outputLen)
+    else:
+      copyBuffer(composed.encodePng(font), output, outputLen)
+  except CatchableError, Defect:
+    output[] = nil
+    outputLen[] = 0
+    UPLOT_ERR_RENDER
+
+proc uplot_render_grid_svg*(values: ptr pointer; count: csize_t;
+    columns, width, height, gap: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderGrid(values, count, columns, width, height, gap, fontPath, output,
+    outputLen, true)
+
+proc uplot_render_grid_png*(values: ptr pointer; count: csize_t;
+    columns, width, height, gap: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderGrid(values, count, columns, width, height, gap, fontPath, output,
+    outputLen, false)
+
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =
   if not value.isNil: deallocShared(value)
