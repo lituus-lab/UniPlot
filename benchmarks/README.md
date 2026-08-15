@@ -132,6 +132,14 @@ ranking:
   The matrix contract added 3.49 ms (6.91%) in this paired run, covering the
   second categorical grouping scan, Cartesian bookkeeping and empty-panel
   composition; rendering is not included.
+- `construct_compile` and `retained_annotation_construct_compile` are an
+  alternating-order pair over the same 100,000-point line-and-point plot. The
+  latter adds exactly one plain text node and one UniVector arrow. On the
+  2026-08-15 Darwin arm64 run they averaged 21.64 ms and 21.88 ms over five
+  iterations after three warmups: a measured difference of 0.24 ms (1.10%).
+  Their observed ranges overlap, so this run does not establish a statistically
+  reliable slowdown. Rendering and the cost of increasing the annotation count
+  are not measured by this stage.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

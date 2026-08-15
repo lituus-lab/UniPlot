@@ -118,6 +118,13 @@ proc secondaryAxisSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   result.secondaryY(scale = 1.8, offset = 32.0, label = "fahrenheit")
 
+proc retainedAnnotationSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  let domainMaximum = max(1.0, float64(count - 1) / 25.0)
+  result.annotateText(domainMaximum * 0.75, 1.0, "sample")
+  result.annotateArrow(domainMaximum * 0.6, 0.5,
+    domainMaximum * 0.75, 1.0)
+
 proc facetedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   var groups = newSeqOfCap[string](count)
@@ -172,6 +179,7 @@ when isMainModule:
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
+      retainedAnnotationCompileTimes,
       jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
@@ -192,12 +200,17 @@ when isMainModule:
       if rowFilter.rowIsFinite(row): inc finiteCount
     let rowFilterMs = elapsedMs(started)
 
-    var sceneResult, secondaryResult: tuple[ms: float64; nodes: int]
+    var sceneResult, secondaryResult, retainedAnnotationResult:
+      tuple[ms: float64; nodes: int]
     if (iteration and 1) == 0:
       sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
       secondaryResult = measureScene(
         secondaryAxisSpec(pointCount).compileScene(size))
+      retainedAnnotationResult = measureScene(
+        retainedAnnotationSpec(pointCount).compileScene(size))
     else:
+      retainedAnnotationResult = measureScene(
+        retainedAnnotationSpec(pointCount).compileScene(size))
       secondaryResult = measureScene(
         secondaryAxisSpec(pointCount).compileScene(size))
       sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
@@ -254,6 +267,7 @@ when isMainModule:
       styledResult.nodes + continuousColorResult.nodes +
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + secondaryResult.nodes + gridResult.nodes +
+      retainedAnnotationResult.nodes +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
@@ -270,6 +284,7 @@ when isMainModule:
       uncertaintyCompileTimes.push uncertaintyResult.ms
       themedCompileTimes.push themedResult.ms
       secondaryCompileTimes.push secondaryResult.ms
+      retainedAnnotationCompileTimes.push retainedAnnotationResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
       categoricalGridCompileTimes.push categoricalGridResult.ms
@@ -305,6 +320,8 @@ when isMainModule:
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "themed_construct_compile": summary(themedCompileTimes),
       "secondary_axis_construct_compile": summary(secondaryCompileTimes),
+      "retained_annotation_construct_compile": summary(
+        retainedAnnotationCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "categorical_grid_construct_compile": summary(
