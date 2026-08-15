@@ -81,6 +81,16 @@ int uplot_render_facet_grid_png(uplot_plot *, const char *column, int columns,
                                 int width, int height, int gap, int shared_x,
                                 int shared_y, const char *font_path,
                                 uint8_t **, size_t *);
+int uplot_render_facet_matrix_svg(uplot_plot *, const char *row_column,
+                                  const char *column_column, int width,
+                                  int height, int gap, int shared_x,
+                                  int shared_y, const char *font_path,
+                                  uint8_t **, size_t *);
+int uplot_render_facet_matrix_png(uplot_plot *, const char *row_column,
+                                  const char *column_column, int width,
+                                  int height, int gap, int shared_x,
+                                  int shared_y, const char *font_path,
+                                  uint8_t **, size_t *);
 void uplot_buffer_free(void *, size_t);
 void uplot_plot_free(uplot_plot *);
 

@@ -332,6 +332,45 @@ proc uplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
   renderFacetGrid(value, column, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, false)
 
+proc renderFacetMatrix(value: pointer; rowColumn, columnColumn: cstring;
+    width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t; svg: bool): cint =
+  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  output[] = nil
+  outputLen[] = 0
+  if value.isNil or rowColumn.isNil or columnColumn.isNil or
+      ($rowColumn).len == 0 or ($columnColumn).len == 0 or width <= 0 or
+      height <= 0 or gap < 0 or sharedX notin 0 .. 1 or
+      sharedY notin 0 .. 1 or fontPath.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let composed = compileFacetMatrix(handle(value).spec, $rowColumn,
+      $columnColumn, Size(width: int(width), height: int(height)), int(gap),
+      sharedX == 1, sharedY == 1)
+    let font = loadTtf($fontPath)
+    if svg:
+      copyBuffer(composed.toSvg(font), output, outputLen)
+    else:
+      copyBuffer(composed.encodePng(font), output, outputLen)
+  except CatchableError, Defect:
+    output[] = nil
+    outputLen[] = 0
+    UPLOT_ERR_RENDER
+
+proc uplot_render_facet_matrix_svg*(value: pointer; rowColumn,
+    columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
+    fontPath: cstring; output: ptr ptr uint8;
+    outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
+    sharedX, sharedY, fontPath, output, outputLen, true)
+
+proc uplot_render_facet_matrix_png*(value: pointer; rowColumn,
+    columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
+    fontPath: cstring; output: ptr ptr uint8;
+    outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
+    sharedX, sharedY, fontPath, output, outputLen, false)
+
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =
   if not value.isNil: deallocShared(value)

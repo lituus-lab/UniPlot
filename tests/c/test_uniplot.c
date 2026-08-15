@@ -65,7 +65,9 @@ int main(void) {
   uplot_buffer_free(png, png_len);
 
   const char *groups[] = {"west", "east", "west"};
+  const char *sides[] = {"left", "right", "right"};
   assert(uplot_add_categorical_column(plot, "group", groups, 3) == UPLOT_OK);
+  assert(uplot_add_categorical_column(plot, "side", sides, 3) == UPLOT_OK);
   assert(uplot_add_categorical_column(plot, "bad", groups, 2) ==
          UPLOT_ERR_ARGUMENT);
   svg = NULL;
@@ -80,6 +82,11 @@ int main(void) {
                                      TEST_FONT, &svg, &svg_len) ==
          UPLOT_ERR_RENDER);
   assert(svg == NULL && svg_len == 0);
+  assert(uplot_render_facet_matrix_png(plot, "group", "side", 656, 480, 16,
+                                       1, 1, TEST_FONT, &png, &png_len) ==
+         UPLOT_OK);
+  assert(png_len > 8 && png[0] == 137 && png[1] == 'P');
+  uplot_buffer_free(png, png_len);
 
   uplot_plot *panels[] = {plot, plot};
   svg = NULL;
