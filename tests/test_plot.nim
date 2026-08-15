@@ -87,6 +87,51 @@ suite "plot compilation":
     check spec.layers[1].missingValues == BreakOnMissing
     check spec.layers[2].missingValues == RejectMissing
 
+  test "missing values break lines and areas without joining gaps":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
+    frame.addColumn("y", [0.0, 1.0, NaN, 1.0, 0.0])
+
+    var brokenLine = plot(frame)
+    brokenLine.geomLine(aes("x", "y"))
+    let brokenLineScene = brokenLine.compileScene()
+    var brokenLineNodes = 0
+    for node in brokenLineScene.nodes:
+      if node.id != 0: inc brokenLineNodes
+    check brokenLineNodes == 2
+
+    var droppedLine = plot(frame)
+    droppedLine.geomLine(aes("x", "y"), missingValues = DropMissing)
+    let droppedLineScene = droppedLine.compileScene()
+    var droppedLineNodes = 0
+    for node in droppedLineScene.nodes:
+      if node.id != 0: inc droppedLineNodes
+    check droppedLineNodes == 1
+
+    var brokenArea = plot(frame)
+    brokenArea.geomArea(aes("x", "y"))
+    let brokenAreaScene = brokenArea.compileScene()
+    var brokenAreaNodes = 0
+    for node in brokenAreaScene.nodes:
+      if node.id != 0: inc brokenAreaNodes
+    check brokenAreaNodes == 2
+
+  test "missing values can be dropped or rejected explicitly":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, Inf, 2.0])
+    var dropped = plot(frame)
+    dropped.geomPoint(aes("x", "y"))
+    let droppedScene = dropped.compileScene()
+    var pointNodes = 0
+    for node in droppedScene.nodes:
+      if node.id != 0: inc pointNodes
+    check pointNodes == 2
+
+    var rejected = plot(frame)
+    rejected.geomPoint(aes("x", "y"), missingValues = RejectMissing)
+    expect PlotError: discard rejected.compileScene()
+
   test "named layers produce a deterministic optional legend":
     var spec = sample()
     spec.layers[0].legendLabel = "Trend"

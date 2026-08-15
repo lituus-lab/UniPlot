@@ -285,64 +285,87 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var finiteColumns = @[layer.mapping.x, layer.mapping.y]
     if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
     if layer.mapping.alpha.len > 0: finiteColumns.add layer.mapping.alpha
-    let rows = spec.data.finiteRows(finiteColumns)
+    let rowFilter = spec.data.initRowFilter(finiteColumns)
     var points: seq[Point]
     var colors: seq[Color]
     var sizes: seq[float32]
     var shapes: seq[MarkerShape]
     var lineStyles: seq[LineStyle]
+    var labels: seq[string]
+    var breakBefore: seq[bool]
     var categoryColors = initTable[string, Color]()
     let paintMapping = if layer.mapping.fill.len > 0:
       layer.mapping.fill else: layer.mapping.color
+    let paintValues = if paintMapping.len > 0:
+      spec.data.categorical(paintMapping) else: @[]
     if paintMapping.len > 0:
       for entry in spec.categoricalEntries(layer, paintMapping):
         categoryColors[entry.category] = entry.color
-      let mappedValues = spec.data.categorical(paintMapping)
-      for row in rows: colors.add categoryColors[mappedValues[row]]
-    else:
-      for _ in rows: colors.add layer.color
-    if layer.mapping.shape.len > 0:
-      let values = spec.data.categorical(layer.mapping.shape)
-      var mapped = initTable[string, MarkerShape]()
-      for row in rows:
-        if values[row] notin mapped:
-          mapped[values[row]] = mappedShape(mapped.len)
-        shapes.add mapped[values[row]]
-    else:
-      for _ in rows: shapes.add layer.shape
-    if layer.mapping.lineStyle.len > 0:
-      let values = spec.data.categorical(layer.mapping.lineStyle)
-      var mapped = initTable[string, LineStyle]()
-      for row in rows:
-        if values[row] notin mapped:
-          mapped[values[row]] = mappedLineStyle(mapped.len)
-        lineStyles.add mapped[values[row]]
-    else:
-      for _ in rows: lineStyles.add layer.lineStyle
-    if layer.mapping.alpha.len > 0:
-      let values = spec.data.numeric(layer.mapping.alpha)
-      let scale = trainContinuous(values, spec.mappedAlphaRange.minimum,
-        spec.mappedAlphaRange.maximum)
-      for i, row in rows: colors[i] = colors[i].withOpacity(scale.map(values[row]))
-    if layer.mapping.size.len > 0:
-      let values = spec.data.numeric(layer.mapping.size)
-      let scale = trainContinuous(values, spec.mappedSizeRange.minimum,
+    let shapeValues = if layer.mapping.shape.len > 0:
+      spec.data.categorical(layer.mapping.shape) else: @[]
+    let lineStyleValues = if layer.mapping.lineStyle.len > 0:
+      spec.data.categorical(layer.mapping.lineStyle) else: @[]
+    let alphaValues = if layer.mapping.alpha.len > 0:
+      spec.data.numeric(layer.mapping.alpha) else: @[]
+    let sizeValues = if layer.mapping.size.len > 0:
+      spec.data.numeric(layer.mapping.size) else: @[]
+    let labelValues = if layer.mapping.label.len > 0:
+      spec.data.categorical(layer.mapping.label) else: @[]
+    var shapeMap = initTable[string, MarkerShape]()
+    var lineStyleMap = initTable[string, LineStyle]()
+    var alphaScale: ContinuousScale
+    if alphaValues.len > 0:
+      alphaScale = trainContinuous(alphaValues,
+        spec.mappedAlphaRange.minimum, spec.mappedAlphaRange.maximum)
+    var sizeScale: ContinuousScale
+    if sizeValues.len > 0:
+      sizeScale = trainContinuous(sizeValues, spec.mappedSizeRange.minimum,
         spec.mappedSizeRange.maximum)
-      for row in rows: sizes.add scale.map(values[row])
-    else:
-      let fallback = if layer.size > 0: layer.size else:
-        case layer.mark
-        of mkPoint: spec.theme.pointSize
-        of mkLine: spec.theme.lineWidth
-        of mkText: 12'f32
-        of mkBar, mkArea: 0'f32
-      for _ in rows: sizes.add fallback
-    for row in rows:
+    let fallbackSize = if layer.size > 0: layer.size else:
+      case layer.mark
+      of mkPoint: spec.theme.pointSize
+      of mkLine: spec.theme.lineWidth
+      of mkText: 12'f32
+      of mkBar, mkArea: 0'f32
+    var pendingBreak = false
+    for row in 0 ..< spec.data.rowCount:
+      if not rowFilter.rowIsFinite(row):
+        case layer.missingValues
+        of DropMissing:
+          discard
+        of BreakOnMissing:
+          pendingBreak = true
+        of RejectMissing:
+          raise newException(PlotError,
+            "layer contains a non-finite mapped value")
+        continue
       let x = if xKind == ckNumeric:
         xScale.map(numericXs[row])
       else:
         xBand.map(categoricalXs[row])
       points.add Point(x: x, y: yScale.map(ys[row]))
+      if layer.mark in {mkLine, mkArea}: breakBefore.add pendingBreak
+      pendingBreak = false
+      var paint = if paintValues.len > 0:
+        categoryColors[paintValues[row]] else: layer.color
+      if alphaValues.len > 0:
+        paint = paint.withOpacity(alphaScale.map(alphaValues[row]))
+      colors.add paint
+      if shapeValues.len > 0:
+        if shapeValues[row] notin shapeMap:
+          shapeMap[shapeValues[row]] = mappedShape(shapeMap.len)
+        shapes.add shapeMap[shapeValues[row]]
+      else:
+        shapes.add layer.shape
+      if lineStyleValues.len > 0:
+        if lineStyleValues[row] notin lineStyleMap:
+          lineStyleMap[lineStyleValues[row]] = mappedLineStyle(lineStyleMap.len)
+        lineStyles.add lineStyleMap[lineStyleValues[row]]
+      else:
+        lineStyles.add layer.lineStyle
+      sizes.add(if sizeValues.len > 0:
+        sizeScale.map(sizeValues[row]) else: fallbackSize)
+      if labelValues.len > 0: labels.add labelValues[row]
     case layer.mark
     of mkPoint:
       for i, point in points:
@@ -355,14 +378,20 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
         layer.mapping.lineStyle.len > 0
       if not hasRowAesthetics and points.len > 1:
-        result.addPath(linePath(points, sizes[0], lineStyles[0]), colors[0],
-          nodeId)
-        inc nodeId
+        var start = 0
+        for stop in 1 .. points.len:
+          if stop == points.len or breakBefore[stop]:
+            if stop - start > 1:
+              result.addPath(linePath(points.toOpenArray(start, stop - 1),
+                sizes[start], lineStyles[start]), colors[start], nodeId)
+              inc nodeId
+            start = stop
       else:
         for i in 1 ..< points.len:
-          result.addPath(linePath([points[i - 1], points[i]], sizes[i],
-            lineStyles[i]), colors[i], nodeId)
-          inc nodeId
+          if not breakBefore[i]:
+            result.addPath(linePath([points[i - 1], points[i]], sizes[i],
+              lineStyles[i]), colors[i], nodeId)
+            inc nodeId
     of mkBar:
       let barWidth = if xKind == ckCategorical: xBand.bandwidth
         else: max(1'f32, area.width / float32(max(1, points.len)) * 0.8)
@@ -376,16 +405,21 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     of mkArea:
       if points.len > 0:
         let base = yScale.map(0.0)
-        var areaPoints = points
-        areaPoints.add Point(x: points[^1].x, y: base)
-        areaPoints.add Point(x: points[0].x, y: base)
-        result.addPath(polygon(areaPoints), layer.color, nodeId); inc nodeId
+        var start = 0
+        for stop in 1 .. points.len:
+          if stop == points.len or breakBefore[stop]:
+            var areaPoints = newSeqOfCap[Point](stop - start + 2)
+            for index in start ..< stop: areaPoints.add points[index]
+            areaPoints.add Point(x: points[stop - 1].x, y: base)
+            areaPoints.add Point(x: points[start].x, y: base)
+            result.addPath(polygon(areaPoints), layer.color, nodeId)
+            inc nodeId
+            start = stop
     of mkText:
       if layer.mapping.label.len == 0:
         raise newException(PlotError, "text layers require a label mapping")
-      let labels = spec.data.categorical(layer.mapping.label)
-      for i, row in rows:
-        result.addText(labels[row], points[i], sizes[i],
+      for i, label in labels:
+        result.addText(label, points[i], sizes[i],
           colors[i], nodeId); inc nodeId
   if legendEntries.len > 0:
     let legendX = area.xMax + 24
