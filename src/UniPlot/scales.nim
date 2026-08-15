@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[math, algorithm, strformat, tables]
+import std/[math, strformat, tables]
 import UniPlot/common
 
 type
@@ -12,6 +12,11 @@ type
     kind*: ScaleKind
     domainMin*, domainMax*: float64
     rangeMin*, rangeMax*: float32
+
+  ContinuousDomain* = object
+    kind*: ScaleKind
+    hasValues: bool
+    minimum, maximum: float64
 
   BandScale* = object
     domain*: seq[string]
@@ -29,6 +34,33 @@ proc continuousScale*(domainMin, domainMax: float64; rangeMin,
   ContinuousScale(kind: kind, domainMin: domainMin, domainMax: domainMax,
     rangeMin: rangeMin, rangeMax: rangeMax)
 
+proc initContinuousDomain*(kind = skLinear): ContinuousDomain =
+  ContinuousDomain(kind: kind)
+
+proc addValues*(domain: var ContinuousDomain; values: openArray[float64]) =
+  for value in values:
+    if value.isFinite and (domain.kind != skLog10 or value > 0):
+      if not domain.hasValues:
+        domain.minimum = value
+        domain.maximum = value
+        domain.hasValues = true
+      else:
+        domain.minimum = min(domain.minimum, value)
+        domain.maximum = max(domain.maximum, value)
+
+proc train*(domain: ContinuousDomain; rangeMin,
+    rangeMax: float32): ContinuousScale =
+  if not domain.hasValues:
+    raise newException(PlotError, "cannot train a scale from empty finite data")
+  var lo = domain.minimum
+  var hi = domain.maximum
+  if lo == hi:
+    let pad = if lo == 0: 1.0 else: abs(lo) * 0.05
+    lo -= pad
+    hi += pad
+    if domain.kind == skLog10: lo = max(lo, domain.minimum * 0.5)
+  continuousScale(lo, hi, rangeMin, rangeMax, domain.kind)
+
 proc map*(scale: ContinuousScale; value: float64): float32 =
   if not value.isFinite or (scale.kind == skLog10 and value <= 0):
     raise newException(PlotError, "value is outside the scale domain")
@@ -41,20 +73,9 @@ proc map*(scale: ContinuousScale; value: float64): float32 =
 
 proc trainContinuous*(values: openArray[float64]; rangeMin, rangeMax: float32;
     kind = skLinear): ContinuousScale =
-  var finite: seq[float64]
-  for value in values:
-    if value.isFinite and (kind != skLog10 or value > 0): finite.add value
-  if finite.len == 0:
-    raise newException(PlotError, "cannot train a scale from empty finite data")
-  finite.sort()
-  var lo = finite[0]
-  var hi = finite[^1]
-  if lo == hi:
-    let pad = if lo == 0: 1.0 else: abs(lo) * 0.05
-    lo -= pad
-    hi += pad
-    if kind == skLog10: lo = max(lo, finite[0] * 0.5)
-  continuousScale(lo, hi, rangeMin, rangeMax, kind)
+  var domain = initContinuousDomain(kind)
+  domain.addValues(values)
+  domain.train(rangeMin, rangeMax)
 
 proc ticks*(scale: ContinuousScale; count = 5): seq[float64] =
   if count < 2: raise newException(PlotError, "tick count must be at least two")
