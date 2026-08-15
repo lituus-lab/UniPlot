@@ -23,6 +23,10 @@ type
     positions*: Table[string, float32]
     rangeMin*, rangeMax*, bandwidth*: float32
 
+  BandDomain* = object
+    values: seq[string]
+    seen: Table[string, bool]
+
 proc continuousScale*(domainMin, domainMax: float64; rangeMin,
     rangeMax: float32; kind = skLinear): ContinuousScale =
   if not domainMin.isFinite or not domainMax.isFinite or domainMin == domainMax:
@@ -91,24 +95,38 @@ proc tickLabel*(value: float64): string =
   if abs(value) >= 1e5 or (value != 0 and abs(value) < 1e-3): &"{value:.3e}"
   else: &"{value:.4g}"
 
-proc trainBand*(values: openArray[string]; rangeMin, rangeMax: float32;
+proc initBandDomain*(): BandDomain =
+  result.seen = initTable[string, bool]()
+
+proc addValues*(domain: var BandDomain; values: openArray[string]) =
+  for value in values:
+    if value notin domain.seen:
+      domain.seen[value] = true
+      domain.values.add value
+
+proc train*(domain: BandDomain; rangeMin, rangeMax: float32;
     padding = 0.1'f32): BandScale =
   if not rangeMin.isFinite or not rangeMax.isFinite or rangeMin == rangeMax:
-    raise newException(PlotError, "band scale range must be finite and non-degenerate")
+    raise newException(PlotError,
+      "band scale range must be finite and non-degenerate")
   if padding < 0 or padding >= 1 or not padding.isFinite:
     raise newException(PlotError, "band padding must be in [0, 1)")
-  result.rangeMin = rangeMin; result.rangeMax = rangeMax
-  result.positions = initTable[string, float32]()
-  for value in values:
-    if value notin result.positions:
-      result.positions[value] = 0
-      result.domain.add value
-  if result.domain.len == 0:
+  if domain.values.len == 0:
     raise newException(PlotError, "cannot train a band scale from empty data")
+  result.rangeMin = rangeMin
+  result.rangeMax = rangeMax
+  result.domain = domain.values
+  result.positions = initTable[string, float32]()
   let step = (rangeMax - rangeMin) / float32(result.domain.len)
   result.bandwidth = abs(step) * (1 - padding)
   for index, value in result.domain:
     result.positions[value] = rangeMin + (float32(index) + 0.5) * step
+
+proc trainBand*(values: openArray[string]; rangeMin, rangeMax: float32;
+    padding = 0.1'f32): BandScale =
+  var domain = initBandDomain()
+  domain.addValues(values)
+  domain.train(rangeMin, rangeMax, padding)
 
 proc map*(scale: BandScale; value: string): float32 =
   if value notin scale.positions:

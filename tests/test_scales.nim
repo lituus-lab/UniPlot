@@ -32,6 +32,14 @@ suite "scales":
     logDomain.addValues([-1.0, 10.0, 100.0])
     check logDomain.train(0, 1).domainMin == 10.0
 
+  test "band domains retain unique categories across batches":
+    var domain = initBandDomain()
+    domain.addValues(["b", "a"])
+    domain.addValues(["a", "c"])
+    let scale = domain.train(0, 120)
+    check scale.domain == @["b", "a", "c"]
+    check scale.map("b") < scale.map("c")
+
   test "invalid domains, ranges, values and tick counts are rejected":
     expect PlotError: discard continuousScale(1, 1, 0, 1)
     expect PlotError: discard continuousScale(NaN, 1, 0, 1)
@@ -40,6 +48,7 @@ suite "scales":
     expect PlotError: discard continuousScale(0, 1, 0, 1).ticks(1)
     expect PlotError: discard trainContinuous([], 0, 1)
     expect PlotError: discard initContinuousDomain().train(0, 1)
+    expect PlotError: discard initBandDomain().train(0, 1)
     expect PlotError: discard trainBand([], 0, 1)
     expect PlotError: discard trainBand(["a"], 0, 0)
     expect PlotError: discard trainBand(["a"], 0, 1, 1)
