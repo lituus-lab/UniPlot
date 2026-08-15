@@ -100,6 +100,21 @@ def test_categorical_heatmaps_render_and_validate_empty_plot_contract():
     with pytest.raises(RuntimeError):
         all_missing.svg(FONT)
 
+def test_explicit_break_histograms_render_and_validate_empty_plot_contract():
+    plot = uniplot.Plot().histogram(
+        [-1, 0, 0.5, 1, 2, 3, float("nan")], [0, 1, 2],
+        color="#267a5e")
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.histogram([1], [0, 1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().histogram([], [0, 1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().histogram([1], [0])
+    with pytest.raises(ValueError):
+        uniplot.Plot().histogram([1], [0, 0])
+
 def test_line_styles_and_marker_shapes_are_exposed():
     plot = uniplot.Plot().line(
         [0, 1, 2], [1, 2, 1], style=uniplot.LINE_DOT_DASH).scatter(

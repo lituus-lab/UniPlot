@@ -20,6 +20,8 @@ cdef extern from "UniPlot.h":
                          const char *, float)
     int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
                            double, const char *, const char *)
+    int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
+                                   const double *, size_t, const char *)
     int uplot_add_heatmap(uplot_plot *, const char **, const char **,
                           const double *, size_t, int)
     int uplot_add_categorical_column(uplot_plot *, const char *,
@@ -229,6 +231,39 @@ cdef class Plot:
             free(x_items); free(y_items); free(number_items)
         if status != 0:
             raise ValueError("invalid heatmap or non-empty plot")
+        return self
+
+    def histogram(self, values, breaks, color="#3366cc"):
+        values = list(values)
+        breaks = list(breaks)
+        if len(values) == 0:
+            raise ValueError("histogram values cannot be empty")
+        if len(breaks) < 2:
+            raise ValueError("histogram breaks require at least two boundaries")
+        cdef size_t value_count = len(values)
+        cdef size_t break_count = len(breaks)
+        cdef double *value_items = <double *>malloc(
+            value_count * sizeof(double))
+        cdef double *break_items = <double *>malloc(
+            break_count * sizeof(double))
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if value_items == NULL or break_items == NULL:
+            free(value_items); free(break_items)
+            raise MemoryError()
+        try:
+            for index in range(value_count):
+                value_items[index] = float(values[index])
+            for index in range(break_count):
+                break_items[index] = float(breaks[index])
+            status = uplot_add_histogram_breaks(
+                self._handle, value_items, value_count,
+                break_items, break_count, encoded_color)
+        finally:
+            free(value_items); free(break_items)
+        if status != 0:
+            raise ValueError("invalid histogram or non-empty plot")
         return self
 
     def categorical_column(self, name, values):
