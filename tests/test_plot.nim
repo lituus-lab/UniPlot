@@ -171,6 +171,23 @@ suite "plot compilation":
     textSpec.geomText(aes("x", "y", "missing"))
     expect PlotError: discard textSpec.compileScene()
 
+  test "themes derive reusable validated style values":
+    let base = darkTheme()
+    let derived = base.deriveTheme(gridColor = "#555b62", lineWidth = 3)
+    check derived.background == base.background
+    check derived.gridColor != base.gridColor
+    check derived.lineWidth == 3
+    check base.withMargins(Insets()).margins == Insets()
+    var first = sample()
+    var second = sample()
+    first.applyTheme(derived)
+    second.applyTheme(derived)
+    check first.compileScene().background == second.compileScene().background
+    when defined(release):
+      expect PlotError: discard base.deriveTheme(lineWidth = -1)
+    else:
+      expect PreConditionDefect: discard base.deriveTheme(lineWidth = -1)
+
   test "layer and convenience constructors reject malformed input":
     var spec = sample()
     expect PlotError: spec.geomLine(aes("", "y"))

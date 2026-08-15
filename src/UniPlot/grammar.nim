@@ -108,6 +108,55 @@ proc defaultTheme*(): Theme =
     gridColor: cssColor("#d9dde3"), margins: Insets(left: 70, top: 50,
     right: 30, bottom: 60), pointSize: 4, lineWidth: 2)
 
+proc deriveTheme*(base: Theme; background = ""; foreground = "";
+    gridColor = ""; pointSize = 0'f32; lineWidth = 0'f32): Theme {.
+    contractual.} =
+  ## Derive a reusable theme. Empty colours and zero numeric values inherit.
+  require:
+    pointSize >= 0 and pointSize.isFinite
+    lineWidth >= 0 and lineWidth.isFinite
+  body:
+    if pointSize < 0 or not pointSize.isFinite or lineWidth < 0 or
+        not lineWidth.isFinite:
+      raise newException(PlotError,
+        "derived theme sizes must be finite and non-negative")
+    result = base
+    if background.len > 0: result.background = cssColor(background)
+    if foreground.len > 0: result.foreground = cssColor(foreground)
+    if gridColor.len > 0: result.gridColor = cssColor(gridColor)
+    if pointSize > 0: result.pointSize = pointSize
+    if lineWidth > 0: result.lineWidth = lineWidth
+
+proc withMargins*(base: Theme; margins: Insets): Theme {.contractual.} =
+  ## Return a theme with an explicit, validated margin set.
+  require:
+    margins.left >= 0 and margins.left.isFinite
+    margins.top >= 0 and margins.top.isFinite
+    margins.right >= 0 and margins.right.isFinite
+    margins.bottom >= 0 and margins.bottom.isFinite
+  body:
+    for margin in [margins.left, margins.top, margins.right, margins.bottom]:
+      if margin < 0 or not margin.isFinite:
+        raise newException(PlotError,
+          "theme margins must be finite and non-negative")
+    result = base
+    result.margins = margins
+
+proc minimalTheme*(): Theme =
+  ## Publication-oriented light preset with quiet grid lines.
+  defaultTheme().deriveTheme(gridColor = "#edf0f2", pointSize = 3.5,
+    lineWidth = 1.5).withMargins(
+      Insets(left: 64, top: 44, right: 24, bottom: 54))
+
+proc darkTheme*(): Theme =
+  ## Dark preset retaining accessible contrast through UniColor parsing.
+  defaultTheme().deriveTheme(background = "#17191c",
+    foreground = "#f1f3f5", gridColor = "#3a3f45")
+
+proc applyTheme*(spec: var PlotSpec; value: Theme) =
+  ## Apply a reusable theme value; compileScene validates public fields.
+  spec.theme = value
+
 proc plot*(data: DataFrame): PlotSpec =
   let continuous = viridis(5)
   if continuous.isErr:
