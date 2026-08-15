@@ -88,6 +88,38 @@ Layer order is rendering order. A zero line width or point radius selects the
 theme default; an explicit positive value overrides it for that layer. Text
 requires the mapped label column to be categorical.
 
+## Reference lines and bands
+
+References live in data coordinates and participate in scale training. They
+therefore remain correct under logarithmic or reversed axes and may extend a
+domain when they lie outside the observed samples.
+"""
+
+nbCode:
+  var referenced = linePlot([0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+    [1.0, 2.8, 2.1, 4.2, 3.7, 5.1], color = "#2457c5")
+  referenced.geomPoint(aes("x", "y"), color = "#d64255", radius = 5)
+  referenced.referenceX(3.0, color = "#7a3db8", width = 2,
+    label = "intervention")
+  referenced.referenceY(4.0, color = "#267a5e", label = "threshold")
+  referenced.referenceXBand(1.0, 2.0, color = "#d9e2f380",
+    label = "window")
+  referenced.referenceYBand(2.4, 3.2, color = "#f4c95d60")
+  referenced.labels(title = "References in data coordinates", x = "time",
+    y = "value")
+  let referencedSvg = referenced.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(referencedSvg,
+  "Reference bands are behind the data; labels and lines use the same trained scales.")
+
+nbText: """
+`referenceX`, `referenceY`, `referenceXBand` and `referenceYBand` require
+finite coordinates. Bands require positive extent. X references require a
+numeric x coordinate, and logarithmic-axis references must be positive. The
+compiler revalidates public `Reference` values even when callers construct
+them directly instead of using these contractual helpers.
+
 ## Legends
 
 A non-empty `legend` argument names a layer. Calling `legend` on the plot
@@ -307,4 +339,4 @@ Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 9)
+validatePage("grammar.html", minSvg = 10)

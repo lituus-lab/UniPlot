@@ -69,7 +69,8 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.
 - [ ] Statistical transforms: binning variants, smoothing, aggregation,
   quantiles and confidence intervals.
-- [ ] Annotations, reference lines/bands, arrows and rich text.
+- [x] Reference lines and reference bands in numeric data coordinates.
+- [ ] Free annotations, arrows and rich text.
 - [ ] Image marks and raster layers.
 - [x] Missing-value policies and intentional line breaks.
 - [ ] Theme inheritance, reusable style sheets and publication presets.
