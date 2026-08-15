@@ -153,6 +153,36 @@ type
     callback: WgpuBufferMapCallback
     userdata1, userdata2: pointer
 
+  WgpuDeviceLostCallback = proc(device: pointer; reason: uint32;
+      message: WgpuStringView; userdata1, userdata2: pointer) {.cdecl.}
+
+  WgpuUncapturedErrorCallback = proc(device: pointer; errorType: uint32;
+      message: WgpuStringView; userdata1, userdata2: pointer) {.cdecl.}
+
+  WgpuDeviceLostCallbackInfo {.bycopy.} = object
+    nextInChain: pointer
+    mode: uint32
+    callback: WgpuDeviceLostCallback
+    userdata1, userdata2: pointer
+
+  WgpuUncapturedErrorCallbackInfo {.bycopy.} = object
+    nextInChain: pointer
+    callback: WgpuUncapturedErrorCallback
+    userdata1, userdata2: pointer
+
+  WgpuQueueDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+
+  WgpuDeviceDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+    requiredFeatureCount: csize_t
+    requiredFeatures, requiredLimits: pointer
+    defaultQueue: WgpuQueueDescriptor
+    deviceLostCallbackInfo: WgpuDeviceLostCallbackInfo
+    uncapturedErrorCallbackInfo: WgpuUncapturedErrorCallbackInfo
+
   CreateInstanceProc = proc(descriptor: pointer): pointer {.cdecl.}
   EnumerateAdaptersProc = proc(instance, options: pointer;
       adapters: ptr pointer): csize_t {.cdecl.}
@@ -199,6 +229,8 @@ type
       offset, size: uint64) {.cdecl.}
   DrawIndexedProc = proc(renderPass: pointer; indexCount, instanceCount,
       firstIndex: uint32; baseVertex: int32; firstInstance: uint32) {.cdecl.}
+  PollDeviceProc = proc(device: pointer; wait: uint32;
+      submissionIndex: pointer): uint32 {.cdecl.}
 
   DeviceRequest = object
     status: Atomic[uint32]
@@ -207,12 +239,19 @@ type
   MapRequest = object
     status: Atomic[uint32]
 
+  DeviceEvents = object
+    lostReason, errorType: Atomic[uint32]
+
   NativeWgpuRuntime* = ref object
     library: LibHandle
     instance, adapter, device, queue: pointer
     meshShader, meshPipeline: pointer
+    events: ptr DeviceEvents
     getVersion: GetVersionProc
     hasFeature: HasFeatureProc
+    processEvents: ProcessEventsProc
+    pollDevice: PollDeviceProc
+    destroyDevice: ReleaseProc
     releaseInstance, releaseAdapter, releaseDevice, releaseQueue: ReleaseProc
     releaseShader, releasePipeline: ReleaseProc
 
@@ -267,6 +306,21 @@ proc receiveMap(status: uint32; message: WgpuStringView;
   discard userdata2
   cast[ptr MapRequest](userdata1).status.store(status, moRelease)
 
+proc receiveDeviceLost(device: pointer; reason: uint32; message: WgpuStringView;
+                       userdata1, userdata2: pointer) {.cdecl.} =
+  discard device
+  discard message
+  discard userdata2
+  cast[ptr DeviceEvents](userdata1).lostReason.store(reason, moRelease)
+
+proc receiveUncapturedError(device: pointer; errorType: uint32;
+                            message: WgpuStringView;
+                            userdata1, userdata2: pointer) {.cdecl.} =
+  discard device
+  discard message
+  discard userdata2
+  cast[ptr DeviceEvents](userdata1).errorType.store(errorType, moRelease)
+
 proc close*(runtime: NativeWgpuRuntime) =
   if runtime.isNil: return
   if runtime.meshPipeline != nil and runtime.releasePipeline != nil:
@@ -279,8 +333,19 @@ proc close*(runtime: NativeWgpuRuntime) =
     runtime.releaseQueue(runtime.queue)
     runtime.queue = nil
   if runtime.device != nil and runtime.releaseDevice != nil:
+    if runtime.pollDevice != nil:
+      discard runtime.pollDevice(runtime.device, 1'u32, nil)
+    if runtime.destroyDevice != nil:
+      runtime.destroyDevice(runtime.device)
+    if runtime.processEvents != nil and runtime.instance != nil:
+      runtime.processEvents(runtime.instance)
     runtime.releaseDevice(runtime.device)
     runtime.device = nil
+    if runtime.processEvents != nil and runtime.instance != nil:
+      runtime.processEvents(runtime.instance)
+  if runtime.events != nil:
+    deallocShared(runtime.events)
+    runtime.events = nil
   if runtime.adapter != nil and runtime.releaseAdapter != nil:
     runtime.releaseAdapter(runtime.adapter)
     runtime.adapter = nil
@@ -309,6 +374,10 @@ proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
           "wgpuInstanceProcessEvents")
       getQueue = loadSymbol[GetQueueProc](library, "wgpuDeviceGetQueue")
     result.getVersion = loadSymbol[GetVersionProc](library, "wgpuGetVersion")
+    result.processEvents = processEvents
+    result.pollDevice = loadSymbol[PollDeviceProc](library, "wgpuDevicePoll")
+    result.destroyDevice = loadSymbol[ReleaseProc](library,
+        "wgpuDeviceDestroy")
     result.hasFeature = loadSymbol[HasFeatureProc](library,
         "wgpuAdapterHasFeature")
     result.releaseInstance = loadSymbol[ReleaseProc](library,
@@ -318,6 +387,10 @@ proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
     result.releaseDevice = loadSymbol[ReleaseProc](library,
         "wgpuDeviceRelease")
     result.releaseQueue = loadSymbol[ReleaseProc](library, "wgpuQueueRelease")
+
+    result.events = cast[ptr DeviceEvents](allocShared0(sizeof(DeviceEvents)))
+    if result.events == nil:
+      raise newException(LibraryError, "cannot allocate WGPU device event state")
 
     result.instance = createInstance(nil)
     if result.instance == nil:
@@ -335,7 +408,15 @@ proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
     let request = cast[ptr DeviceRequest](allocShared0(sizeof(DeviceRequest)))
     if request == nil:
       raise newException(LibraryError, "cannot allocate WGPU request state")
-    discard requestDevice(result.adapter, nil,
+    let emptyLabel = WgpuStringView(data: "".cstring, length: 0)
+    var deviceDescriptor = WgpuDeviceDescriptor(label: emptyLabel,
+      defaultQueue: WgpuQueueDescriptor(label: emptyLabel),
+      deviceLostCallbackInfo: WgpuDeviceLostCallbackInfo(
+        mode: CallbackAllowProcessEvents, callback: receiveDeviceLost,
+        userdata1: result.events),
+      uncapturedErrorCallbackInfo: WgpuUncapturedErrorCallbackInfo(
+        callback: receiveUncapturedError, userdata1: result.events))
+    discard requestDevice(result.adapter, addr deviceDescriptor,
         WgpuRequestDeviceCallbackInfo(mode: CallbackAllowProcessEvents,
           callback: receiveDevice, userdata1: request))
     var attempts = 0
@@ -366,6 +447,16 @@ proc implementationVersion*(runtime: NativeWgpuRuntime): uint32 =
 proc supportsTimestampQueries*(runtime: NativeWgpuRuntime): bool =
   not runtime.isNil and runtime.adapter != nil and runtime.hasFeature != nil and
     runtime.hasFeature(runtime.adapter, FeatureTimestampQuery) != 0
+
+proc deviceLostReason*(runtime: NativeWgpuRuntime): uint32 =
+  if runtime.isNil or runtime.events == nil: 0'u32
+  else: runtime.events.lostReason.load(moAcquire)
+
+proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
+  if runtime.isNil or runtime.events == nil: result = 0'u32
+  else:
+    result = runtime.events.errorType.load(moAcquire)
+    runtime.events.errorType.store(0'u32, moRelease)
 
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
@@ -612,6 +703,10 @@ struct VertexOut {
   for row in 0 ..< int(height):
     copyMem(addr result[row * int(unpaddedRow)],
       unsafeAddr sourceBytes[row * int(paddedRow)], int(unpaddedRow))
+  if runtime.deviceLostReason() != 0'u32:
+    raise newException(LibraryError, "wgpu-native device was lost")
+  if runtime.takeUncapturedError() != 0'u32:
+    raise newException(LibraryError, "wgpu-native reported an uncaptured error")
 
 proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                         red, green, blue, alpha: float64): seq[byte] =

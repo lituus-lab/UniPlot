@@ -109,6 +109,8 @@ proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
         uint32(size.height),
         rgba.comp(0), rgba.comp(1), rgba.comp(2), rgba.alpha)
     except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
       raise newException(WgpuError, error.msg)
 
 proc clearWgpuTarget*(backend: WgpuBackend; size: Size; color: Color) =
@@ -156,6 +158,8 @@ proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
         uint32(size.height), clear.comp(0), clear.comp(1), clear.comp(2),
         clear.alpha, vertices, mesh.indices)
     except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
       raise newException(WgpuError, error.msg)
 
 proc renderWgpuScene*(backend: WgpuBackend; scene: Scene;
@@ -211,4 +215,6 @@ proc renderWgpuScene*(backend: WgpuBackend; scene: Scene;
         uint32(scene.size.height), clear.comp(0), clear.comp(1), clear.comp(2),
         clear.alpha, vertices, indices)
     except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
       raise newException(WgpuError, error.msg)
