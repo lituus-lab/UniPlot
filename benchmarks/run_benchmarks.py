@@ -30,6 +30,7 @@ def command_json(command, provider, env=None):
 def main():
     iterations = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     points = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
+    warmups = int(sys.argv[3]) if len(sys.argv) > 3 else 3
     BUILD.mkdir(exist_ok=True)
     RESULTS.mkdir(exist_ok=True)
     binary = BUILD / "benchmark_uniplot"
@@ -49,16 +50,18 @@ def main():
 
     providers = [
         command_json([str(binary), str(iterations), str(points),
-                      "tests/DejaVuSans.ttf"], "UniPlot"),
+                      "tests/DejaVuSans.ttf", str(warmups)], "UniPlot"),
         command_json([str(benchmark_python), "benchmarks/benchmark_matplotlib.py",
-                      str(iterations), str(points)], "Matplotlib", benchmark_env),
+                      str(iterations), str(points), str(warmups)],
+                     "Matplotlib", benchmark_env),
         command_json([str(benchmark_python), "benchmarks/benchmark_plotly.py",
-                      str(iterations), str(points)], "Plotly", benchmark_env),
+                      str(iterations), str(points), str(warmups)],
+                     "Plotly", benchmark_env),
     ]
     if shutil.which("Rscript"):
         providers.append(command_json([
             "Rscript", "benchmarks/benchmark_ggplot2.R",
-            str(iterations), str(points)
+            str(iterations), str(points), str(warmups)
         ], "ggplot2", benchmark_env))
     else:
         providers.append({"provider": "ggplot2", "available": False,
@@ -67,7 +70,7 @@ def main():
         providers.append(command_json([
             "julia", f"--project={JULIA_PROJECT}",
             "benchmarks/benchmark_plots.jl",
-            str(iterations), str(points)
+            str(iterations), str(points), str(warmups)
         ], "Plots.jl", benchmark_env))
     else:
         providers.append({"provider": "Plots.jl", "available": False,
@@ -86,7 +89,7 @@ def main():
         },
         "methodology": {
             "iterations": iterations,
-            "warmup_iterations": 3,
+            "warmup_iterations": warmups,
             "points": points,
             "canvas": "800x500",
             "warning": "Stages align intent, not internal implementation; compare trends, not API overhead as identical work."

@@ -10,12 +10,21 @@ configurable number of measured iterations.
 ```bash
 nimble benchmarkDeps         # explicit, isolated optional dependency setup
 nimble benchmark             # 20 iterations, 1,000 points
+nimble benchmarkScales       # 10^3, 10^5 and 10^6 points, all providers
 nimble benchmark -- 50 5000  # direct runner arguments when supported
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
 
 Results are written to `benchmarks/results/latest.json` with library versions,
 machine metadata, methodology and mean/standard deviation/min/max.
+`benchmarkScales` writes `benchmarks/results/workload_suite.json`. It uses
+20/3, 5/1 and 1/0 measured/warm-up iterations respectively. SVG and PNG output
+at one million points is intentionally real rather than replaced by a
+no-output shortcut, so the largest workload is expensive in both time and
+memory. Passing a third argument to `run_benchmarks.py` overrides the normal
+three loop warm-ups. Zero disables those warm-ups; provider-specific
+availability checks and runtime initialization remain disclosed implementation
+work rather than being mislabeled as process-start timing.
 
 `benchmarkDeps` creates `build/benchmark-python` for Matplotlib, Plotly and
 Kaleido; `build/benchmark-r-library` for ggplot2 when R is installed; and uses

@@ -58,6 +58,7 @@ when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
   let fontPath = if paramCount() >= 3: paramStr(3) else: "tests/DejaVuSans.ttf"
+  let warmups = if paramCount() >= 4: parseInt(paramStr(4)) else: 3
   let font = loadTtf(fontPath)
   let size = Size(width: 800, height: 500)
   let referenceSpec = sampleSpec(pointCount)
@@ -67,7 +68,7 @@ when isMainModule:
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, svgTimes, pngTimes: RunningStat
   var consumed = 0
-  for iteration in 0 ..< iterations + 3:
+  for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
     let trained = trainContinuous(referenceX, 0, 800)
     let scaleMs = elapsedMs(started)
@@ -103,7 +104,7 @@ when isMainModule:
       styledScene.nodes.len xor continuousColorScene.nodes.len xor
       finiteCount xor int(trained.domainMax)
 
-    if iteration >= 3:
+    if iteration >= warmups:
       scaleTimes.push scaleMs
       rowFilterTimes.push rowFilterMs
       compileTimes.push compileMs
@@ -119,7 +120,7 @@ when isMainModule:
     "points": pointCount,
     "width": size.width,
     "height": size.height,
-    "warmup_iterations": 3,
+    "warmup_iterations": warmups,
     "stages": {
       "continuous_scale_train": summary(scaleTimes),
       "row_filter_scan": summary(rowFilterTimes),

@@ -35,13 +35,14 @@ def make_figure(xs, ys):
 def main():
     iterations = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     point_count = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
+    warmups = int(sys.argv[3]) if len(sys.argv) > 3 else 3
     xs = [index / 25.0 for index in range(point_count)]
     ys = [math.sin(x) + 0.02 * x for x in xs]
     construct, svg, png = [], [], []
     guard = 0
 
     reference = make_figure(xs, ys)
-    for iteration in range(iterations + 3):
+    for iteration in range(iterations + warmups):
         started = time.perf_counter_ns()
         figure = make_figure(xs, ys)
         construct_ms = (time.perf_counter_ns() - started) / 1_000_000
@@ -59,7 +60,7 @@ def main():
         png_ms = (time.perf_counter_ns() - started) / 1_000_000
         guard ^= len(target.getvalue())
 
-        if iteration >= 3:
+        if iteration >= warmups:
             construct.append(construct_ms)
             svg.append(svg_ms)
             png.append(png_ms)
@@ -72,7 +73,7 @@ def main():
         "points": point_count,
         "width": 800,
         "height": 500,
-        "warmup_iterations": 3,
+        "warmup_iterations": warmups,
         "stages": {
             "construct_compile": describe(construct),
             "svg_from_compiled_scene": describe(svg),

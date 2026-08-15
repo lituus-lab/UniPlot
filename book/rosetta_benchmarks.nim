@@ -142,6 +142,7 @@ static and deterministic; browser interaction belongs to a future backend.
 ```bash
 nimble benchmarkDeps
 nimble benchmark
+nimble benchmarkScales
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
 
@@ -157,6 +158,11 @@ Results are written to `benchmarks/results/latest.json` with versions and
 machine metadata. Matplotlib's Agg backend and Plotly/Kaleido are measured when
 installed. The runner records missing providers instead of installing packages
 or silently dropping them.
+
+`benchmarkScales` runs the same output semantics at 10³, 10⁵ and 10⁶ points
+and records all three reports in `benchmarks/results/workload_suite.json`.
+The largest case still serializes actual SVG and PNG output; it is not a
+construction-only substitute presented as an end-to-end result.
 
 The stages align user intent, not implementation internals: Matplotlib can
 defer layout to `savefig`, whereas UniPlot performs it in `compileScene`.

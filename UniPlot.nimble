@@ -113,6 +113,9 @@ task example, "Nim demo (print-only; no file I/O)":
 task benchmark, "Reproducible UniPlot/Matplotlib off-screen benchmark":
   exec "python3 benchmarks/run_benchmarks.py"
 
+task benchmarkScales, "Run cross-library 10^3, 10^5, and 10^6-point workloads":
+  exec "python3 benchmarks/run_workload_suite.py"
+
 task benchmarkDeps, "Install isolated Python/R/Julia benchmark dependencies":
   exec "python3 benchmarks/install_deps.py"
 

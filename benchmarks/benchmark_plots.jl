@@ -6,6 +6,7 @@ using Statistics
 
 iterations = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 20
 point_count = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1000
+warmups = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : 3
 x = collect(0:(point_count - 1)) ./ 25
 y = sin.(x) .+ 0.02 .* x
 
@@ -19,7 +20,8 @@ end
 
 function describe(values)
   @sprintf("{\"mean_ms\":%.9f,\"stdev_ms\":%.9f,\"min_ms\":%.9f,\"max_ms\":%.9f}",
-           mean(values), std(values), minimum(values), maximum(values))
+           mean(values), length(values) > 1 ? std(values) : 0.0,
+           minimum(values), maximum(values))
 end
 
 reference = make_plot()
@@ -27,7 +29,7 @@ construct = Float64[]
 svg_times = Float64[]
 png_times = Float64[]
 guard = 0
-for iteration in 1:(iterations + 3)
+for iteration in 1:(iterations + warmups)
   construct_ms = @elapsed(make_plot()) * 1000
   svg_path = tempname() * ".svg"
   svg_ms = @elapsed(savefig(reference, svg_path)) * 1000
@@ -36,7 +38,7 @@ for iteration in 1:(iterations + 3)
   guard = xor(xor(guard, filesize(svg_path)), filesize(png_path))
   rm(svg_path)
   rm(png_path)
-  if iteration > 3
+  if iteration > warmups
     push!(construct, construct_ms)
     push!(svg_times, svg_ms)
     push!(png_times, png_ms)
@@ -45,8 +47,8 @@ end
 
 @printf(paste0(
   "{\"provider\":\"Plots.jl\",\"version\":\"%s\",\"iterations\":%d,",
-  "\"points\":%d,\"width\":800,\"height\":500,\"warmup_iterations\":3,",
+  "\"points\":%d,\"width\":800,\"height\":500,\"warmup_iterations\":%d,",
   "\"stages\":{\"construct_compile\":%s,\"svg_from_compiled_scene\":%s,",
   "\"png_from_compiled_scene\":%s},\"guard\":%d}\n"),
-  string(pkgversion(Plots)), iterations, point_count, describe(construct),
+  string(pkgversion(Plots)), iterations, point_count, warmups, describe(construct),
   describe(svg_times), describe(png_times), guard)
