@@ -67,7 +67,7 @@ silently claimed by the focused 1.0 publication contract.
 - [x] One-dimensional categorical facets in Nim, C and Python.
 - [x] Two-dimensional categorical facet matrices preserving empty Cartesian
   cells in Nim, C and Python.
-- [ ] Secondary axes.
+- [x] Affine secondary y guides sharing primary positions in Nim, C and Python.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.
