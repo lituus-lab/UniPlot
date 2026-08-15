@@ -72,6 +72,14 @@ ranking:
   21.34 ms for the unannotated construction in the same process; the apparent
   difference is noise, while the absence of material annotation overhead is
   the relevant observation.
+- `uncertainty_construct_compile` compiles a line, one contiguous ribbon and
+  one capped error bar per row. It includes real UniVector stroke expansion
+  for every interval and is intentionally excluded from cross-provider
+  rankings until all providers share the same uncertainty semantics. On the
+  2026-08-15 Darwin arm64 reference run, 100,000 rows averaged 47.03 ms over
+  five measured iterations, versus 21.29 ms for the common line-plus-point
+  construction in the same process. The 2.21x ratio reflects 100,000 expanded
+  capped intervals and is a regression baseline, not a cross-library result.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other

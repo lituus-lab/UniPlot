@@ -177,6 +177,14 @@ defer layout to `savefig`, whereas UniPlot performs it in `compileScene`.
 Numbers are suitable for regression tracking on the same machine, not for a
 universal “fastest library” claim.
 
+UniPlot additionally reports an `uncertainty_construct_compile` diagnostic:
+one line, one contiguous ribbon and one capped error bar per row. A 100,000-row
+Darwin arm64 run on 2026-08-15 averaged 47.03 ms over five measured iterations,
+versus 21.29 ms for the common line-plus-point construction in the same
+process. This 2.21x ratio includes actual UniVector stroke expansion for all
+100,000 intervals. It is an internal regression baseline, not a comparison
+with differently specified uncertainty marks in other libraries.
+
 `benchmarkDeps` is deliberately explicit. It creates isolated environments
 under `build/`, installs Python plotting dependencies there, and only installs
 ggplot2/Plots.jl when their R/Julia runtimes already exist. The normal library

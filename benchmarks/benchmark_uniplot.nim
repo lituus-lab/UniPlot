@@ -62,6 +62,28 @@ proc annotatedSpec(count: int): PlotSpec =
   result.referenceXBand(domainMaximum * 0.2, domainMaximum * 0.3)
   result.referenceYBand(-0.25, 0.25)
 
+proc uncertaintySpec(count: int): PlotSpec =
+  var
+    x = newSeq[float64](count)
+    estimate = newSeq[float64](count)
+    lower = newSeq[float64](count)
+    upper = newSeq[float64](count)
+  for index in 0 ..< count:
+    x[index] = float64(index) / 25.0
+    estimate[index] = sin(x[index]) + 0.02 * x[index]
+    lower[index] = estimate[index] - 0.25
+    upper[index] = estimate[index] + 0.25
+  var frame = initDataFrame()
+  frame.addColumn("x", x)
+  frame.addColumn("estimate", estimate)
+  frame.addColumn("lower", lower)
+  frame.addColumn("upper", upper)
+  result = plot(frame)
+  let interval = aes("x", "", yMin = "lower", yMax = "upper")
+  result.geomRibbon(interval)
+  result.geomErrorBar(interval)
+  result.geomLine(aes("x", "estimate"))
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -75,7 +97,7 @@ when isMainModule:
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
-      pngTimes: RunningStat
+      uncertaintyCompileTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -107,6 +129,10 @@ when isMainModule:
     let referenceCompileMs = elapsedMs(started)
 
     started = getMonoTime()
+    let uncertaintyScene = uncertaintySpec(pointCount).compileScene(size)
+    let uncertaintyCompileMs = elapsedMs(started)
+
+    started = getMonoTime()
     let svg = reference.toSvg(font)
     let svgMs = elapsedMs(started)
 
@@ -115,7 +141,7 @@ when isMainModule:
     let pngMs = elapsedMs(started)
     consumed += svg.len + png.len + scene.nodes.len + styledScene.nodes.len +
       continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
-      int(trained.domainMax)
+      uncertaintyScene.nodes.len + int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
@@ -124,6 +150,7 @@ when isMainModule:
       styledCompileTimes.push styledCompileMs
       continuousColorCompileTimes.push continuousColorCompileMs
       referenceCompileTimes.push referenceCompileMs
+      uncertaintyCompileTimes.push uncertaintyCompileMs
       svgTimes.push svgMs
       pngTimes.push pngMs
 
@@ -143,6 +170,7 @@ when isMainModule:
       "continuous_color_construct_compile": summary(
         continuousColorCompileTimes),
       "reference_construct_compile": summary(referenceCompileTimes),
+      "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
       "png_from_compiled_scene": summary(pngTimes)
     },
