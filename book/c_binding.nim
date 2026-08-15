@@ -58,8 +58,8 @@ int main(void) {
   plot = restored;
 
   uplot_plot *panels[] = {plot, restored};
-  int status = uplot_render_grid_svg(
-    panels, 2, 2, 1000, 420, 16,
+  int status = uplot_render_grid_svg_shared(
+    panels, 2, 2, 1000, 420, 16, 1, 1,
     "DejaVuSans.ttf", &bytes, &length);
   if (status == UPLOT_OK) {
     fwrite(bytes, 1, length, stdout);
@@ -79,6 +79,9 @@ int main(void) {
 - `uplot_render_grid_svg` and `uplot_render_grid_png` accept a borrowed array
   of non-null plot handles, an explicit row-major column count, canvas size
   and pixel gap. They do not take ownership of the handles.
+- The additive `_shared` variants take `shared_x` and `shared_y` integer flags
+  (`0` or `1`) and derive common numeric domains. The original entry points
+  remain ABI-compatible aliases for two false flags.
 - `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
   ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
   explicit output dimensions and returns null for malformed or unsupported

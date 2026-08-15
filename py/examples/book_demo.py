@@ -28,9 +28,11 @@ def main() -> int:
         .title("Python scatter panel")
     )
     svg_path.write_bytes(uniplot.grid_svg(
-        [figure, second], font, columns=2, width=1000, height=420, gap=16))
+        [figure, second], font, columns=2, width=1000, height=420, gap=16,
+        shared_x=True, shared_y=True))
     png_path.write_bytes(uniplot.grid_png(
-        [figure, second], font, columns=2, width=1000, height=420, gap=16))
+        [figure, second], font, columns=2, width=1000, height=420, gap=16,
+        shared_x=True, shared_y=True))
     return 0
 
 

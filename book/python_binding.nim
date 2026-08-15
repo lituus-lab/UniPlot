@@ -48,9 +48,11 @@ Path("plot.png").write_bytes(figure.png(font))
 
 other = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3])
 Path("grid.svg").write_bytes(
-    uniplot.grid_svg([figure, other], font, columns=2))
+    uniplot.grid_svg([figure, other], font, columns=2,
+                     shared_x=True, shared_y=True))
 Path("grid.png").write_bytes(
-    uniplot.grid_png([figure, other], font, columns=2))
+    uniplot.grid_png([figure, other], font, columns=2,
+                     shared_x=True, shared_y=True))
 ```
 
 Methods return `self`, so construction can be chained. `svg()` and `png()`
@@ -71,9 +73,10 @@ copying it.
   the retained specification.
 - `title(text)` sets the plot title.
 - `svg(font_path)` and `png(font_path)` render bytes.
-- `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16)` and
-  `grid_png(...)` compose borrowed `Plot` instances without transferring their
-  ownership.
+- `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
+  shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
+  instances without transferring ownership. Shared flags derive common
+  numeric domains and reject incompatible transforms or directions.
 - `to_json()` returns the complete schema-v1 specification as `str`;
   `Plot.from_json(payload, width, height)` accepts `str` or UTF-8 `bytes` and
   restores a full Nim grammar specification.

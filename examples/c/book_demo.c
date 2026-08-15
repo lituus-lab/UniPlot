@@ -48,10 +48,10 @@ int main(int argc, char **argv) {
       uplot_set_title(second, "Second C ABI panel") != UPLOT_OK)
     goto cleanup;
   uplot_plot *panels[] = {plot, second};
-  if (uplot_render_grid_svg(panels, 2, 2, 1000, 420, 16, argv[1], &svg,
-                            &svg_length) != UPLOT_OK ||
-      uplot_render_grid_png(panels, 2, 2, 1000, 420, 16, argv[1], &png,
-                            &png_length) != UPLOT_OK)
+  if (uplot_render_grid_svg_shared(panels, 2, 2, 1000, 420, 16, 1, 1,
+                                   argv[1], &svg, &svg_length) != UPLOT_OK ||
+      uplot_render_grid_png_shared(panels, 2, 2, 1000, 420, 16, 1, 1,
+                                   argv[1], &png, &png_length) != UPLOT_OK)
     goto cleanup;
   if (!write_bytes(argv[2], svg, svg_length) ||
       !write_bytes(argv[3], png, png_length))
