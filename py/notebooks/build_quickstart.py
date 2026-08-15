@@ -1,14 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-"""Author py/notebooks/quickstart.ipynb, then execute it so the committed file
-carries real outputs for GitHub to render. Run from the repo root:
-
-    python3 py/notebooks/build_quickstart.py
-
-CI re-executes the notebook against an installed wheel; this script only
-regenerates it after an API change."""
+"""Build and execute the UniPlot Python quickstart notebook."""
 import os
-
 import nbformat as nbf
 from nbclient import NotebookClient
 
@@ -17,80 +10,46 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(HERE, "quickstart.ipynb")
 
 CELLS = [
-    ("md", """# UniTemplate — Python quickstart
+    ("md", """# UniPlot — Python quickstart
 
-`unitemplate` is a Cython extension over the UniTemplate C ABI, shipped as a
-self-contained wheel: the native library travels inside the package, so
-installing it needs neither Nim nor a compiler.
+The Python API drives the same pure-Nim scene and renderers as the Nim and C
+surfaces. A font path is explicit so output is reproducible."""),
+    ("code", """from pathlib import Path
+import sys
+sys.path.insert(0, "py")
+import uniplot
 
-```
-pip install unitemplate
-```
-
-CI executes this notebook against the wheel the release actually publishes, so
-an output below that stops matching fails the build."""),
-    ("md", "## The API"),
-    ("code", """import unitemplate
-
-unitemplate.version(), unitemplate.__version__"""),
-    ("md", "`fibonacci` is the template's hello-world, iterative and O(n)."),
-    ("code", "[unitemplate.fibonacci(n) for n in range(11)]"),
-    ("md", """## The domain is part of the contract
-
-`fibonacci` is defined on `[0, 92]` — 92 being the largest argument whose result
-still fits in a signed 64-bit integer. The bound is not advisory."""),
-    ("code", "unitemplate.fibonacci(92)"),
-    ("md", """Past it the binding raises, rather than returning a silently wrong
-number. This is the contract the Nim library states as a precondition; each
-surface expresses it in the terms its own callers expect."""),
-    ("code", """try:
-    unitemplate.fibonacci(93)
-except ValueError as exc:
-    print("ValueError:", exc)"""),
-    ("code", """try:
-    unitemplate.fibonacci(-1)
-except ValueError as exc:
-    print("ValueError:", exc)"""),
-    ("md", "A non-integer argument is a type error, not a coercion."),
-    ("code", """try:
-    unitemplate.fibonacci(10.0)
-except TypeError as exc:
-    print("TypeError:", exc)"""),
-    ("md", """## The C ABI underneath
-
-The same entry points are reachable from anything that speaks C. There the
-contract is expressed by clamping instead of raising — an exception must never
-unwind across an ABI boundary:
-
-```c
-unitemplate_fibonacci(-5);   /* 0       — clamped */
-unitemplate_fibonacci(200);  /* fib(92) — clamped */
-```
-
-See `include/UniTemplate.h`, and the book for the full picture."""),
+uniplot.version(), uniplot.abi_version()"""),
+    ("code", """font = Path("tests/DejaVuSans.ttf")
+figure = (uniplot.Plot(480, 300)
+          .line([0, 1, 2, 3], [1, 3, 2, 4])
+          .scatter([0, 1, 2, 3], [1, 3, 2, 4], color="#cc3344")
+          .title("Python quickstart"))
+svg = figure.svg(font)
+png = figure.png(font)
+(svg[:4], png[:4], len(svg), len(png))"""),
+    ("md", """`svg` and `png` were compiled from one retained scene. The wheel
+bundles the native library; users provide the TrueType font used for text."""),
 ]
 
-
 def main():
-    nb = nbf.v4.new_notebook()
-    nb.cells = [
-        nbf.v4.new_markdown_cell(src) if kind == "md" else nbf.v4.new_code_cell(src)
-        for kind, src in CELLS
-    ]
-    nb.metadata["kernelspec"] = {
-        "display_name": "Python 3",
-        "language": "python",
-        "name": "python3",
+    notebook = nbf.v4.new_notebook()
+    notebook.cells = []
+    for index, (kind, source) in enumerate(CELLS):
+        cell = (nbf.v4.new_markdown_cell(source) if kind == "md"
+                else nbf.v4.new_code_cell(source))
+        cell.id = f"uniplot-{index + 1}"
+        notebook.cells.append(cell)
+    notebook.metadata["kernelspec"] = {
+        "display_name": "Python 3", "language": "python", "name": "python3"
     }
-    # Execute from the repo root, never from py/: there, `import unitemplate`
-    # would resolve to the py/unitemplate source tree instead of the installed
-    # package, and the notebook would stop testing what it claims to test.
-    NotebookClient(nb, timeout=120, kernel_name="python3",
+    NotebookClient(notebook, timeout=120, kernel_name="python3",
                    resources={"metadata": {"path": ROOT}}).execute()
-    with open(OUT, "w") as f:
-        nbf.write(nb, f)
+    for cell in notebook.cells:
+        cell.metadata.pop("execution", None)
+    with open(OUT, "w", encoding="utf-8") as stream:
+        nbf.write(notebook, stream)
     print(f"wrote {OUT}")
-
 
 if __name__ == "__main__":
     main()

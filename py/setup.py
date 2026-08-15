@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-"""Build unitemplate._core, a Cython extension over the UniTemplate C ABI.
+"""Build uniplot._core, a Cython extension over the UniPlot C ABI.
 
 Normal development: run `nimble pyLib` first so the library is at the repo
 root, then any setup.py command. Installing from the sdist -- no repo root,
@@ -17,9 +17,9 @@ from Cython.Build import cythonize
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-PKG_DIR = os.path.join(HERE, "unitemplate")
+PKG_DIR = os.path.join(HERE, "uniplot")
 VENDOR_DIR = os.path.join(HERE, "_nimsrc")
-NIMBLE_FILE = "UniTemplate.nimble"
+NIMBLE_FILE = "UniPlot.nimble"
 VENDOR_FILES = [NIMBLE_FILE, "config.nims"]
 VENDOR_DIRS = ["src", "include"]
 
@@ -27,13 +27,13 @@ VENDOR_DIRS = ["src", "include"]
 # Elsewhere: bundle the shared lib in the package, found through an rpath
 # relative to the extension.
 if sys.platform == "win32":
-    LIB_NAME, BUNDLED = "UniTemplate.lib", False
+    LIB_NAME, BUNDLED = "UniPlot.lib", False
     LINK_ARGS, NIMBLE_TASK = [], "clibMsvc"
 elif sys.platform == "darwin":
-    LIB_NAME, BUNDLED = "libUniTemplate.dylib", True
+    LIB_NAME, BUNDLED = "libUniPlot.dylib", True
     LINK_ARGS, NIMBLE_TASK = ["-Wl,-rpath,@loader_path"], "clib"
 else:
-    LIB_NAME, BUNDLED = "libUniTemplate.so", True
+    LIB_NAME, BUNDLED = "libUniPlot.so", True
     LINK_ARGS, NIMBLE_TASK = ["-Wl,-rpath,$ORIGIN"], "clib"
 
 
@@ -51,7 +51,7 @@ def vendor_nim_source():
 
 
 def nim_project_dir():
-    """Where UniTemplate.nimble lives: the real repo root in a normal
+    """Where UniPlot.nimble lives: the real repo root in a normal
     checkout, or the vendored copy when building from an extracted sdist
     (which has no parent repo, just this project standalone)."""
     if os.path.exists(os.path.join(ROOT, NIMBLE_FILE)):
@@ -80,7 +80,7 @@ def ensure_lib_built():
         subprocess.check_call(["nimble", NIMBLE_TASK], cwd=proj)
     except FileNotFoundError:
         raise SystemExit(
-            "setup.py: `nimble` not found on PATH. Building unitemplate from "
+            "setup.py: `nimble` not found on PATH. Building uniplot from "
             "source needs Nim (https://nim-lang.org/install.html)."
         )
     except subprocess.CalledProcessError as e:
@@ -106,26 +106,26 @@ else:
         os.makedirs(PKG_DIR, exist_ok=True)
         shutil.copy2(lib_path, os.path.join(PKG_DIR, LIB_NAME))
 
-# The sdist ships the pre-transpiled unitemplate/_core.c, not the .pyx (Cython
+# The sdist ships the pre-transpiled uniplot/_core.c, not the .pyx (Cython
 # rewrites Extension.sources from .pyx to .c when it builds the sdist, so the
 # .pyx is never actually collected). Cythonize only when the .pyx is present
 # (a normal git checkout); an sdist install compiles the shipped .c directly,
 # needing no Cython.
-pyx = os.path.join("unitemplate", "_core.pyx")
+pyx = os.path.join("uniplot", "_core.pyx")
 ext = Extension(
-    "unitemplate._core",
-    sources=[pyx if os.path.exists(os.path.join(HERE, pyx)) else os.path.join("unitemplate", "_core.c")],
+    "uniplot._core",
+    sources=[pyx if os.path.exists(os.path.join(HERE, pyx)) else os.path.join("uniplot", "_core.c")],
     include_dirs=[INCLUDE],
     library_dirs=[LIB_DIR],
     extra_link_args=LINK_ARGS,
-    libraries=["UniTemplate"],
+    libraries=["UniPlot"],
 )
 ext_modules = cythonize([ext], language_level=3) if ext.sources[0].endswith(".pyx") else [ext]
 
 setup(
     ext_modules=ext_modules,
     include_package_data=True,
-    package_data={"unitemplate": [LIB_NAME] if BUNDLED else []},
-    exclude_package_data={"unitemplate": ["_core.c"]},
+    package_data={"uniplot": [LIB_NAME] if BUNDLED else []},
+    exclude_package_data={"uniplot": ["_core.c"]},
     zip_safe=False,
 )
