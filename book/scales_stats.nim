@@ -200,8 +200,38 @@ summation to UniAccurate, avoiding a local numerical kernel and preventing
 avoidable overflow for large finite values. This value object is the shared
 statistical basis for boxplots; rendering code does not recompute quartiles.
 
+## Grouped boxplots
+"""
+
+nbCode:
+  let boxGroups = ["control", "control", "control", "control", "control",
+    "treated", "treated", "treated", "treated", "treated"]
+  let boxValues = [1.0, 1.4, 1.8, 2.1, 5.2,
+    2.0, 2.4, 2.7, 3.0, 3.3]
+  var boxes = boxPlot(boxGroups, boxValues, color = "#267a5e",
+    outlierColor = "#d64255")
+  boxes.labels(title = "Grouped distribution", x = "cohort", y = "response")
+  let boxesSvg = boxes.compileScene(Size(width: 720, height: 420)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(boxesSvg,
+  "Type-7 quartiles, Tukey whiskers and an explicitly retained outlier.")
+
+nbText: """
+`boxPlot(groups, values)` preserves first-seen group order, ignores non-finite
+observations within a group and rejects a group with no finite sample. It
+materialises one validated summary row per group plus separate outlier rows.
+The `mkBoxPlot` renderer only consumes those precomputed columns; it verifies
+`lower whisker ≤ Q1 ≤ median ≤ Q3 ≤ upper whisker` and never hides a second
+statistical implementation. Boxes and outliers become ordinary retained
+UniVector scene paths, so CPU, SVG, PNG and WGPU share the same geometry.
+
+`geomBoxPlot` is also public for callers that already own summary columns.
+Its `boxWidth` is a fraction in `(0, 1]` of the categorical band (or the
+available numeric slot), while its outline width is in screen pixels.
+
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 3)
+validatePage("scales_stats.html", minSvg = 4)
