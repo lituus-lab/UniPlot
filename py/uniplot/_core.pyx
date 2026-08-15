@@ -30,6 +30,8 @@ cdef extern from "UniPlot.h":
                                     const double *, size_t, const char *,
                                     float, int, int)
     int uplot_set_title(uplot_plot *, const char *)
+    int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
+    int uplot_clear_secondary_y(uplot_plot *)
     int uplot_render_png(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_svg(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_grid_svg(uplot_plot **, size_t, int, int, int, int,
@@ -176,6 +178,18 @@ cdef class Plot:
     def title(self, value):
         cdef bytes encoded = str(value).encode("utf-8")
         if uplot_set_title(self._handle, encoded) != 0: raise ValueError("invalid title")
+        return self
+
+    def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
+        cdef bytes encoded = str(label).encode("utf-8")
+        if uplot_set_secondary_y(
+                self._handle, scale, offset, encoded) != 0:
+            raise ValueError("invalid secondary y transform")
+        return self
+
+    def clear_secondary_y(self):
+        if uplot_clear_secondary_y(self._handle) != 0:
+            raise RuntimeError("cannot clear secondary y axis")
         return self
 
     cdef bytes _render(self, font, bint svg):

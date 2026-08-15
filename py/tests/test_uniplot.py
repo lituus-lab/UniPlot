@@ -12,9 +12,13 @@ def test_version():
 
 def test_plot_renders_svg_and_png():
     plot = uniplot.Plot(320, 240).line([0, 1, 2], [1, 3, 2]).scatter(
-        [0, 1, 2], [1, 3, 2], color="#cc3333").title("Python")
+        [0, 1, 2], [1, 3, 2], color="#cc3333").title("Python").secondary_y(
+            1.8, 32.0, "fahrenheit")
     assert plot.svg(FONT).startswith(b"<svg")
     assert plot.png(FONT).startswith(b"\x89PNG")
+    assert plot.clear_secondary_y() is plot
+    with pytest.raises(ValueError):
+        plot.secondary_y(0.0)
 
 def test_plot_grid_renders_svg_and_png():
     first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
