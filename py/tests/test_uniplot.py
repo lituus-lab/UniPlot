@@ -17,6 +17,9 @@ def test_plot_renders_svg_and_png():
                 1.0, 3.0, "peak").annotate_arrow(0.5, 1.5, 1.0, 3.0)
     assert plot.svg(FONT).startswith(b"<svg")
     assert plot.png(FONT).startswith(b"\x89PNG")
+    density = uniplot.Plot().histogram(
+        [0, 0.5, 1, 2, 3], [0, 1, 3], density=True)
+    assert density.svg(FONT).startswith(b"<svg")
     assert plot.clear_secondary_y() is plot
     assert plot.clear_annotations() is plot
     with pytest.raises(ValueError):

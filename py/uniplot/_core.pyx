@@ -22,6 +22,9 @@ cdef extern from "UniPlot.h":
                            double, const char *, const char *)
     int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
                                    const double *, size_t, const char *)
+    int uplot_add_numeric_histogram(uplot_plot *, const double *, size_t,
+                                    const double *, size_t, int,
+                                    const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -236,7 +239,7 @@ cdef class Plot:
             raise ValueError("invalid heatmap or non-empty plot")
         return self
 
-    def histogram(self, values, breaks, color="#3366cc"):
+    def histogram(self, values, breaks, color="#3366cc", bint density=False):
         values = list(values)
         breaks = list(breaks)
         if len(values) == 0:
@@ -260,9 +263,9 @@ cdef class Plot:
                 value_items[index] = float(values[index])
             for index in range(break_count):
                 break_items[index] = float(breaks[index])
-            status = uplot_add_histogram_breaks(
+            status = uplot_add_numeric_histogram(
                 self._handle, value_items, value_count,
-                break_items, break_count, encoded_color)
+                break_items, break_count, density, encoded_color)
         finally:
             free(value_items); free(break_items)
         if status != 0:
