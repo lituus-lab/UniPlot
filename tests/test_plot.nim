@@ -77,3 +77,12 @@ suite "plot compilation":
     for node in hidden.nodes:
       if node.kind == snText:
         check node.text notin ["Series", "Trend", "Samples"]
+
+  test "recipes forward legend labels":
+    var spec = linePlot([0.0, 1.0], [1.0, 2.0], legend = "Observed")
+    spec.legend()
+    let scene = spec.compileScene()
+    var found = false
+    for node in scene.nodes:
+      if node.kind == snText and node.text == "Observed": found = true
+    check found

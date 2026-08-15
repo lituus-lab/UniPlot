@@ -94,28 +94,32 @@ proc legend*(spec: var PlotSpec; title = ""; position = lpRight) =
   spec.legendSpec = LegendSpec(visible: position != lpNone, title: title,
     position: position)
 
-proc linePlot*(x, y: openArray[float64]; color = "#3366cc"): PlotSpec =
+proc linePlot*(x, y: openArray[float64]; color = "#3366cc";
+    legend = ""): PlotSpec =
   var frame = initDataFrame()
   frame.addColumn("x", x); frame.addColumn("y", y)
-  result = plot(frame); result.geomLine(aes("x", "y"), color)
+  result = plot(frame); result.geomLine(aes("x", "y"), color, legend = legend)
 
-proc scatterPlot*(x, y: openArray[float64]; color = "#3366cc"): PlotSpec =
+proc scatterPlot*(x, y: openArray[float64]; color = "#3366cc";
+    legend = ""): PlotSpec =
   var frame = initDataFrame()
   frame.addColumn("x", x); frame.addColumn("y", y)
-  result = plot(frame); result.geomPoint(aes("x", "y"), color)
+  result = plot(frame); result.geomPoint(aes("x", "y"), color,
+    legend = legend)
 
 proc barPlot*(categories: openArray[string]; values: openArray[float64];
-    color = "#3366cc"): PlotSpec =
+    color = "#3366cc"; legend = ""): PlotSpec =
   var frame = initDataFrame()
   frame.addColumn("category", categories); frame.addColumn("value", values)
-  result = plot(frame); result.geomBar(aes("category", "value"), color)
+  result = plot(frame); result.geomBar(aes("category", "value"), color,
+    legend = legend)
 
 proc histogramPlot*(values: openArray[float64]; binCount = 30;
-    color = "#3366cc"): PlotSpec =
+    color = "#3366cc"; legend = ""): PlotSpec =
   let bins = histogram(values, binCount)
   var labels: seq[string]
   var counts: seq[float64]
   for bin in bins:
     labels.add tickLabel(bin.lower) & "–" & tickLabel(bin.upper)
     counts.add float64(bin.count)
-  result = barPlot(labels, counts, color)
+  result = barPlot(labels, counts, color, legend)
