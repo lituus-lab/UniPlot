@@ -355,6 +355,16 @@ every LRU eviction; it is not attributed to byte accounting alone. Streaming
 buffers, render targets and readback storage are outside this prepared-cache
 measurement, so 20 MiB is not a total GPU-memory claim.
 
+The next run splits every vertex/index transfer at the default 4 MiB boundary.
+Across three 50-iteration processes it issued exactly 159 queue writes for 53
+mesh uploads, transferred 541,267,800 bytes and never exceeded 4,194,304 bytes
+in one write. Preparation averaged 73.7713 ms, forced-miss upload plus
+submission 1.0467 ms, resident submission 0.0935 ms and publication 3.1042 ms.
+The forced-miss mean is 0.28% above the preceding byte-budget run and does not
+establish a slowdown. These counters measure host-to-queue calls and payload;
+they do not measure PCIe traffic, GPU completion, allocation traffic or total
+resident memory.
+
 The optional fourth argument compares the current means with a baseline only
 after adapter, backend, workload, canvas and residency semantics match. Each
 phase carries its own ratio derived from repeated runs, because asynchronous

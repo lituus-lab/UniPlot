@@ -68,6 +68,12 @@ validation task checks individual pixels, exact CPU/GPU parity, direct uploads,
 cache hits and LRU eviction. Run `nimble wgpuBenchmark` to measure preparation,
 forced misses, alternating resident submission and publication separately.
 
+Vertex and index transfers are issued in aligned chunks no larger than 4 MiB
+by default. Pass `uploadChunkBytes` to choose a multiple of four bytes from 4
+bytes through 64 MiB. `WgpuDiagnostics` reports queue-write calls, exact bytes
+submitted and the largest individual write. This is a per-call transfer bound;
+it is not a ring buffer or a bound on total backend memory.
+
 ## Typed failures
 
 Plotting-domain and user-input failures raise `PlotError`. UniPlot rejects

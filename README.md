@@ -129,6 +129,11 @@ single prepared scene larger than the byte budget is rejected. The byte count
 covers allocated prepared vertex/index capacities. Direct streaming buffers,
 the render target and readback storage are separate and are not included in
 that prepared-cache budget.
+Queue uploads are split into aligned writes of at most 4 MiB by default.
+`uploadChunkBytes` configures a multiple of four bytes from 4 bytes through
+64 MiB; diagnostics expose the call count, transferred bytes and largest
+write. This bounds each native queue write, not total streaming-buffer or GPU
+memory use.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
 prepare on each call. `nimble wgpuBenchmark` measures preparation,
 forced LRU misses, alternating resident submission and publication separately.
