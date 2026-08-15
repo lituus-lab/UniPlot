@@ -81,6 +81,48 @@ suite "plot composition":
     check $grid.nodes[secondBackground].path == $parsePath(
       "M 417 0 L 817 0 L 817 301 L 417 301 Z")
 
+  test "share numeric domains without mutating source specifications":
+    var
+      first = linePlot([0.0, 1.0], [10.0, 20.0])
+      second = linePlot([2.0, 4.0], [-5.0, 5.0])
+      expectedFirst = first
+      expectedSecond = second
+    expectedFirst.xLimits(0.0, 4.0)
+    expectedSecond.xLimits(0.0, 4.0)
+    expectedFirst.yLimits(-5.0, 20.0)
+    expectedSecond.yLimits(-5.0, 20.0)
+    let
+      shared = compileGrid([first, second], 2,
+        Size(width: 816, height: 300), sharedX = true, sharedY = true)
+      expected = compileGrid([expectedFirst, expectedSecond], 2,
+        Size(width: 816, height: 300))
+    check not first.xScaleSpec.domain.configured
+    check not second.yScaleSpec.domain.configured
+    check shared.nodes.len == expected.nodes.len
+    for index in 0 ..< shared.nodes.len:
+      check shared.nodes[index].kind == expected.nodes[index].kind
+      case shared.nodes[index].kind
+      of snPath:
+        check $shared.nodes[index].path == $expected.nodes[index].path
+      of snText:
+        check shared.nodes[index].text == expected.nodes[index].text
+        check shared.nodes[index].position == expected.nodes[index].position
+
+  test "shared numeric domains reject incompatible axes":
+    let
+      numeric = sampleSpec("#3366cc")
+      categorical = barPlot(["a", "b"], [1.0, 2.0])
+    expect PlotError:
+      discard compileGrid([numeric, categorical], 2, sharedX = true)
+    var logarithmic = sampleSpec("#cc6633")
+    logarithmic.scaleY(skLog10)
+    expect PlotError:
+      discard compileGrid([numeric, logarithmic], 2, sharedY = true)
+    var clipped = numeric
+    clipped.xLimits(0.5, 2.0)
+    expect PlotError:
+      discard compileGrid([clipped, numeric], 2, sharedX = true)
+
   test "reject invalid grid dimensions in every build mode":
     let spec = sampleSpec("#3366cc")
     when not defined(release):

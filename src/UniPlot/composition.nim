@@ -3,7 +3,7 @@
 ## Deterministic composition of independently compiled plots.
 import UniVector
 import contracts
-import UniPlot/[common, grammar, scene, guides]
+import UniPlot/[common, data, scales, grammar, scene, guides]
 
 func composedId(panel: int; nodeId: uint64): uint64 {.inline.} =
   if nodeId == 0: return 0
@@ -13,12 +13,70 @@ func composedId(panel: int; nodeId: uint64): uint64 {.inline.} =
   result = value xor (value shr 31)
   if result == 0: result = 1
 
+proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
+    shareY: bool): seq[PlotSpec] =
+  result = @specs
+  if not shareX and not shareY: return
+  var
+    xDomain = initContinuousDomain()
+    yDomain = initContinuousDomain()
+    initialized = false
+    xKind = skLinear
+    yKind = skLinear
+    xReversed = false
+    yReversed = false
+  for spec in specs:
+    let domains = collectAxisDomains(spec)
+    if not initialized:
+      xKind = spec.xScaleSpec.kind
+      yKind = spec.yScaleSpec.kind
+      xReversed = spec.xScaleSpec.reversed
+      yReversed = spec.yScaleSpec.reversed
+      xDomain = initContinuousDomain(xKind)
+      yDomain = initContinuousDomain(yKind)
+      initialized = true
+    if shareX:
+      if domains.xKind != ckNumeric:
+        raise newException(PlotError,
+          "shared x axes currently require numeric coordinates")
+      if spec.xScaleSpec.kind != xKind or
+          spec.xScaleSpec.reversed != xReversed:
+        raise newException(PlotError,
+          "shared x axes require matching scale kinds and directions")
+      if spec.xScaleSpec.domain.configured:
+        discard domains.xContinuous.train(0, 1,
+          spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
+      xDomain.merge(domains.xContinuous)
+      if spec.xScaleSpec.domain.configured:
+        xDomain.addValues([spec.xScaleSpec.domain.minimum,
+          spec.xScaleSpec.domain.maximum])
+    if shareY:
+      if spec.yScaleSpec.kind != yKind or
+          spec.yScaleSpec.reversed != yReversed:
+        raise newException(PlotError,
+          "shared y axes require matching scale kinds and directions")
+      if spec.yScaleSpec.domain.configured:
+        discard domains.yContinuous.train(0, 1,
+          spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
+      yDomain.merge(domains.yContinuous)
+      if spec.yScaleSpec.domain.configured:
+        yDomain.addValues([spec.yScaleSpec.domain.minimum,
+          spec.yScaleSpec.domain.maximum])
+  if shareX:
+    let bounds = xDomain.fittedBounds()
+    for spec in result.mitems: spec.xLimits(bounds.minimum, bounds.maximum)
+  if shareY:
+    let bounds = yDomain.fittedBounds()
+    for spec in result.mitems: spec.yLimits(bounds.minimum, bounds.maximum)
+
 proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
                   size = Size(width: 1200, height: 800);
-                  gap = 16): Scene {.contractual.} =
+                  gap = 16; sharedX = false;
+                  sharedY = false): Scene {.contractual.} =
   ## Compile plots into a row-major grid on one retained scene.
   ##
-  ## Each panel keeps its own scales, guides, theme and background. Node IDs
+  ## Panels optionally share numeric x or y domains. Each panel keeps its own
+  ## guides, theme and background. Node IDs
   ## are deterministically namespaced by panel so picking can distinguish
   ## otherwise identical specifications.
   require:
@@ -50,7 +108,8 @@ proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
       extraWidth = availableWidth mod columns
       extraHeight = availableHeight mod rows
     result = initScene(size, specs[0].theme.background)
-    for panel, spec in specs:
+    let preparedSpecs = shareNumericDomains(specs, sharedX, sharedY)
+    for panel, spec in preparedSpecs:
       let
         column = panel mod columns
         row = panel div columns
