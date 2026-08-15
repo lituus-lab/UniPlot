@@ -12,6 +12,8 @@ cdef extern from "UniPlot.h":
     const char *uplot_version()
     int uplot_abi_version()
     uplot_plot *uplot_plot_new(int, int)
+    uplot_plot *uplot_plot_from_json(const uint8_t *, size_t, int, int)
+    int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *)
     int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                        const char *, float)
     int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
@@ -59,6 +61,35 @@ cdef class Plot:
     def __dealloc__(self):
         if self._handle != NULL:
             uplot_plot_free(self._handle)
+
+    @classmethod
+    def from_json(cls, payload, int width=800, int height=500):
+        cdef bytes encoded
+        if isinstance(payload, bytes):
+            encoded = payload
+        elif isinstance(payload, str):
+            encoded = payload.encode("utf-8")
+        else:
+            raise TypeError("payload must be str or bytes")
+        cdef uplot_plot *parsed = uplot_plot_from_json(
+            <const uint8_t *>encoded, len(encoded), width, height)
+        if parsed == NULL:
+            raise ValueError("invalid UniPlot JSON or plot dimensions")
+        result = cls(width, height)
+        uplot_plot_free((<Plot>result)._handle)
+        (<Plot>result)._handle = parsed
+        return result
+
+    def to_json(self):
+        cdef uint8_t *output = NULL
+        cdef size_t length = 0
+        if uplot_plot_to_json(self._handle, &output, &length) != 0:
+            raise RuntimeError("JSON encoding failed")
+        try:
+            return PyBytes_FromStringAndSize(
+                <char *>output, length).decode("utf-8")
+        finally:
+            uplot_buffer_free(output, length)
 
     cdef _series(self, x, y, color, float size, bint points, int style,
                  int missing):

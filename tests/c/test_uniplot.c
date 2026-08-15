@@ -65,6 +65,32 @@ int main(void) {
   uplot_buffer_free(png, png_len);
   uplot_plot_free(plot);
 
+  const char *json_source =
+      "{\"schema\":\"org.lituus-lab.uniplot.plot-spec\",\"version\":2}";
+  assert(uplot_plot_from_json(NULL, 0, 320, 240) == NULL);
+  assert(uplot_plot_from_json((const uint8_t *)json_source,
+                              strlen(json_source), 320, 240) == NULL);
+
+  plot = uplot_plot_new(320, 240);
+  assert(plot != NULL);
+  assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
+  uint8_t *json = NULL;
+  size_t json_len = 0;
+  assert(uplot_plot_to_json(NULL, &json, &json_len) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_plot_to_json(plot, &json, &json_len) == UPLOT_OK);
+  assert(json != NULL && json_len > 0);
+  uplot_plot *restored = uplot_plot_from_json(json, json_len, 320, 240);
+  assert(restored != NULL);
+  uint8_t *roundtrip = NULL;
+  size_t roundtrip_len = 0;
+  assert(uplot_plot_to_json(restored, &roundtrip, &roundtrip_len) == UPLOT_OK);
+  assert(roundtrip_len == json_len);
+  assert(memcmp(roundtrip, json, json_len) == 0);
+  uplot_buffer_free(json, json_len);
+  uplot_buffer_free(roundtrip, roundtrip_len);
+  uplot_plot_free(restored);
+  uplot_plot_free(plot);
+
   uplot_plot *rejecting_plot = uplot_plot_new(320, 240);
   assert(rejecting_plot != NULL);
   assert(uplot_add_line_configured(

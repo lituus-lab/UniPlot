@@ -25,3 +25,8 @@ Line styles and marker shapes use the `LINE_*` and `MARKER_*` constants and
 are rendered by the same UniVector geometry as the Nim API.
 `MISSING_BREAK`, `MISSING_DROP` and `MISSING_REJECT` select explicit handling
 for `NaN` and infinite mapped values. Lines break by default; points drop them.
+
+`Plot.to_json()` exports the complete versioned Nim `PlotSpec`; `Plot.from_json`
+restores it with explicit output dimensions. This bridge preserves features
+that do not yet have individual Python builder methods without maintaining a
+second plotting engine in the binding.

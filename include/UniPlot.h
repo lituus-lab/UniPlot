@@ -37,6 +37,9 @@ int uplot_init(void);
 const char *uplot_version(void);
 int uplot_abi_version(void);
 uplot_plot *uplot_plot_new(int width, int height);
+uplot_plot *uplot_plot_from_json(const uint8_t *, size_t, int width,
+                                 int height);
+int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *);
 int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,

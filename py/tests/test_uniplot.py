@@ -42,3 +42,16 @@ def test_missing_value_policies_are_exposed():
         rejecting.svg(FONT)
     with pytest.raises(ValueError):
         uniplot.Plot().line([0, 1], [1, 2], missing=999)
+
+def test_versioned_json_round_trip():
+    original = uniplot.Plot(320, 240).line([1, 2, 3], [2, 4, 3]).title(
+        "Python JSON")
+    payload = original.to_json()
+    restored = uniplot.Plot.from_json(payload, 320, 240)
+    assert restored.to_json() == payload
+    assert restored.svg(FONT).startswith(b"<svg")
+    assert uniplot.Plot.from_json(payload.encode("utf-8")).to_json() == payload
+    with pytest.raises(ValueError):
+        uniplot.Plot.from_json('{"version": 999}')
+    with pytest.raises(TypeError):
+        uniplot.Plot.from_json(42)

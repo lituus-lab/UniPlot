@@ -43,6 +43,20 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
     cast[pointer](handle)
   except CatchableError, Defect: nil
 
+proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
+    height: cint): pointer {.exportc, dynlib, cdecl.} =
+  if payload.isNil or length == 0 or length > csize_t(high(int)): return nil
+  try:
+    let size = Size(width: int(width), height: int(height))
+    size.validate()
+    var encoded = newString(int(length))
+    copyMem(addr encoded[0], payload, int(length))
+    let parsed = PlotHandle(spec: fromJson(encoded), size: size)
+    GC_ref(parsed)
+    cast[pointer](parsed)
+  except CatchableError, Defect:
+    nil
+
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
 
 proc resizeFrame(frame: var DataFrame; rowCount: int) =
@@ -160,6 +174,21 @@ proc copyBuffer(bytes: openArray[byte]; output: ptr ptr uint8;
   copyMem(memory, unsafeAddr bytes[0], bytes.len)
   output[] = memory; outputLen[] = csize_t(bytes.len)
   UPLOT_OK
+
+proc copyBuffer(bytes: string; output: ptr ptr uint8;
+    outputLen: ptr csize_t): cint =
+  if bytes.len == 0: return copyBuffer([], output, outputLen)
+  copyBuffer(bytes.toOpenArrayByte(0, bytes.high), output, outputLen)
+
+proc uplot_plot_to_json*(value: pointer; output: ptr ptr uint8;
+    outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil: return UPLOT_ERR_ARGUMENT
+  try:
+    copyBuffer(handle(value).spec.toJson, output, outputLen)
+  except CatchableError, Defect:
+    if not output.isNil: output[] = nil
+    if not outputLen.isNil: outputLen[] = 0
+    UPLOT_ERR_RENDER
 
 proc uplot_render_png*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
