@@ -558,6 +558,18 @@ proc histogramPlot*(values: openArray[float64]; binCount = 30;
     counts.add float64(bin.count)
   result = barPlot(labels, counts, color, legend)
 
+proc histogramBreaksPlot*(values, breaks: openArray[float64];
+    color = "#3366cc"; legend = ""): PlotSpec =
+  ## Build a categorical bar plot from explicit histogram boundaries.
+  let bins = histogramBreaks(values, breaks)
+  var
+    labels = newSeqOfCap[string](bins.len)
+    counts = newSeqOfCap[float64](bins.len)
+  for bin in bins:
+    labels.add tickLabel(bin.lower) & "–" & tickLabel(bin.upper)
+    counts.add float64(bin.count)
+  result = barPlot(labels, counts, color, legend)
+
 proc boxPlot*(groups: openArray[string]; values: openArray[float64];
     whiskerLength = 1.5; color = "#3366cc"; outlierColor = "#cc3344";
     legend = ""): PlotSpec {.contractual.} =

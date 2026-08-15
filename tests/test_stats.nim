@@ -14,6 +14,11 @@ suite "statistics":
     let spec = histogramPlot([0.0, 0.2, 0.8, 1.0], 2)
     check spec.layers.len == 1
     check spec.data.rowCount == 2
+    let explicit = histogramBreaksPlot(
+      [0.0, 0.5, 1.0, 2.0], [0.0, 1.0, 3.0])
+    check explicit.layers.len == 1
+    check explicit.data.rowCount == 2
+    check explicit.data.numeric("value") == @[2.0, 2.0]
 
   test "histograms reject invalid bin counts and ignore non-finite input":
     expect PlotError: discard histogram([1.0], 0)
