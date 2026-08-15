@@ -100,11 +100,13 @@ const
     else: ""
 
 task clib, "C shared library":
-  exec "nim c --app:lib --noMain --mm:arc -d:release -o:" & sharedLib & macArgs &
+  exec "nim c --nimcache:build/nimcache-clib --app:lib --noMain --mm:arc" &
+       " -d:release -o:" & sharedLib & macArgs &
        " src/UniPlot/c_api.nim"
 
 task clibStatic, "C static library":
-  exec "nim c --app:staticlib --noMain --mm:arc -d:release -o:" & staticLib &
+  exec "nim c --nimcache:build/nimcache-clib-static --app:staticlib --noMain" &
+       " --mm:arc -d:release -o:" & staticLib &
        " src/UniPlot/c_api.nim"
 
 task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
@@ -113,7 +115,8 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # output is `UniPlot.lib` — the intentional exception to the sharedLib /
   # staticLib naming. setup.py's Windows branch matches: `LIB_NAME =
   # "UniPlot.lib"` and `libraries=["UniPlot"]`.
-  exec "nim c --cc:vcc --app:staticlib --noMain --mm:arc -d:release" &
+  exec "nim c --nimcache:build/nimcache-clib-msvc --cc:vcc --app:staticlib" &
+       " --noMain --mm:arc -d:release" &
        " -o:UniPlot.lib src/UniPlot/c_api.nim"
 
 # Nim's MinGW toolchain names it mingw32-make.
