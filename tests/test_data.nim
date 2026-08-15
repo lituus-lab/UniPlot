@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/unittest
+import contracts
 import UniPlot
 
 suite "data":
@@ -18,6 +19,15 @@ suite "data":
     frame.addColumn("y", [Inf, 2.0, 3.0])
     frame.addColumn("label", ["a", "b", "c"])
     check frame.finiteRows(["x", "y", "label"]) == @[2]
+    let filter = frame.initRowFilter(["x", "y", "label"])
+    check not filter.rowIsFinite(0)
+    check not filter.rowIsFinite(1)
+    check filter.rowIsFinite(2)
+
+    when defined(release):
+      expect PlotError: discard filter.rowIsFinite(3)
+    else:
+      expect PreConditionDefect: discard filter.rowIsFinite(3)
 
   test "an empty first column still fixes the row count":
     var frame = initDataFrame()

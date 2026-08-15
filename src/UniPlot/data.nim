@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/[tables, math]
+import contracts
 import UniPlot/common
 
 type
@@ -19,6 +20,10 @@ type
     order*: seq[string]
     columns*: Table[string, Column]
     rowCount*: int
+
+  RowFilter* = object
+    rowCount: int
+    numericColumns: seq[seq[float64]]
 
 proc initDataFrame*(): DataFrame =
   result.columns = initTable[string, Column]()
@@ -51,19 +56,30 @@ proc categorical*(frame: DataFrame; name: string): seq[string] =
     raise newException(PlotError, "categorical column not found: " & name)
   frame.columns[name].categories
 
-proc finiteRows*(frame: DataFrame; columns: openArray[string]): seq[int] =
-  var numericColumns = newSeqOfCap[seq[float64]](columns.len)
+proc initRowFilter*(frame: DataFrame;
+    columns: openArray[string]): RowFilter =
+  result.rowCount = frame.rowCount
+  result.numericColumns = newSeqOfCap[seq[float64]](columns.len)
   for name in columns:
     if name notin frame.columns:
       raise newException(PlotError, "column not found: " & name)
     let column = frame.columns[name]
     if column.kind == ckNumeric:
-      numericColumns.add column.numbers
+      result.numericColumns.add column.numbers
+
+proc rowIsFinite*(filter: RowFilter; row: int): bool {.contractual.} =
+  require:
+    row >= 0 and row < filter.rowCount
+  body:
+    if row < 0 or row >= filter.rowCount:
+      raise newException(PlotError, "row index is outside the data frame")
+    for values in filter.numericColumns:
+      if classify(values[row]) in {fcNan, fcInf, fcNegInf}:
+        return false
+    true
+
+proc finiteRows*(frame: DataFrame; columns: openArray[string]): seq[int] =
+  let filter = frame.initRowFilter(columns)
   result = newSeqOfCap[int](frame.rowCount)
   for row in 0 ..< frame.rowCount:
-    var valid = true
-    for values in numericColumns:
-      if classify(values[row]) in {fcNan, fcInf, fcNegInf}:
-        valid = false
-        break
-    if valid: result.add row
+    if filter.rowIsFinite(row): result.add row
