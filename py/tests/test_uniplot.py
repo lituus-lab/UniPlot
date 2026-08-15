@@ -67,6 +67,21 @@ def test_series_shape_is_checked():
     with pytest.raises(ValueError):
         uniplot.Plot().line([1], [1, 2])
 
+def test_grouped_boxplots_render_and_validate_empty_plot_contract():
+    plot = uniplot.Plot().boxplot(
+        ["a", "a", "a", "a", "a", "b", "b"],
+        [1, 2, 3, 4, 100, 8, 9])
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.boxplot(["a"], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().boxplot(["a"], [1, 2])
+    with pytest.raises(ValueError):
+        uniplot.Plot().boxplot(["a"], [1], whisker_length=-1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().boxplot(["a"], [float("nan")])
+
 def test_line_styles_and_marker_shapes_are_exposed():
     plot = uniplot.Plot().line(
         [0, 1, 2], [1, 2, 1], style=uniplot.LINE_DOT_DASH).scatter(

@@ -18,6 +18,8 @@ cdef extern from "UniPlot.h":
                        const char *, float)
     int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                          const char *, float)
+    int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
+                           double, const char *, const char *)
     int uplot_add_categorical_column(uplot_plot *, const char *,
                                       const char **, size_t)
     int uplot_add_line_styled(uplot_plot *, const double *, const double *,
@@ -156,6 +158,39 @@ cdef class Plot:
     def scatter(self, x, y, color="#3366cc", radius=4.0,
                 shape=MARKER_CIRCLE, missing=MISSING_DROP):
         return self._series(x, y, color, radius, True, shape, missing)
+
+    def boxplot(self, groups, values, double whisker_length=1.5,
+                color="#3366cc", outlier_color="#cc3344"):
+        groups = list(groups)
+        values = list(values)
+        if len(groups) != len(values) or len(groups) == 0:
+            raise ValueError("groups and values must have equal non-zero lengths")
+        cdef list encoded_groups = [str(group).encode("utf-8")
+                                    for group in groups]
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef bytes encoded_outlier_color = str(outlier_color).encode("utf-8")
+        cdef size_t count = len(values)
+        cdef const char **group_items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef double *number_items = <double *>malloc(count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if group_items == NULL or number_items == NULL:
+            free(group_items); free(number_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                group_items[index] = encoded_groups[index]
+                number_items[index] = float(values[index])
+            status = uplot_add_box_plot(self._handle, group_items,
+                                        number_items, count, whisker_length,
+                                        encoded_color,
+                                        encoded_outlier_color)
+        finally:
+            free(group_items); free(number_items)
+        if status != 0:
+            raise ValueError("invalid box plot or non-empty plot")
+        return self
 
     def categorical_column(self, name, values):
         values = list(values)
