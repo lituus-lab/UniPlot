@@ -82,6 +82,7 @@ const testBins = [
   ("test_scales", "test_scales"),
   ("test_stats", "test_stats"),
   ("test_serialization", "test_serialization"),
+  ("test_composition", "test_composition"),
   ("test_plot", "test_plot"),
   ("test_render", "test_render"),
   ("test_wgpu_boundary", "test_wgpu_boundary"),

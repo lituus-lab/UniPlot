@@ -8,9 +8,10 @@ import UniPlot/stats
 import UniPlot/grammar
 import UniPlot/scene
 import UniPlot/guides
+import UniPlot/composition
 import UniPlot/render
 import UniPlot/serialization
-export common, data, scales, stats, grammar, scene, guides, render,
+export common, data, scales, stats, grammar, scene, guides, composition, render,
   serialization
 
 const UniPlotVersion* = "1.0.0"
