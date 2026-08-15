@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 ## Deterministic composition of independently compiled plots.
+import std/tables
 import UniVector
 import contracts
 import UniPlot/[common, data, scales, grammar, scene, guides]
@@ -12,6 +13,39 @@ func composedId(panel: int; nodeId: uint64): uint64 {.inline.} =
   value = (value xor (value shr 27)) * 0x94d049bb133111eb'u64
   result = value xor (value shr 31)
   if result == 0: result = 1
+
+proc facetSpecs*(spec: PlotSpec; column: string): seq[PlotSpec] {.
+    contractual.} =
+  ## Split a specification by a categorical column in first-seen order.
+  require:
+    column.len > 0
+  ensure:
+    result.len > 0
+  body:
+    if column.len == 0:
+      raise newException(PlotError, "facet column name cannot be empty")
+    if column notin spec.data.columns or
+        spec.data.columns[column].kind != ckCategorical:
+      raise newException(PlotError,
+        "faceting requires an existing categorical column")
+    var
+      order: seq[string]
+      rows = initTable[string, seq[int]]()
+    for row, category in spec.data.categorical(column):
+      if category notin rows: order.add category
+      rows.mgetOrPut(category, @[]).add row
+    if order.len == 0:
+      raise newException(PlotError, "cannot facet an empty categorical column")
+    result = newSeqOfCap[PlotSpec](order.len)
+    for category in order:
+      var panel = spec
+      panel.data = spec.data.selectRows(rows[category])
+      let facetTitle = column & " = " & category
+      panel.title = if spec.title.len > 0:
+        spec.title & " — " & facetTitle
+      else:
+        facetTitle
+      result.add panel
 
 proc shareNumericDomains(specs: openArray[PlotSpec]; shareX,
     shareY: bool): seq[PlotSpec] =
@@ -134,3 +168,9 @@ proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
             Point(x: node.position.x + float32(dx),
               y: node.position.y + float32(dy)),
             node.fontSize, node.color, id, node.anchor)
+
+proc compileFacetGrid*(spec: PlotSpec; column: string; columns: int;
+    size = Size(width: 1200, height: 800); gap = 16; sharedX = false;
+    sharedY = false): Scene =
+  ## Split one specification by category and compile the panels row-major.
+  compileGrid(spec.facetSpecs(column), columns, size, gap, sharedX, sharedY)

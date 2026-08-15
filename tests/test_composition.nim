@@ -123,6 +123,45 @@ suite "plot composition":
     expect PlotError:
       discard compileGrid([clipped, numeric], 2, sharedX = true)
 
+  test "facet specifications retain category order and complete semantics":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0, 3.0])
+    frame.addColumn("y", [2.0, 4.0, 3.0, 8.0])
+    frame.addColumn("group", ["west", "east", "west", "east"])
+    var spec = plot(frame)
+    spec.geomLine(aes("x", "y"))
+    spec.labels(title = "Measurements", x = "time", y = "value")
+    let facets = spec.facetSpecs("group")
+    check facets.len == 2
+    check facets[0].data.categorical("group") == @["west", "west"]
+    check facets[0].data.numeric("x") == @[0.0, 2.0]
+    check facets[1].data.categorical("group") == @["east", "east"]
+    check facets[0].title == "Measurements — group = west"
+    check facets[1].title == "Measurements — group = east"
+    check spec.data.rowCount == 4
+    check compileFacetGrid(spec, "group", 2, sharedX = true,
+      sharedY = true).nodes.len > 0
+
+  test "faceting rejects absent, numeric and empty categories":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y"))
+    expect PlotError: discard spec.facetSpecs("missing")
+    expect PlotError: discard spec.facetSpecs("x")
+    var empty = initDataFrame()
+    empty.addColumn("x", newSeq[float64]())
+    empty.addColumn("y", newSeq[float64]())
+    empty.addColumn("group", newSeq[string]())
+    var emptySpec = plot(empty)
+    emptySpec.geomPoint(aes("x", "y"))
+    expect PlotError: discard emptySpec.facetSpecs("group")
+    when defined(release):
+      expect PlotError: discard spec.facetSpecs("")
+    else:
+      expect PreConditionDefect: discard spec.facetSpecs("")
+
   test "reject invalid grid dimensions in every build mode":
     let spec = sampleSpec("#3366cc")
     when not defined(release):
