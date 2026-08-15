@@ -57,8 +57,10 @@ int main(void) {
   uplot_plot_free(plot);
   plot = restored;
 
-  int status = uplot_render_svg(
-    plot, "DejaVuSans.ttf", &bytes, &length);
+  uplot_plot *panels[] = {plot, restored};
+  int status = uplot_render_grid_svg(
+    panels, 2, 2, 1000, 420, 16,
+    "DejaVuSans.ttf", &bytes, &length);
   if (status == UPLOT_OK) {
     fwrite(bytes, 1, length, stdout);
     uplot_buffer_free(bytes, length);
@@ -74,6 +76,9 @@ int main(void) {
   `uplot_plot_free`.
 - SVG and PNG renderers allocate byte buffers; release them with
   `uplot_buffer_free` using the returned length.
+- `uplot_render_grid_svg` and `uplot_render_grid_png` accept a borrowed array
+  of non-null plot handles, an explicit row-major column count, canvas size
+  and pixel gap. They do not take ownership of the handles.
 - `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
   ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
   explicit output dimensions and returns null for malformed or unsupported
@@ -113,9 +118,9 @@ let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
 nbRawHtml gallery([
-  svgFigure(cSvg, "SVG produced after a C JSON round trip."),
-  pngFigure(cPng, "PNG produced by the restored C handle.",
-    "Line and diamond markers rendered through the UniPlot C ABI")
+  svgFigure(cSvg, "Two-panel SVG produced through the C grid ABI."),
+  pngFigure(cPng, "The same C handles composed into a PNG grid.",
+    "Two plot panels rendered through the UniPlot C ABI")
 ])
 
 nbSave

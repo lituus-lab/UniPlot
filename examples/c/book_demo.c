@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
   uplot_plot *plot = uplot_plot_new(800, 500);
+  uplot_plot *second = NULL;
   if (plot == NULL) return EXIT_FAILURE;
   if (uplot_add_line_styled(plot, x, y, 6, "#2457c5", 2.5f,
                             UPLOT_LINE_DOT_DASH) != UPLOT_OK ||
@@ -40,8 +41,17 @@ int main(int argc, char **argv) {
   if (restored == NULL) goto cleanup;
   uplot_plot_free(plot);
   plot = restored;
-  if (uplot_render_svg(plot, argv[1], &svg, &svg_length) != UPLOT_OK ||
-      uplot_render_png(plot, argv[1], &png, &png_length) != UPLOT_OK)
+  second = uplot_plot_new(800, 500);
+  if (second == NULL ||
+      uplot_add_points_shaped(second, x, y, 6, "#267a5e", 6.0f,
+                              UPLOT_MARKER_CROSS) != UPLOT_OK ||
+      uplot_set_title(second, "Second C ABI panel") != UPLOT_OK)
+    goto cleanup;
+  uplot_plot *panels[] = {plot, second};
+  if (uplot_render_grid_svg(panels, 2, 2, 1000, 420, 16, argv[1], &svg,
+                            &svg_length) != UPLOT_OK ||
+      uplot_render_grid_png(panels, 2, 2, 1000, 420, 16, argv[1], &png,
+                            &png_length) != UPLOT_OK)
     goto cleanup;
   if (!write_bytes(argv[2], svg, svg_length) ||
       !write_bytes(argv[3], png, png_length))
@@ -52,6 +62,7 @@ cleanup:
   uplot_buffer_free(svg, svg_length);
   uplot_buffer_free(png, png_length);
   uplot_buffer_free(json, json_length);
+  uplot_plot_free(second);
   uplot_plot_free(plot);
   return result;
 }
