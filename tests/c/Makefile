@@ -11,14 +11,14 @@ endif
 
 ROOT   := $(CURDIR)/../..
 CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
-LIB    := $(ROOT)/libUniTemplate.a
+LIB    := $(ROOT)/libUniPlot.a
 
 ifeq ($(OS),Windows_NT)
-  BIN  := test_unitemplate.exe
+  BIN  := test_uniplot.exe
   RUN  := $(BIN)
   RM_F := del /q
 else
-  BIN  := test_unitemplate
+  BIN  := test_uniplot
   RUN  := ./$(BIN)
   RM_F := rm -f
 endif
@@ -27,8 +27,8 @@ endif
 all: run
 run: $(BIN)
 	$(RUN)
-$(BIN): test_unitemplate.c $(ROOT)/include/UniTemplate.h $(LIB)
-	$(CC) $(CFLAGS) -o $(BIN) test_unitemplate.c $(LIB)
+$(BIN): test_uniplot.c $(ROOT)/include/UniPlot.h $(LIB)
+	$(CC) $(CFLAGS) -DTEST_FONT=\"$(CURDIR)/../DejaVuSans.ttf\" -o $(BIN) test_uniplot.c $(LIB) -lz
 # File target, not phony: `nimble ctest` already built the lib, don't redo it.
 $(LIB):
 	cd $(ROOT) && nimble clibStatic

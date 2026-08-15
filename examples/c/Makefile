@@ -11,7 +11,7 @@ endif
 
 ROOT   := $(CURDIR)/../..
 CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
-LIB    := $(ROOT)/libUniTemplate.a
+LIB    := $(ROOT)/libUniPlot.a
 
 ifeq ($(OS),Windows_NT)
   BIN  := demo.exe
@@ -27,8 +27,8 @@ endif
 all: run
 run: $(BIN)
 	$(RUN)
-$(BIN): demo.c $(ROOT)/include/UniTemplate.h $(LIB)
-	$(CC) $(CFLAGS) -o $(BIN) demo.c $(LIB)
+$(BIN): demo.c $(ROOT)/include/UniPlot.h $(LIB)
+	$(CC) $(CFLAGS) -o $(BIN) demo.c $(LIB) -lz
 # File target, not phony: `nimble cexample` already built the lib, don't redo it.
 $(LIB):
 	cd $(ROOT) && nimble clibStatic

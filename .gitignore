@@ -1,8 +1,8 @@
 # build artifacts
 build/
-# Anchored: this is the build output dir, and unanchored `bin/` would also
-# swallow any nested bin/ a subdirectory legitimately tracks.
-/bin/
+# Keep the CLI source under bin/, ignore only its generated executable.
+/bin/uniplot
+/bin/uniplot.exe
 libUniPlot.so
 libUniPlot.so.*
 libUniPlot.dylib

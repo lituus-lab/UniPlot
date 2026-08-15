@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2026 lituus-lab */
+#include "UniPlot.h"
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#ifndef TEST_FONT
+#define TEST_FONT "../DejaVuSans.ttf"
+#endif
+int main(void) {
+  const double x[] = {0.0, 1.0, 2.0}, y[] = {1.0, 3.0, 2.0};
+  uint8_t *svg = NULL, *png = NULL;
+  size_t svg_len = 0, png_len = 0;
+  assert(uplot_init() == UPLOT_OK);
+  assert(strcmp(uplot_version(), UNIPLOT_VERSION) == 0);
+  assert(uplot_abi_version() == UNIPLOT_ABI_VERSION);
+  uplot_plot *plot = uplot_plot_new(320, 240);
+  assert(plot != NULL);
+  assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
+  assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
+  assert(uplot_set_title(plot, "C plot") == UPLOT_OK);
+  assert(uplot_render_svg(plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  assert(uplot_render_png(plot, TEST_FONT, &png, &png_len) == UPLOT_OK);
+  assert(png_len > 8 && png[0] == 137 && png[1] == 'P');
+  uplot_buffer_free(svg, svg_len);
+  uplot_buffer_free(png, png_len);
+  uplot_plot_free(plot);
+  puts("All UniPlot C ABI tests passed.");
+  return 0;
+}
