@@ -44,12 +44,23 @@ when isMainModule:
   let fontPath = if paramCount() >= 3: paramStr(3) else: "tests/DejaVuSans.ttf"
   let font = loadTtf(fontPath)
   let size = Size(width: 800, height: 500)
-  let reference = sampleSpec(pointCount).compileScene(size)
+  let referenceSpec = sampleSpec(pointCount)
+  let reference = referenceSpec.compileScene(size)
+  let referenceX = referenceSpec.data.numeric("x")
 
-  var compileTimes, styledCompileTimes, svgTimes, pngTimes: RunningStat
+  var scaleTimes, finiteRowTimes, compileTimes, styledCompileTimes, svgTimes,
+      pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + 3:
     var started = getMonoTime()
+    let trained = trainContinuous(referenceX, 0, 800)
+    let scaleMs = elapsedMs(started)
+
+    started = getMonoTime()
+    let finiteRows = referenceSpec.data.finiteRows(["x", "y"])
+    let finiteRowMs = elapsedMs(started)
+
+    started = getMonoTime()
     let scene = sampleSpec(pointCount).compileScene(size)
     let compileMs = elapsedMs(started)
 
@@ -65,9 +76,11 @@ when isMainModule:
     let png = reference.encodePng(font)
     let pngMs = elapsedMs(started)
     consumed = consumed xor svg.len xor png.len xor scene.nodes.len xor
-      styledScene.nodes.len
+      styledScene.nodes.len xor finiteRows.len xor int(trained.domainMax)
 
     if iteration >= 3:
+      scaleTimes.push scaleMs
+      finiteRowTimes.push finiteRowMs
       compileTimes.push compileMs
       styledCompileTimes.push styledCompileMs
       svgTimes.push svgMs
@@ -82,6 +95,8 @@ when isMainModule:
     "height": size.height,
     "warmup_iterations": 3,
     "stages": {
+      "continuous_scale_train": summary(scaleTimes),
+      "finite_row_select": summary(finiteRowTimes),
       "construct_compile": summary(compileTimes),
       "styled_construct_compile": summary(styledCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
