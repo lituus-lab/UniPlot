@@ -698,3 +698,54 @@ proc heatmapPlot*(xs, ys: openArray[string]; values: openArray[float64];
   result.geomTile(aes("x", "y", color = "value"), legend = legend)
   if legend.len > 0:
     result.legend()
+
+proc numericHeatmapPlot*(xBreaks, yBreaks, values: openArray[float64];
+    legend = "value"): PlotSpec {.contractual.} =
+  ## Build row-major numeric cells from explicit x and y boundaries.
+  require:
+    xBreaks.len >= 2
+    yBreaks.len >= 2
+  body:
+    if xBreaks.len < 2 or yBreaks.len < 2:
+      raise newException(PlotError,
+        "numeric heatmap axes require at least two boundaries")
+    let
+      xBins = histogramBreaks([], xBreaks)
+      yBins = histogramBreaks([], yBreaks)
+    if xBins.len > high(int) div yBins.len or
+        values.len != xBins.len * yBins.len:
+      raise newException(PlotError,
+        "numeric heatmap values must match the row-major cell count")
+    var xMin, xMax, yMin, yMax, cellValues: seq[float64]
+    xMin = newSeqOfCap[float64](values.len)
+    xMax = newSeqOfCap[float64](values.len)
+    yMin = newSeqOfCap[float64](values.len)
+    yMax = newSeqOfCap[float64](values.len)
+    cellValues = newSeqOfCap[float64](values.len)
+    for xBin in xBins:
+      let width = xBin.upper - xBin.lower
+      if width <= 0 or not width.isFinite:
+        raise newException(PlotError,
+          "numeric heatmap intervals must have finite positive widths")
+    for yIndex, yBin in yBins:
+      let yWidth = yBin.upper - yBin.lower
+      if yWidth <= 0 or not yWidth.isFinite:
+        raise newException(PlotError,
+          "numeric heatmap intervals must have finite positive widths")
+      for xIndex, xBin in xBins:
+        xMin.add xBin.lower
+        xMax.add xBin.upper
+        yMin.add yBin.lower
+        yMax.add yBin.upper
+        cellValues.add values[yIndex * xBins.len + xIndex]
+    var frame = initDataFrame()
+    frame.addColumn("xMin", xMin)
+    frame.addColumn("xMax", xMax)
+    frame.addColumn("yMin", yMin)
+    frame.addColumn("yMax", yMax)
+    frame.addColumn("value", cellValues)
+    result = plot(frame)
+    result.geomRect(aes("", "", xMin = "xMin", xMax = "xMax",
+      yMin = "yMin", yMax = "yMax", fill = "value"), legend = legend)
+    if legend.len > 0:
+      result.legend()

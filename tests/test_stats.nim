@@ -157,3 +157,24 @@ suite "statistics":
     check spec.layers.len == 1
     check spec.data.categorical("category") == @["beta", "alpha"]
     check spec.data.numeric("value") == @[4.0, 4.0]
+
+  test "numeric heatmaps materialize row-major variable-size cells":
+    let heat = numericHeatmapPlot(
+      [0.0, 1.0, 3.0], [10.0, 20.0, 40.0],
+      [1.0, 2.0, 3.0, NaN])
+    check heat.layers[0].mark == mkRect
+    check heat.data.numeric("xMin") == @[0.0, 1.0, 0.0, 1.0]
+    check heat.data.numeric("xMax") == @[1.0, 3.0, 1.0, 3.0]
+    check heat.data.numeric("yMin") == @[10.0, 10.0, 20.0, 20.0]
+    check heat.data.numeric("value")[0 .. 2] == @[1.0, 2.0, 3.0]
+    discard heat.compileScene()
+    when defined(release):
+      expect PlotError:
+        discard numericHeatmapPlot([0.0], [0.0, 1.0], [])
+    else:
+      expect PreConditionDefect:
+        discard numericHeatmapPlot([0.0], [0.0, 1.0], [])
+    expect PlotError:
+      discard numericHeatmapPlot([0.0, 1.0], [0.0, 1.0], [1.0, 2.0])
+    expect PlotError:
+      discard numericHeatmapPlot([-1e308, 1e308], [0.0, 1.0], [1.0])
