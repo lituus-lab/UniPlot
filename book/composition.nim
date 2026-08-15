@@ -120,6 +120,8 @@ nbCode:
   observations.addColumn("value", [1.0, 2.0, 1.5, 4.0, 3.0, 5.0])
   observations.addColumn("site",
     ["north", "north", "north", "south", "south", "south"])
+  observations.addColumn("phase",
+    ["early", "late", "late", "late", "late", "late"])
   var measured = plot(observations)
   measured.geomLine(aes("time", "value"), color = "#267a5e")
   measured.geomPoint(aes("time", "value"), color = "#d65f2d", radius = 4)
@@ -140,11 +142,33 @@ first appearance. `compileFacetGrid` performs the split and ordinary grid
 compilation in one call; its sharing flags have the same contract as
 `compileGrid`.
 
-Empty, missing or numeric facet columns are rejected. Two-dimensional facets,
-guide deduplication and secondary axes remain future work.
+Empty, missing or numeric facet columns are rejected. Guide deduplication and
+secondary axes remain future work.
+
+## Two-dimensional facet matrices
+"""
+
+nbCode:
+  let matrix = compileFacetMatrix(measured, "site", "phase",
+    size = Size(width: 900, height: 620), gap = 18,
+    sharedX = true, sharedY = true)
+  let matrixSvg = matrix.toSvg(font)
+
+nbRawHtml svgFigure(matrixSvg,
+  "A complete site-by-phase matrix; south/early remains an explicit empty cell.")
+
+nbText: """
+`facetCells` exposes the row-major Cartesian metadata, including empty `rows`
+sequences. `compileFacetMatrix` orders both dimensions by first appearance.
+Observed cells retain the complete specification and participate in shared
+domain training. An absent combination receives only its theme background and
+deterministic title: UniPlot does not invent data or axes for it.
+
+Row and column fields must be distinct categorical columns. Compacting absent
+combinations is deliberately a different operation and is not silently used.
 
 Next: [Versioned JSON](serialization.html).
 """
 
 nbSave
-validatePage("composition.html", minSvg = 4, requirePng = true)
+validatePage("composition.html", minSvg = 5, requirePng = true)
