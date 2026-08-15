@@ -88,10 +88,11 @@ silently claimed by the focused 1.0 publication contract.
   Python, with documented out-of-domain handling.
 - [x] First-seen one-dimensional grouped count, sum, mean, minimum and maximum
   in Nim, C and Python, using UniAccurate for compensated sum and mean.
+- [x] Retained numeric rectangle marks and variable-width count/density
+  histograms in Nim, C and Python.
 - [ ] Statistical transforms: automatic bin-selection rules after UniMath
-  exposes the required float64 roots/transcendentals, numeric variable-width
-  histogram geometry/densities, smoothing, multi-column or windowed grouped
-  transforms and confidence intervals.
+  exposes the required float64 roots/transcendentals, smoothing, multi-column
+  or windowed grouped transforms and confidence intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
