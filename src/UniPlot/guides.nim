@@ -38,6 +38,28 @@ proc segmentPath(a, b: Point; width: float32): Path =
     Point(x: b.x + nx, y: b.y + ny), Point(x: b.x - nx, y: b.y - ny),
     Point(x: a.x - nx, y: a.y - ny)])
 
+proc arrowPath(startPoint, endPoint: Point; width,
+    requestedHeadSize: float32): Path =
+  let
+    dx = endPoint.x - startPoint.x
+    dy = endPoint.y - startPoint.y
+    length = sqrt(dx * dx + dy * dy)
+  if length <= 0 or not length.isFinite:
+    raise newException(PlotError, "arrow maps to a degenerate screen segment")
+  let
+    ux = dx / length
+    uy = dy / length
+    headLength = min(requestedHeadSize, length * 0.8'f32)
+    halfHeadWidth = headLength * 0.55'f32
+    base = Point(x: endPoint.x - ux * headLength,
+      y: endPoint.y - uy * headLength)
+    left = Point(x: base.x - uy * halfHeadWidth,
+      y: base.y + ux * halfHeadWidth)
+    right = Point(x: base.x + uy * halfHeadWidth,
+      y: base.y - ux * halfHeadWidth)
+  result = segmentPath(startPoint, base, width)
+  result.addPath polygon([endPoint, left, right])
+
 func mappedShape(index: int): MarkerShape =
   if index > MarkerShape.high.ord:
     raise newException(PlotError, "shape mapping exceeds marker capacity")
@@ -190,6 +212,28 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
         raise newException(PlotError,
           "logarithmic y references must be positive")
       result.yContinuous.addValues([reference.minimum, reference.maximum])
+  for annotation in spec.annotations:
+    if not annotation.x.isFinite or not annotation.y.isFinite or
+        annotation.size <= 0 or not annotation.size.isFinite:
+      raise newException(PlotError, "invalid annotation")
+    case annotation.kind
+    of akText:
+      if annotation.text.len == 0:
+        raise newException(PlotError, "text annotation cannot be empty")
+    of akArrow:
+      if not annotation.xEnd.isFinite or not annotation.yEnd.isFinite or
+          (annotation.x == annotation.xEnd and annotation.y ==
+              annotation.yEnd) or
+          annotation.headSize <= 0 or not annotation.headSize.isFinite:
+        raise newException(PlotError, "invalid arrow annotation")
+    if result.xKind != ckNumeric:
+      raise newException(PlotError,
+        "annotations require numeric x coordinates")
+    result.xContinuous.addValues([annotation.x])
+    result.yContinuous.addValues([annotation.y])
+    if annotation.kind == akArrow:
+      result.xContinuous.addValues([annotation.xEnd])
+      result.yContinuous.addValues([annotation.yEnd])
   var includeZero = false
   for layer in spec.layers:
     if layer.mapping.x notin spec.data.columns:
@@ -692,6 +736,21 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
               result.addPath(polygon(ribbon), layer.color, nodeId)
               inc nodeId
             start = stop
+  for annotation in spec.annotations:
+    let startPoint = Point(x: xScale.map(annotation.x),
+      y: yScale.map(annotation.y))
+    case annotation.kind
+    of akText:
+      result.addText(annotation.text, startPoint, annotation.size,
+        annotation.color, nodeId)
+      inc nodeId
+    of akArrow:
+      let endPoint = Point(x: xScale.map(annotation.xEnd),
+        y: yScale.map(annotation.yEnd))
+      result.addPath(arrowPath(startPoint, endPoint, annotation.size,
+        annotation.headSize), annotation.color, nodeId)
+      inc nodeId
+
   if legendEntries.len > 0 or continuousGuides.len > 0:
     let legendX = area.xMax +
       (if spec.secondaryYSpec.enabled: secondaryAxisWidth else: 0'f32) + 24

@@ -74,6 +74,17 @@ type
     width*: float32
     label*: string
 
+  AnnotationKind* = enum
+    akText
+    akArrow
+
+  Annotation* = object
+    kind*: AnnotationKind
+    x*, y*, xEnd*, yEnd*: float64
+    text*: string
+    color*: Color
+    size*, headSize*: float32
+
   Aes* = object
     x*, y*: string
     yMin*, yMax*: string
@@ -113,6 +124,7 @@ type
     xScaleSpec*, yScaleSpec*: AxisScaleSpec
     secondaryYSpec*: SecondaryAxisSpec
     references*: seq[Reference]
+    annotations*: seq[Annotation]
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -324,6 +336,40 @@ proc secondaryY*(spec: var PlotSpec; scale = 1.0; offset = 0.0;
 proc clearSecondaryY*(spec: var PlotSpec) =
   ## Remove the transformed right-side y guide.
   spec.secondaryYSpec = SecondaryAxisSpec()
+
+proc annotateText*(spec: var PlotSpec; x, y: float64; text: string;
+    color = "#202124"; fontSize = 13'f32) {.contractual.} =
+  ## Add plain UniGlyph text at numeric data coordinates.
+  require:
+    x.isFinite and y.isFinite
+    text.len > 0
+    fontSize > 0 and fontSize.isFinite
+  body:
+    if not x.isFinite or not y.isFinite or text.len == 0 or fontSize <= 0 or
+        not fontSize.isFinite:
+      raise newException(PlotError, "invalid text annotation")
+    spec.annotations.add Annotation(kind: akText, x: x, y: y, text: text,
+      color: cssColor(color), size: fontSize)
+
+proc annotateArrow*(spec: var PlotSpec; x, y, xEnd, yEnd: float64;
+    color = "#202124"; width = 2'f32; headSize = 8'f32) {.contractual.} =
+  ## Add a UniVector arrow between two distinct numeric data coordinates.
+  require:
+    x.isFinite and y.isFinite and xEnd.isFinite and yEnd.isFinite
+    x != xEnd or y != yEnd
+    width > 0 and width.isFinite
+    headSize > 0 and headSize.isFinite
+  body:
+    if not x.isFinite or not y.isFinite or not xEnd.isFinite or
+        not yEnd.isFinite or (x == xEnd and y == yEnd) or width <= 0 or
+        not width.isFinite or headSize <= 0 or not headSize.isFinite:
+      raise newException(PlotError, "invalid arrow annotation")
+    spec.annotations.add Annotation(kind: akArrow, x: x, y: y, xEnd: xEnd,
+      yEnd: yEnd, color: cssColor(color), size: width, headSize: headSize)
+
+proc clearAnnotations*(spec: var PlotSpec) =
+  ## Remove all retained text and arrow annotations.
+  spec.annotations.setLen(0)
 
 proc xLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
   ## Fix the numeric x domain. The limits must contain every rendered value.

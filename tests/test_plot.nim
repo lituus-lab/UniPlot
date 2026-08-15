@@ -165,6 +165,31 @@ suite "plot compilation":
         inc referenceLabels
     check referenceLabels == 2
 
+  test "plain text and arrows compile through retained annotations":
+    var spec = sample()
+    spec.annotateText(1.0, 3.5, "peak", color = "#7a3db8", fontSize = 14)
+    spec.annotateArrow(0.5, 1.5, 1.0, 3.0, color = "#d65f2d",
+      width = 2, headSize = 10)
+    let scene = spec.compileScene()
+    var foundText = false
+    for node in scene.nodes:
+      if node.kind == snText and node.text == "peak": foundText = true
+    check foundText
+    spec.clearAnnotations()
+    check spec.annotations.len == 0
+    expect PlotError:
+      var categorical = barPlot(["a", "b"], [1.0, 2.0])
+      categorical.annotateText(0.0, 1.0, "invalid")
+      discard categorical.compileScene()
+    when defined(release):
+      expect PlotError: spec.annotateText(NaN, 1.0, "bad")
+      expect PlotError: spec.annotateText(1.0, 1.0, "")
+      expect PlotError: spec.annotateArrow(1.0, 1.0, 1.0, 1.0)
+    else:
+      expect PreConditionDefect: spec.annotateText(NaN, 1.0, "bad")
+      expect PreConditionDefect: spec.annotateText(1.0, 1.0, "")
+      expect PreConditionDefect: spec.annotateArrow(1.0, 1.0, 1.0, 1.0)
+
   test "references reject invalid values and categorical x coordinates":
     var spec = sample()
     when defined(release):
