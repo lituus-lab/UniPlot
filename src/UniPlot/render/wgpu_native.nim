@@ -277,6 +277,12 @@ type
   DeviceEvents = object
     lostReason, errorType, mapStatus: Atomic[uint32]
 
+  PreparedMeshBuffers = object
+    token, lastUse: uint64
+    vertexBuffer, indexBuffer: pointer
+    vertexCapacity, indexCapacity: uint64
+    vertexSize, indexSize: uint64
+
   NativeWgpuRuntime* = ref object
     library: LibHandle
     instance, adapter, device, queue: pointer
@@ -285,7 +291,11 @@ type
     vertexBuffer, indexBuffer, readbackBuffer: pointer
     targetWidth, targetHeight: uint32
     vertexCapacity, indexCapacity, readbackCapacity: uint64
-    uploadedToken, meshUploadCount: uint64
+    preparedCacheCapacity: int
+    preparedMeshes: seq[PreparedMeshBuffers]
+    preparedUseClock: uint64
+    meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
+    preparedCacheEvictions: uint64
     events: ptr DeviceEvents
     getVersion: GetVersionProc
     hasFeature: HasFeatureProc
@@ -379,6 +389,15 @@ proc close*(runtime: NativeWgpuRuntime) =
   if runtime.readbackBuffer != nil and runtime.releaseBuffer != nil:
     runtime.releaseBuffer(runtime.readbackBuffer)
     runtime.readbackBuffer = nil
+  if runtime.releaseBuffer != nil:
+    for entry in runtime.preparedMeshes.mitems:
+      if entry.indexBuffer != nil:
+        runtime.releaseBuffer(entry.indexBuffer)
+        entry.indexBuffer = nil
+      if entry.vertexBuffer != nil:
+        runtime.releaseBuffer(entry.vertexBuffer)
+        entry.vertexBuffer = nil
+  runtime.preparedMeshes.setLen(0)
   if runtime.indexBuffer != nil and runtime.releaseBuffer != nil:
     runtime.releaseBuffer(runtime.indexBuffer)
     runtime.indexBuffer = nil
@@ -441,12 +460,17 @@ proc backendName(value: uint32): string =
   of 8: "opengles"
   else: "unknown"
 
-proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
+proc openNativeWgpu*(libraryPath: string;
+                     preparedCacheCapacity: int): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
+  if preparedCacheCapacity <= 0:
+    raise newException(LibraryError,
+      "prepared WGPU cache capacity must be positive")
   let library = loadLib(libraryPath)
   if library == nil:
     raise newException(LibraryError, "cannot load wgpu-native: " & libraryPath)
-  result = NativeWgpuRuntime(library: library)
+  result = NativeWgpuRuntime(library: library,
+    preparedCacheCapacity: preparedCacheCapacity)
   try:
     let
       createInstance = loadSymbol[CreateInstanceProc](library,
@@ -575,6 +599,14 @@ proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
 proc meshUploadCount*(runtime: NativeWgpuRuntime): uint64 =
   ## Return vertex/index upload pairs issued through the queue.
   if runtime.isNil: 0'u64 else: runtime.meshUploadCount
+
+proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
+    hits, misses, evictions: uint64; entries, capacity: int] =
+  if runtime.isNil:
+    return (0'u64, 0'u64, 0'u64, 0, 0)
+  (runtime.preparedCacheHits, runtime.preparedCacheMisses,
+    runtime.preparedCacheEvictions, runtime.preparedMeshes.len,
+    runtime.preparedCacheCapacity)
 
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
@@ -764,46 +796,86 @@ struct VertexOut {
         runtime.meshShader = nil
         raise newException(LibraryError, "wgpu-native did not create a pipeline")
     let
-      vertexSize = uint64(meshVertices.len * sizeof(float32))
-      indexSize = uint64(meshIndices.len * sizeof(uint32))
-    if runtime.vertexCapacity < vertexSize:
-      if runtime.vertexBuffer != nil:
-        releaseBuffer(runtime.vertexBuffer)
-        runtime.vertexBuffer = nil
-      runtime.uploadedToken = 0
-      runtime.vertexCapacity = grownCapacity(runtime.vertexCapacity, vertexSize)
-      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
-        usage: BufferUsageCopyDst or BufferUsageVertex,
-        size: runtime.vertexCapacity)
-      runtime.vertexBuffer = createBuffer(runtime.device, addr descriptor)
-      if runtime.vertexBuffer == nil:
-        runtime.vertexCapacity = 0
-        raise newException(LibraryError,
-          "wgpu-native did not create a vertex buffer")
-    if runtime.indexCapacity < indexSize:
-      if runtime.indexBuffer != nil:
-        releaseBuffer(runtime.indexBuffer)
-        runtime.indexBuffer = nil
-      runtime.uploadedToken = 0
-      runtime.indexCapacity = grownCapacity(runtime.indexCapacity, indexSize)
-      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
-        usage: BufferUsageCopyDst or BufferUsageIndex,
-        size: runtime.indexCapacity)
-      runtime.indexBuffer = createBuffer(runtime.device, addr descriptor)
-      if runtime.indexBuffer == nil:
-        runtime.indexCapacity = 0
-        raise newException(LibraryError,
-          "wgpu-native did not create an index buffer")
-    if uploadToken == 0 or runtime.uploadedToken != uploadToken:
+      vertexSize = uint64(meshVertices.len) * uint64(sizeof(float32))
+      indexSize = uint64(meshIndices.len) * uint64(sizeof(uint32))
+    template ensureBuffer(buffer, capacity: untyped;
+                          required, bufferUsage: uint64;
+                          description: string) =
+      if capacity < required:
+        if buffer != nil:
+          releaseBuffer(buffer)
+          buffer = nil
+        capacity = grownCapacity(capacity, required)
+        var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+          usage: BufferUsageCopyDst or bufferUsage, size: capacity)
+        buffer = createBuffer(runtime.device, addr descriptor)
+        if buffer == nil:
+          capacity = 0
+          raise newException(LibraryError,
+            "wgpu-native did not create a " & description & " buffer")
+
+    var activeVertexBuffer, activeIndexBuffer: pointer
+    if uploadToken == 0:
+      ensureBuffer(runtime.vertexBuffer, runtime.vertexCapacity, vertexSize,
+        BufferUsageVertex, "vertex")
+      ensureBuffer(runtime.indexBuffer, runtime.indexCapacity, indexSize,
+        BufferUsageIndex, "index")
       writeBuffer(runtime.queue, runtime.vertexBuffer, 0,
         unsafeAddr meshVertices[0], csize_t(vertexSize))
       writeBuffer(runtime.queue, runtime.indexBuffer, 0,
         unsafeAddr meshIndices[0], csize_t(indexSize))
-      runtime.uploadedToken = uploadToken
       inc runtime.meshUploadCount
+      activeVertexBuffer = runtime.vertexBuffer
+      activeIndexBuffer = runtime.indexBuffer
+    else:
+      var entryIndex = -1
+      for index, entry in runtime.preparedMeshes:
+        if entry.token == uploadToken:
+          entryIndex = index
+          break
+      if entryIndex >= 0:
+        let entry = runtime.preparedMeshes[entryIndex]
+        if entry.vertexSize != vertexSize or entry.indexSize != indexSize:
+          raise newException(LibraryError,
+            "prepared WGPU token changed its mesh size")
+        inc runtime.preparedCacheHits
+      else:
+        inc runtime.preparedCacheMisses
+        if runtime.preparedMeshes.len < runtime.preparedCacheCapacity:
+          runtime.preparedMeshes.add PreparedMeshBuffers()
+          entryIndex = runtime.preparedMeshes.high
+        else:
+          entryIndex = 0
+          for index in 1 ..< runtime.preparedMeshes.len:
+            if runtime.preparedMeshes[index].lastUse <
+                runtime.preparedMeshes[entryIndex].lastUse:
+              entryIndex = index
+          inc runtime.preparedCacheEvictions
+        var entry = addr runtime.preparedMeshes[entryIndex]
+        entry.token = 0
+        ensureBuffer(entry.vertexBuffer, entry.vertexCapacity, vertexSize,
+          BufferUsageVertex, "prepared vertex")
+        ensureBuffer(entry.indexBuffer, entry.indexCapacity, indexSize,
+          BufferUsageIndex, "prepared index")
+        writeBuffer(runtime.queue, entry.vertexBuffer, 0,
+          unsafeAddr meshVertices[0], csize_t(vertexSize))
+        writeBuffer(runtime.queue, entry.indexBuffer, 0,
+          unsafeAddr meshIndices[0], csize_t(indexSize))
+        entry.token = uploadToken
+        entry.vertexSize = vertexSize
+        entry.indexSize = indexSize
+        inc runtime.meshUploadCount
+      if runtime.preparedUseClock == high(uint64):
+        for entry in runtime.preparedMeshes.mitems: entry.lastUse = 0
+        runtime.preparedUseClock = 1
+      else:
+        inc runtime.preparedUseClock
+      runtime.preparedMeshes[entryIndex].lastUse = runtime.preparedUseClock
+      activeVertexBuffer = runtime.preparedMeshes[entryIndex].vertexBuffer
+      activeIndexBuffer = runtime.preparedMeshes[entryIndex].indexBuffer
     setPipeline(renderPass, runtime.meshPipeline)
-    setVertexBuffer(renderPass, 0, runtime.vertexBuffer, 0, vertexSize)
-    setIndexBuffer(renderPass, runtime.indexBuffer, IndexFormatUint32, 0,
+    setVertexBuffer(renderPass, 0, activeVertexBuffer, 0, vertexSize)
+    setIndexBuffer(renderPass, activeIndexBuffer, IndexFormatUint32, 0,
       indexSize)
     drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
   endPass(renderPass)

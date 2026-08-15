@@ -11,6 +11,7 @@ import UniPlot/[common, scene]
 import UniPlot/render/wgpu_native
 
 const WgpuNativeTargetVersion* = "29.0.1.1"
+const MaxPreparedCacheEntries* = 64
 
 type
   WgpuError* = object of CatchableError
@@ -45,6 +46,9 @@ type
 
   WgpuDiagnostics* = object
     meshUploads*: uint64
+    preparedCacheHits*, preparedCacheMisses*: uint64
+    preparedCacheEvictions*: uint64
+    preparedCacheEntries*, preparedCacheCapacity*: int
 
   WgpuBackend* = ref object
     state*: WgpuBackendState
@@ -87,18 +91,24 @@ proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
       let kind = if node.kind == snText: wrGlyphAtlas else: wrPathMesh
       result.resources.add WgpuResource(id: node.id, kind: kind)
 
-proc openWgpuBackend*(libraryPath: string): WgpuBackend {.contractual.} =
-  ## Open a real wgpu-native adapter, device, and queue from `libraryPath`.
+proc openWgpuBackend*(libraryPath: string;
+    preparedCacheCapacity = 4): WgpuBackend {.contractual.} =
+  ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
     libraryPath.len > 0
+    preparedCacheCapacity in 1 .. MaxPreparedCacheEntries
   ensure:
     not result.isNil and result.state == wbsReady
   body:
     if libraryPath.len == 0:
       raise newException(WgpuError, "wgpu-native library path is empty")
+    if preparedCacheCapacity notin 1 .. MaxPreparedCacheEntries:
+      raise newException(WgpuError,
+        "prepared WGPU cache capacity must be in 1.." &
+        $MaxPreparedCacheEntries)
     result = WgpuBackend(state: wbsUnavailable)
     try:
-      result.runtime = openNativeWgpu(libraryPath)
+      result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity)
       result.state = wbsReady
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
@@ -138,7 +148,13 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
   body:
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
-    WgpuDiagnostics(meshUploads: backend.runtime.meshUploadCount())
+    let cache = backend.runtime.preparedCacheStats()
+    WgpuDiagnostics(meshUploads: backend.runtime.meshUploadCount(),
+      preparedCacheHits: cache.hits,
+      preparedCacheMisses: cache.misses,
+      preparedCacheEvictions: cache.evictions,
+      preparedCacheEntries: cache.entries,
+      preparedCacheCapacity: cache.capacity)
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =

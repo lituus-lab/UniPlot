@@ -27,13 +27,25 @@ suite "WGPU boundary":
       expect PreConditionDefect:
         discard openWgpuBackend("")
 
+  test "prepared cache capacity is bounded":
+    when defined(release):
+      expect WgpuError: discard openWgpuBackend("/unused", 0)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", MaxPreparedCacheEntries + 1)
+    else:
+      expect PreConditionDefect: discard openWgpuBackend("/unused", 0)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", MaxPreparedCacheEntries + 1)
+
   test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
     if libraryPath.len == 0:
       skip()
     else:
-      let backend = openWgpuBackend(libraryPath)
+      let backend = openWgpuBackend(libraryPath, preparedCacheCapacity = 2)
       check backend.state == wbsReady
+      check backend.wgpuDiagnostics.preparedCacheCapacity == 2
+      check backend.wgpuDiagnostics.preparedCacheEntries == 0
       let capabilities = wgpuCapabilities(backend)
       check capabilities.available
       check capabilities.storageBuffers
@@ -106,7 +118,7 @@ suite "WGPU boundary":
         parseColor("#ffffff").get, mesh, parseColor("#ff0000").get)
       check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 2
       backend.submitWgpuPrepared(prepared)
-      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 3
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 2
       var styledFrame = initDataFrame()
       styledFrame.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
       styledFrame.addColumn("y", [1.0, 2.0, NaN, 2.0, 1.0])
@@ -119,8 +131,22 @@ suite "WGPU boundary":
       let styledPrepared = styledSpec.compileScene(styledSize).prepareWgpuScene(
         font)
       let styledPixels = backend.renderWgpuPrepared(styledPrepared)
-      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 4
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 3
       check styledPixels.len == styledSize.width * styledSize.height * 4
       check styledPixels.anyIt(it != 255'u8)
+      var thirdScene = initScene(Size(width: 16, height: 16),
+        parseColor("#ffffff").get)
+      thirdScene.addPath(parsePath("M 1 1 L 8 1 L 8 8 Z"),
+        parseColor("#00aa00").get)
+      let thirdPrepared = thirdScene.prepareWgpuScene(font)
+      backend.submitWgpuPrepared(thirdPrepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 4
+      check backend.wgpuDiagnostics.preparedCacheEntries == 2
+      check backend.wgpuDiagnostics.preparedCacheEvictions == 1
+      backend.submitWgpuPrepared(prepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 5
+      check backend.wgpuDiagnostics.preparedCacheEvictions == 2
+      check backend.wgpuDiagnostics.preparedCacheMisses == 4
+      check backend.wgpuDiagnostics.preparedCacheHits == 3
       backend.close()
       check backend.state == wbsUnavailable
