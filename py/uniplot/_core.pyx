@@ -22,6 +22,9 @@ cdef extern from "UniPlot.h":
                            double, const char *, const char *)
     int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
                                    const double *, size_t, const char *)
+    int uplot_add_grouped_aggregate(uplot_plot *, const char **,
+                                    const double *, size_t, int,
+                                    const char *)
     int uplot_add_heatmap(uplot_plot *, const char **, const char **,
                           const double *, size_t, int)
     int uplot_add_categorical_column(uplot_plot *, const char *,
@@ -264,6 +267,37 @@ cdef class Plot:
             free(value_items); free(break_items)
         if status != 0:
             raise ValueError("invalid histogram or non-empty plot")
+        return self
+
+    def aggregate(self, groups, values, int aggregation=AGG_MEAN,
+                  color="#3366cc"):
+        groups = list(groups)
+        values = list(values)
+        if len(groups) != len(values) or len(groups) == 0:
+            raise ValueError("groups and values must have equal non-zero lengths")
+        cdef list encoded_groups = [str(group).encode("utf-8")
+                                    for group in groups]
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t count = len(values)
+        cdef const char **group_items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef double *number_items = <double *>malloc(count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if group_items == NULL or number_items == NULL:
+            free(group_items); free(number_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                group_items[index] = encoded_groups[index]
+                number_items[index] = float(values[index])
+            status = uplot_add_grouped_aggregate(
+                self._handle, group_items, number_items, count,
+                aggregation, encoded_color)
+        finally:
+            free(group_items); free(number_items)
+        if status != 0:
+            raise ValueError("invalid grouped aggregate or non-empty plot")
         return self
 
     def categorical_column(self, name, values):
