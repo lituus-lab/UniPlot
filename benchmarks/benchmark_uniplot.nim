@@ -98,10 +98,12 @@ when isMainModule:
   let referenceSpec = sampleSpec(pointCount)
   let reference = referenceSpec.compileScene(size)
   let referenceX = referenceSpec.data.numeric("x")
+  let referenceJson = referenceSpec.toJson
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
-      uncertaintyCompileTimes, themedCompileTimes, pngTimes: RunningStat
+      uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
+      jsonDecodeTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -141,6 +143,14 @@ when isMainModule:
     let themedCompileMs = elapsedMs(started)
 
     started = getMonoTime()
+    let encodedSpec = referenceSpec.toJson
+    let jsonEncodeMs = elapsedMs(started)
+
+    started = getMonoTime()
+    let decodedSpec = fromJson(referenceJson)
+    let jsonDecodeMs = elapsedMs(started)
+
+    started = getMonoTime()
     let svg = reference.toSvg(font)
     let svgMs = elapsedMs(started)
 
@@ -150,7 +160,7 @@ when isMainModule:
     consumed += svg.len + png.len + scene.nodes.len + styledScene.nodes.len +
       continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
       uncertaintyScene.nodes.len + themedScene.nodes.len +
-      int(trained.domainMax)
+      encodedSpec.len + decodedSpec.data.rowCount + int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
@@ -161,6 +171,8 @@ when isMainModule:
       referenceCompileTimes.push referenceCompileMs
       uncertaintyCompileTimes.push uncertaintyCompileMs
       themedCompileTimes.push themedCompileMs
+      jsonEncodeTimes.push jsonEncodeMs
+      jsonDecodeTimes.push jsonDecodeMs
       svgTimes.push svgMs
       pngTimes.push pngMs
 
@@ -171,6 +183,7 @@ when isMainModule:
     "points": pointCount,
     "width": size.width,
     "height": size.height,
+    "json_bytes": referenceJson.len,
     "warmup_iterations": warmups,
     "stages": {
       "continuous_scale_train": summary(scaleTimes),
@@ -182,6 +195,8 @@ when isMainModule:
       "reference_construct_compile": summary(referenceCompileTimes),
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "themed_construct_compile": summary(themedCompileTimes),
+      "json_encode": summary(jsonEncodeTimes),
+      "json_decode": summary(jsonDecodeTimes),
       "svg_from_compiled_scene": summary(svgTimes),
       "png_from_compiled_scene": summary(pngTimes)
     },

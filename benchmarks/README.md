@@ -86,6 +86,13 @@ ranking:
   the 2026-08-15 Darwin arm64 run it averaged 21.47 ms for 100,000 points over
   five measured iterations, versus 21.37 ms for the default theme in the same
   process. The 0.10 ms difference is within run-to-run noise.
+- `json_encode` and `json_decode` measure the complete versioned PlotSpec,
+  including both 100,000-value numeric columns. The decode input is prepared
+  outside the timed loop; encoding and parsing are reported separately. On the
+  2026-08-15 Darwin arm64 run, encoding averaged 8.04 ms and decoding averaged
+  17.80 ms over five measured iterations for a 2,582,339-byte compact payload.
+  These are in-memory, uncompressed schema costs; filesystem, compression and
+  network I/O are not included.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other

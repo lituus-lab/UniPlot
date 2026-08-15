@@ -190,6 +190,12 @@ The reusable-theme diagnostic averaged 21.47 ms for the dark preset versus
 run. The 0.10 ms difference is within run-to-run noise; it records that preset
 application introduced no detected construction regression.
 
+Versioned PlotSpec JSON is measured in two stages. For 100,000 rows on the
+same 2026-08-15 Darwin arm64 run, in-memory encoding averaged 8.04 ms and
+decoding averaged 17.80 ms over five measured iterations. The input JSON is
+prepared before the timed decode loop and contains 2,582,339 uncompressed
+bytes. Neither stage includes filesystem, compression or network I/O.
+
 `benchmarkDeps` is deliberately explicit. It creates isolated environments
 under `build/`, installs Python plotting dependencies there, and only installs
 ggplot2/Plots.jl when their R/Julia runtimes already exist. The normal library
