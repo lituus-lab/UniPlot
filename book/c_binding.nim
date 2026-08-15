@@ -116,6 +116,10 @@ int main(void) {
   grouped samples. It requires an otherwise empty handle, making replacement
   semantics explicit; malformed groups, colours or whisker lengths are
   argument errors.
+- `uplot_add_heatmap` copies aligned categorical x/y/value arrays and accepts
+  `UPLOT_AGG_COUNT`, `SUM`, `MEAN`, `MINIMUM` or `MAXIMUM`. It also requires an
+  otherwise empty handle. First-seen axis order and missing Cartesian cells
+  follow the Nim `aggregate2D` contract.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
@@ -140,14 +144,19 @@ let
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
   cBoxSvg = readFile("../assets/generated/c_boxplot.svg")
   cBoxPng = pngDataUri(readFile("../assets/generated/c_boxplot.png"))
+  cHeatSvg = readFile("../assets/generated/c_heatmap.svg")
+  cHeatPng = pngDataUri(readFile("../assets/generated/c_heatmap.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
     "A categorical facet matrix rendered through the UniPlot C ABI"),
   svgFigure(cBoxSvg, "A grouped boxplot built and rendered through the C ABI."),
   pngFigure(cBoxPng, "The same C boxplot as an embedded PNG.",
-    "A grouped boxplot rendered through the UniPlot C ABI")
+    "A grouped boxplot rendered through the UniPlot C ABI"),
+  svgFigure(cHeatSvg, "A categorical heatmap built through `uplot_add_heatmap`."),
+  pngFigure(cHeatPng, "The same C heatmap as an embedded PNG.",
+    "A categorical heatmap rendered through the UniPlot C ABI")
 ])
 
 nbSave
-validatePage("c_binding.html", minSvg = 2, requirePng = true)
+validatePage("c_binding.html", minSvg = 3, requirePng = true)

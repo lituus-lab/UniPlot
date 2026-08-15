@@ -7,10 +7,12 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 6:
+    if len(sys.argv) != 8:
         raise SystemExit(
-            "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png")
-    font, svg_path, png_path, box_svg_path, box_png_path = map(
+            "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
+            "HEAT.svg HEAT.png")
+    (font, svg_path, png_path, box_svg_path, box_png_path,
+     heat_svg_path, heat_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -44,6 +46,15 @@ def main() -> int:
              .title("Python grouped boxplot"))
     box_svg_path.write_bytes(boxes.svg(font))
     box_png_path.write_bytes(boxes.png(font))
+    heatmap = (uniplot.Plot(760, 440)
+               .heatmap(
+                   ["morning", "morning", "afternoon", "evening", "evening"],
+                   ["north", "north", "north", "north", "south"],
+                   [2.0, 4.0, 7.0, 5.0, 9.0],
+                   aggregation=uniplot.AGG_MEAN)
+               .title("Python categorical heatmap"))
+    heat_svg_path.write_bytes(heatmap.svg(font))
+    heat_png_path.write_bytes(heatmap.png(font))
     return 0
 
 

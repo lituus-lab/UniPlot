@@ -81,6 +81,9 @@ copying it.
 - `boxplot(groups, values, whisker_length=1.5, ...)` builds grouped type-7
   summaries on an empty `Plot`. Calling it after another mark is rejected
   instead of silently replacing or combining incompatible retained data.
+- `heatmap(x, y, values, aggregation=AGG_MEAN)` builds a complete categorical
+  matrix on an empty `Plot`. `AGG_COUNT`, `AGG_SUM`, `AGG_MEAN`,
+  `AGG_MINIMUM` and `AGG_MAXIMUM` expose the native aggregation choices.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
@@ -126,14 +129,19 @@ let
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
   pythonBoxSvg = readFile("../assets/generated/python_boxplot.svg")
   pythonBoxPng = pngDataUri(readFile("../assets/generated/python_boxplot.png"))
+  pythonHeatSvg = readFile("../assets/generated/python_heatmap.svg")
+  pythonHeatPng = pngDataUri(readFile("../assets/generated/python_heatmap.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
     "A categorical facet matrix rendered through the UniPlot Python binding"),
   svgFigure(pythonBoxSvg, "A grouped boxplot built through `Plot.boxplot`."),
   pngFigure(pythonBoxPng, "The same Python boxplot as an embedded PNG.",
-    "A grouped boxplot rendered through the UniPlot Python binding")
+    "A grouped boxplot rendered through the UniPlot Python binding"),
+  svgFigure(pythonHeatSvg, "A categorical heatmap built through `Plot.heatmap`."),
+  pngFigure(pythonHeatPng, "The same Python heatmap as an embedded PNG.",
+    "A categorical heatmap rendered through the UniPlot Python binding")
 ])
 
 nbSave
-validatePage("python_binding.html", minSvg = 2, requirePng = true)
+validatePage("python_binding.html", minSvg = 3, requirePng = true)

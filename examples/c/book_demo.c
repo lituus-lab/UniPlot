@@ -12,8 +12,9 @@ static int write_bytes(const char *path, const uint8_t *data, size_t length) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 6) {
-    fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg BOX.png\n");
+  if (argc != 8) {
+    fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg "
+                    "BOX.png HEAT.svg HEAT.png\n");
     return EXIT_FAILURE;
   }
   const double x[] = {0, 1, 2, 3, 4, 5};
@@ -25,11 +26,16 @@ int main(int argc, char **argv) {
   uint8_t *json = NULL;
   uint8_t *box_svg = NULL;
   uint8_t *box_png = NULL;
+  uint8_t *heat_svg = NULL;
+  uint8_t *heat_png = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
   size_t json_length = 0;
   size_t box_svg_length = 0;
   size_t box_png_length = 0;
+  size_t heat_svg_length = 0;
+  size_t heat_png_length = 0;
+  uplot_plot *heatmap = NULL;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -83,6 +89,22 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
   uplot_plot_free(boxes);
+  const char *heat_x[] = {"morning", "morning", "afternoon", "evening",
+                          "evening"};
+  const char *heat_y[] = {"north", "north", "north", "north", "south"};
+  const double heat_values[] = {2.0, 4.0, 7.0, 5.0, 9.0};
+  heatmap = uplot_plot_new(760, 440);
+  if (heatmap == NULL ||
+      uplot_add_heatmap(heatmap, heat_x, heat_y, heat_values, 5,
+                        UPLOT_AGG_MEAN) != UPLOT_OK ||
+      uplot_set_title(heatmap, "C categorical heatmap") != UPLOT_OK ||
+      uplot_render_svg(heatmap, argv[1], &heat_svg, &heat_svg_length) !=
+        UPLOT_OK ||
+      uplot_render_png(heatmap, argv[1], &heat_png, &heat_png_length) !=
+        UPLOT_OK ||
+      !write_bytes(argv[6], heat_svg, heat_svg_length) ||
+      !write_bytes(argv[7], heat_png, heat_png_length))
+    goto cleanup;
   result = EXIT_SUCCESS;
 
 cleanup:
@@ -91,6 +113,9 @@ cleanup:
   uplot_buffer_free(json, json_length);
   uplot_buffer_free(box_svg, box_svg_length);
   uplot_buffer_free(box_png, box_png_length);
+  uplot_buffer_free(heat_svg, heat_svg_length);
+  uplot_buffer_free(heat_png, heat_png_length);
+  uplot_plot_free(heatmap);
   uplot_plot_free(plot);
   return result;
 }
