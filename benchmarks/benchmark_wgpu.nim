@@ -101,6 +101,11 @@ proc main() =
     if iteration >= 3: frameTimes.push(frameMs)
   if backend.wgpuDiagnostics.meshUploads != uploadsBeforeWarm:
     quit("resident prepared scene was uploaded during publication", 1)
+  let diagnostics = backend.wgpuDiagnostics
+  if diagnostics.largestUploadWrite > diagnostics.uploadChunkBytes:
+    quit("a queue write exceeded the configured upload chunk", 1)
+  if diagnostics.uploadWriteCalls < diagnostics.meshUploads * 2'u64:
+    quit("mesh uploads did not issue both vertex and index writes", 1)
   let report = %*{
     "provider": "UniPlot-WGPU",
     "wgpu_native": WgpuNativeTargetVersion,
@@ -110,27 +115,32 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "prepared-lru-byte-budget-2-v1",
+    "residency": "prepared-lru-byte-budget-chunked-2-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
       "upload_submit": "cycle three identities through two slots and enqueue",
       "submit": "alternate two resident identities without upload/readback",
       "publication_frame": "submit resident geometry and read back RGBA8",
-      "prepared_cache_bytes": "allocated prepared vertex/index capacities only"
+      "prepared_cache_bytes": "allocated prepared vertex/index capacities only",
+      "upload_writes": "queue writes split at the configured byte bound"
     },
     "preparation": summary(preparationTimes),
     "upload_submit": summary(uploadSubmitTimes),
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
-    "mesh_uploads": backend.wgpuDiagnostics.meshUploads,
-    "prepared_cache_hits": backend.wgpuDiagnostics.preparedCacheHits,
-    "prepared_cache_misses": backend.wgpuDiagnostics.preparedCacheMisses,
-    "prepared_cache_evictions": backend.wgpuDiagnostics.preparedCacheEvictions,
-    "prepared_cache_bytes": backend.wgpuDiagnostics.preparedCacheBytes,
+    "mesh_uploads": diagnostics.meshUploads,
+    "upload_write_calls": diagnostics.uploadWriteCalls,
+    "upload_bytes": diagnostics.uploadBytes,
+    "largest_upload_write": diagnostics.largestUploadWrite,
+    "upload_chunk_bytes": diagnostics.uploadChunkBytes,
+    "prepared_cache_hits": diagnostics.preparedCacheHits,
+    "prepared_cache_misses": diagnostics.preparedCacheMisses,
+    "prepared_cache_evictions": diagnostics.preparedCacheEvictions,
+    "prepared_cache_bytes": diagnostics.preparedCacheBytes,
     "prepared_cache_peak_bytes":
-      backend.wgpuDiagnostics.preparedCachePeakBytes,
+      diagnostics.preparedCachePeakBytes,
     "prepared_cache_byte_budget":
-      backend.wgpuDiagnostics.preparedCacheByteBudget,
+      diagnostics.preparedCacheByteBudget,
     "guard": consumed
   }
   echo $report
