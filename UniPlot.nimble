@@ -49,7 +49,7 @@ task docs, "API reference + book into pages/ — what CI publishes":
   # index and fails on Nim distributions (notably Homebrew) that omit the
   # compiler's optional tools/dochack source.
   for module in ["common", "data", "scales", "stats", "grammar", "scene",
-      "guides", "render"]:
+      "guides", "render", "render/wgpu"]:
     exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot/" &
          module & ".nim"
   exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"

@@ -17,6 +17,7 @@ adapter, device and queue without changing plot layout.
 """
 
 nbCode:
+  import UniGlyph
   import UniPlot
   import UniPlot/render/wgpu
 
@@ -24,12 +25,14 @@ nbCode:
   spec.labels(title = "GPU-ready semantics")
   let scene = spec.compileScene(Size(width: 640, height: 400))
   let frame = prepareWgpuFrame(scene)
+  let prepared = prepareWgpuScene(scene, loadTtf("../../tests/DejaVuSans.ttf"))
   let capabilities = wgpuCapabilities()
 
   echo "target wgpu-native: ", WgpuNativeTargetVersion
   echo "frame size: ", frame.size.width, " × ", frame.size.height
   echo "scene nodes: ", frame.nodeCount
   echo "semantic resources: ", frame.resources.len
+  echo "prepared target: ", prepared.size.width, " × ", prepared.size.height
   echo "native backend linked: ", capabilities.available
 
 nbText: """
@@ -50,11 +53,13 @@ nimble wgpuTest
 The installer and tasks are written in Nim. Native artifacts are pinned to
 wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 
-`renderWgpuScene(backend, scene, font)` uses the same UniGlyph layouts and
-UniVector tessellation as the CPU backends. It uploads an ordered indexed mesh,
-submits the retained WGSL pipeline and reads unpadded RGBA8 pixels back. The
-headless validation task checks both individual pixels and an exact CPU/GPU
-fixture. Run `nimble wgpuBenchmark` for the end-to-end warm-frame measurement.
+`prepareWgpuScene(scene, font)` uses the same UniGlyph layouts and UniVector
+tessellation as the CPU backends. `submitWgpuPrepared` uploads and enqueues the
+retained indexed geometry without readback; `renderWgpuPrepared` additionally
+returns unpadded RGBA8 pixels. The convenience scene overloads prepare on every
+call. The headless validation task checks both individual pixels and an exact
+CPU/GPU fixture. Run `nimble wgpuBenchmark` to measure preparation, submission
+and publication separately.
 
 ## Typed failures
 

@@ -111,9 +111,11 @@ Install the pinned runtime with `nimble wgpuDeps`, then validate the native
 device path with `nimble wgpuTest`. Both tasks are implemented in Nim; the
 downloaded runtime stays in the ignored `.deps` directory.
 
-`renderWgpuScene` compiles retained paths and UniGlyph text through UniVector,
-uploads indexed meshes, submits a WGSL render pass and returns unpadded RGBA8
-pixels. `nimble wgpuBenchmark` measures that complete warm-frame path.
+`prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once.
+`submitWgpuPrepared` reuses that geometry without readback;
+`renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
+prepare on each call. `nimble wgpuBenchmark` measures preparation, submission
+and publication separately.
 
 ## License
 
