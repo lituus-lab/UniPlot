@@ -116,6 +116,9 @@ task benchmark, "Reproducible UniPlot/Matplotlib off-screen benchmark":
 task benchmarkScales, "Run cross-library 10^3, 10^5, and 10^6-point workloads":
   exec "python3 benchmarks/run_workload_suite.py"
 
+task benchmarkThermals, "Compare cold processes with warmed provider stages":
+  exec "python3 benchmarks/run_thermal_suite.py"
+
 task benchmarkDeps, "Install isolated Python/R/Julia benchmark dependencies":
   exec "python3 benchmarks/install_deps.py"
 

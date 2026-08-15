@@ -11,6 +11,7 @@ configurable number of measured iterations.
 nimble benchmarkDeps         # explicit, isolated optional dependency setup
 nimble benchmark             # 20 iterations, 1,000 points
 nimble benchmarkScales       # 10^3, 10^5 and 10^6 points, all providers
+nimble benchmarkThermals     # cold process wall time + warmed stages
 nimble benchmark -- 50 5000  # direct runner arguments when supported
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
@@ -25,6 +26,15 @@ memory. Passing a third argument to `run_benchmarks.py` overrides the normal
 three loop warm-ups. Zero disables those warm-ups; provider-specific
 availability checks and runtime initialization remain disclosed implementation
 work rather than being mislabeled as process-start timing.
+
+`benchmarkThermals` writes `benchmarks/results/thermal_suite.json`. Its cold
+measurement is the wall time of a fresh provider subprocess performing one
+actual SVG and PNG render; it includes language/runtime and library startup,
+reference construction, serialization and shutdown. UniPlot is compiled
+before its provider subprocess and compilation is therefore excluded. The
+warm report is a separate process with three loop warmups and 20 measured
+iterations. Cold wall time and warm stage time have different boundaries and
+are never divided into a synthetic speedup ratio.
 
 `benchmarkDeps` creates `build/benchmark-python` for Matplotlib, Plotly and
 Kaleido; `build/benchmark-r-library` for ggplot2 when R is installed; and uses

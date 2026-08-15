@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,13 +19,17 @@ JULIA_PROJECT = ROOT / "benchmarks" / "julia"
 
 
 def command_json(command, provider, env=None):
+    started = time.perf_counter_ns()
     try:
         completed = subprocess.run(command, cwd=ROOT, check=True, env=env,
                                    capture_output=True, text=True)
-        return json.loads(completed.stdout.strip().splitlines()[-1])
+        result = json.loads(completed.stdout.strip().splitlines()[-1])
     except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
         detail = getattr(error, "stderr", "") or str(error)
-        return {"provider": provider, "available": False, "reason": detail.strip()}
+        result = {"provider": provider, "available": False,
+                  "reason": detail.strip()}
+    result["process_wall_ms"] = (time.perf_counter_ns() - started) / 1_000_000
+    return result
 
 
 def main():

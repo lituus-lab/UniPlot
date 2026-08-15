@@ -143,6 +143,7 @@ static and deterministic; browser interaction belongs to a future backend.
 nimble benchmarkDeps
 nimble benchmark
 nimble benchmarkScales
+nimble benchmarkThermals
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
 
@@ -163,6 +164,13 @@ or silently dropping them.
 and records all three reports in `benchmarks/results/workload_suite.json`.
 The largest case still serializes actual SVG and PNG output; it is not a
 construction-only substitute presented as an end-to-end result.
+
+`benchmarkThermals` records fresh-process wall time separately from warmed
+per-stage measurements. The cold boundary includes runtime and library startup,
+reference construction, one real SVG and PNG render, serialization and
+shutdown; UniPlot compilation happens before its measured provider process.
+The book does not derive a misleading ratio between that boundary and a warm
+individual stage.
 
 The stages align user intent, not implementation internals: Matplotlib can
 defer layout to `savefig`, whereas UniPlot performs it in `compileScene`.
