@@ -106,8 +106,9 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
     xDomain = initContinuousDomain()
     xBand = initBandDomain()
     yDomain = initContinuousDomain()
+    yBand = initBandDomain()
     initialized = false
-    xCoordinateKind = ckNumeric
+    xCoordinateKind, yCoordinateKind = ckNumeric
     xKind = skLinear
     yKind = skLinear
     xReversed = false
@@ -117,6 +118,7 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
     if not initialized:
       xKind = spec.xScaleSpec.kind
       xCoordinateKind = domains.xKind
+      yCoordinateKind = domains.yKind
       yKind = spec.yScaleSpec.kind
       xReversed = spec.xScaleSpec.reversed
       yReversed = spec.yScaleSpec.reversed
@@ -152,17 +154,33 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
           xBand.addValues(spec.xScaleSpec.categories.values)
         xBand.merge(domains.xBand)
     if shareY:
+      if domains.yKind != yCoordinateKind:
+        raise newException(PlotError,
+          "shared y axes require matching coordinate kinds")
       if spec.yScaleSpec.kind != yKind or
           spec.yScaleSpec.reversed != yReversed:
         raise newException(PlotError,
           "shared y axes require matching scale kinds and directions")
-      if spec.yScaleSpec.domain.configured:
-        discard domains.yContinuous.train(0, 1,
-          spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
-      yDomain.merge(domains.yContinuous)
-      if spec.yScaleSpec.domain.configured:
-        yDomain.addValues([spec.yScaleSpec.domain.minimum,
-          spec.yScaleSpec.domain.maximum])
+      if domains.yKind == ckNumeric:
+        if spec.yScaleSpec.categories.configured:
+          raise newException(PlotError,
+            "categorical y domain cannot be applied to numeric coordinates")
+        if spec.yScaleSpec.domain.configured:
+          discard domains.yContinuous.train(0, 1,
+            spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
+        yDomain.merge(domains.yContinuous)
+        if spec.yScaleSpec.domain.configured:
+          yDomain.addValues([spec.yScaleSpec.domain.minimum,
+            spec.yScaleSpec.domain.maximum])
+      else:
+        if spec.yScaleSpec.domain.configured:
+          raise newException(PlotError,
+            "numeric y limits cannot be applied to categorical coordinates")
+        if spec.yScaleSpec.categories.configured:
+          discard domains.yBand.train(0, 1,
+            spec.yScaleSpec.categories.values)
+          yBand.addValues(spec.yScaleSpec.categories.values)
+        yBand.merge(domains.yBand)
   if shareX:
     if xCoordinateKind == ckNumeric:
       let bounds = xDomain.fittedBounds()
@@ -171,8 +189,12 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
       let categories = xBand.train(0, 1).domain
       for spec in result.mitems: spec.xCategories(categories)
   if shareY:
-    let bounds = yDomain.fittedBounds()
-    for spec in result.mitems: spec.yLimits(bounds.minimum, bounds.maximum)
+    if yCoordinateKind == ckNumeric:
+      let bounds = yDomain.fittedBounds()
+      for spec in result.mitems: spec.yLimits(bounds.minimum, bounds.maximum)
+    else:
+      let categories = yBand.train(0, 1).domain
+      for spec in result.mitems: spec.yCategories(categories)
 
 proc compileCells(cells: openArray[GridCell]; columns: int; size: Size;
     gap: int; sharedX, sharedY: bool): Scene =

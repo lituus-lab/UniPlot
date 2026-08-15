@@ -191,10 +191,11 @@ proc withOpacity(value: Color; opacity: float32): Color =
   adjusted.get
 
 type AxisDomains* = object
-  xKind*: ColumnKind
+  xKind*, yKind*: ColumnKind
   xContinuous*: ContinuousDomain
   xBand*: BandDomain
   yContinuous*: ContinuousDomain
+  yBand*: BandDomain
 
 proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   ## Accumulate every coordinate that must be representable by plot axes.
@@ -209,7 +210,18 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
       "categorical x coordinates only support a linear scale")
   result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
   result.xBand = initBandDomain()
+  let firstY = spec.layers[0].mapping.y
+  if spec.layers[0].mark in {mkErrorBar, mkRibbon}:
+    result.yKind = ckNumeric
+  else:
+    if firstY notin spec.data.columns:
+      raise newException(PlotError, "layer mapping references a missing column")
+    result.yKind = spec.data.columns[firstY].kind
+  if result.yKind == ckCategorical and spec.yScaleSpec.kind != skLinear:
+    raise newException(PlotError,
+      "categorical y coordinates only support a linear scale")
   result.yContinuous = initContinuousDomain(spec.yScaleSpec.kind)
+  result.yBand = initBandDomain()
   for reference in spec.references:
     if not reference.minimum.isFinite or not reference.maximum.isFinite or
         reference.minimum > reference.maximum or reference.width <= 0 or
@@ -227,6 +239,9 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
           "logarithmic x references must be positive")
       result.xContinuous.addValues([reference.minimum, reference.maximum])
     of rkYLine, rkYBand:
+      if result.yKind != ckNumeric:
+        raise newException(PlotError,
+          "y references require numeric y coordinates")
       if spec.yScaleSpec.kind == skLog10 and reference.minimum <= 0:
         raise newException(PlotError,
           "logarithmic y references must be positive")
@@ -245,9 +260,9 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
               annotation.yEnd) or
           annotation.headSize <= 0 or not annotation.headSize.isFinite:
         raise newException(PlotError, "invalid arrow annotation")
-    if result.xKind != ckNumeric:
+    if result.xKind != ckNumeric or result.yKind != ckNumeric:
       raise newException(PlotError,
-        "annotations require numeric x coordinates")
+        "annotations require numeric x and y coordinates")
     result.xContinuous.addValues([annotation.x])
     result.yContinuous.addValues([annotation.y])
     if annotation.kind == akArrow:
@@ -257,12 +272,29 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   for layer in spec.layers:
     if layer.mapping.x notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
+    if layer.mark == mkTile and
+        (spec.data.columns[layer.mapping.x].kind != ckCategorical or
+        layer.mapping.y notin spec.data.columns or
+        spec.data.columns[layer.mapping.y].kind != ckCategorical):
+      raise newException(PlotError,
+        "tile layers require categorical x and y coordinates")
     if spec.data.columns[layer.mapping.x].kind != result.xKind:
       raise newException(PlotError, "all x mappings must use the same column kind")
     if result.xKind == ckNumeric:
       result.xContinuous.addValues(spec.data.numeric(layer.mapping.x))
     else:
       result.xBand.addValues(spec.data.categorical(layer.mapping.x))
+    if layer.mark notin {mkErrorBar, mkRibbon} and
+        (layer.mapping.y notin spec.data.columns or
+        spec.data.columns[layer.mapping.y].kind != result.yKind):
+      raise newException(PlotError,
+        "all y mappings must use the same column kind")
+    if result.yKind == ckCategorical:
+      if layer.mark != mkTile or result.xKind != ckCategorical:
+        raise newException(PlotError,
+          "categorical y coordinates require categorical tile layers")
+      result.yBand.addValues(spec.data.categorical(layer.mapping.y))
+      continue
     if layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot}:
       for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
         if mapping notin spec.data.columns or
@@ -343,17 +375,18 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
               "box-plot statistics must reference numeric columns")
     elif layer.mapping.y notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
-    elif spec.data.columns[layer.mapping.y].kind != ckNumeric:
+    elif layer.mark != mkTile and
+        spec.data.columns[layer.mapping.y].kind != ckNumeric:
       raise newException(PlotError, "y mappings must reference numeric columns")
     if layer.mapping.color.len > 0 and
         layer.mapping.color notin spec.data.columns:
       raise newException(PlotError,
         "color mappings must reference an existing column")
     if layer.mapping.fill.len > 0 and
-        (layer.mark notin {mkPoint, mkBar} or
+        (layer.mark notin {mkPoint, mkBar, mkTile} or
         layer.mapping.fill notin spec.data.columns):
       raise newException(PlotError,
-        "fill mappings require a point or bar column")
+        "fill mappings require a point, bar or tile column")
     if layer.mapping.color.len > 0 and layer.mapping.fill.len > 0:
       raise newException(PlotError,
         "a layer cannot map both color and fill")
@@ -451,9 +484,13 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if legendHeight > area.height:
     raise newException(PlotError, "legend does not fit the drawing height")
   let domains = collectAxisDomains(spec)
-  let xKind = domains.xKind
+  let
+    xKind = domains.xKind
+    yKind = domains.yKind
   var xScale: ContinuousScale
   var xBand: BandScale
+  var yScale: ContinuousScale
+  var yBand: BandScale
   let
     xRangeMin = if spec.xScaleSpec.reversed: area.xMax else: area.xMin
     xRangeMax = if spec.xScaleSpec.reversed: area.xMin else: area.xMax
@@ -476,12 +513,23 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.xScaleSpec.categories.values)
     else:
       domains.xBand.train(xRangeMin, xRangeMax)
-  let yScale = if spec.yScaleSpec.domain.configured:
-    domains.yContinuous.train(yRangeMin, yRangeMax,
-        spec.yScaleSpec.domain.minimum,
-      spec.yScaleSpec.domain.maximum)
+  if yKind == ckCategorical and spec.yScaleSpec.domain.configured:
+    raise newException(PlotError,
+      "numeric y limits cannot be applied to categorical coordinates")
+  if yKind == ckNumeric and spec.yScaleSpec.categories.configured:
+    raise newException(PlotError,
+      "categorical y domain cannot be applied to numeric coordinates")
+  if yKind == ckNumeric and spec.yScaleSpec.domain.configured:
+    yScale = domains.yContinuous.train(yRangeMin, yRangeMax,
+      spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
+  elif yKind == ckNumeric:
+    yScale = domains.yContinuous.train(yRangeMin, yRangeMax)
   else:
-    domains.yContinuous.train(yRangeMin, yRangeMax)
+    yBand = if spec.yScaleSpec.categories.configured:
+      domains.yBand.train(yRangeMin, yRangeMax,
+        spec.yScaleSpec.categories.values)
+    else:
+      domains.yBand.train(yRangeMin, yRangeMax)
   var nodeId = 1'u64
   if xKind == ckNumeric:
     for value in xScale.ticks():
@@ -494,20 +542,28 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     for value in xBand.domain:
       result.addText(value, Point(x: xBand.map(value), y: area.yMax + 20), 11,
         spec.theme.foreground, anchor = textMiddle)
-  for value in yScale.ticks():
-    let y = yScale.map(value)
-    result.addPath(segmentPath(Point(x: area.xMin, y: y),
-      Point(x: area.xMax, y: y), 1), spec.theme.gridColor)
-    result.addText(tickLabel(value), Point(x: 5, y: y), 11,
-      spec.theme.foreground)
+  if yKind == ckNumeric:
+    for value in yScale.ticks():
+      let y = yScale.map(value)
+      result.addPath(segmentPath(Point(x: area.xMin, y: y),
+        Point(x: area.xMax, y: y), 1), spec.theme.gridColor)
+      result.addText(tickLabel(value), Point(x: 5, y: y), 11,
+        spec.theme.foreground)
+      if spec.secondaryYSpec.enabled:
+        let secondaryValue = value * spec.secondaryYSpec.scale +
+          spec.secondaryYSpec.offset
+        if not secondaryValue.isFinite:
+          raise newException(PlotError,
+            "secondary y transform produced a non-finite tick")
+        result.addText(tickLabel(secondaryValue),
+          Point(x: area.xMax + 8, y: y), 11, spec.theme.foreground)
+  else:
     if spec.secondaryYSpec.enabled:
-      let secondaryValue = value * spec.secondaryYSpec.scale +
-        spec.secondaryYSpec.offset
-      if not secondaryValue.isFinite:
-        raise newException(PlotError,
-          "secondary y transform produced a non-finite tick")
-      result.addText(tickLabel(secondaryValue),
-        Point(x: area.xMax + 8, y: y), 11, spec.theme.foreground)
+      raise newException(PlotError,
+        "secondary y guides require numeric y coordinates")
+    for value in yBand.domain:
+      result.addText(value, Point(x: 5, y: yBand.map(value)), 11,
+        spec.theme.foreground)
   if spec.title.len > 0:
     result.addText(spec.title, Point(x: area.xMin, y: 25), 18,
       spec.theme.foreground)
@@ -567,8 +623,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   for layer in spec.layers:
     let
       bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot}
-      ys = if not bounded or layer.mark == mkBoxPlot:
+      ys = if yKind == ckNumeric and
+          (not bounded or layer.mark == mkBoxPlot):
         spec.data.numeric(layer.mapping.y) else: @[]
+      categoricalYs = if yKind == ckCategorical:
+        spec.data.categorical(layer.mapping.y) else: @[]
       lowerValues = if bounded: spec.data.numeric(layer.mapping.yMin) else: @[]
       upperValues = if bounded: spec.data.numeric(layer.mapping.yMax) else: @[]
       firstQuartileValues = if layer.mark == mkBoxPlot:
@@ -648,7 +707,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       of mkPoint: spec.theme.pointSize
       of mkLine, mkErrorBar, mkBoxPlot: spec.theme.lineWidth
       of mkText: 12'f32
-      of mkBar, mkArea, mkRibbon: 0'f32
+      of mkBar, mkArea, mkRibbon, mkTile: 0'f32
     var pendingBreak = false
     for row in 0 ..< spec.data.rowCount:
       if not rowFilter.rowIsFinite(row):
@@ -690,7 +749,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         else:
           points.add Point(x: x, y: (lower.y + upper.y) * 0.5)
       else:
-        points.add Point(x: x, y: yScale.map(ys[row]))
+        let y = if yKind == ckNumeric: yScale.map(ys[row]) else:
+          yBand.map(categoricalYs[row])
+        points.add Point(x: x, y: y)
       if layer.mark in {mkLine, mkArea, mkRibbon}:
         breakBefore.add pendingBreak
       pendingBreak = false
@@ -813,6 +874,14 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           lowerPoints[index].y, firstQuartileY, point.y, thirdQuartileY,
           upperPoints[index].y, sizes[index]), colors[index], nodeId)
         inc nodeId
+    of mkTile:
+      for index, point in points:
+        var tile = newPath()
+        tile.rect(point.x - xBand.bandwidth * 0.5,
+          point.y - yBand.bandwidth * 0.5,
+          xBand.bandwidth, yBand.bandwidth)
+        result.addPath(tile, colors[index], nodeId)
+        inc nodeId
   for annotation in spec.annotations:
     let startPoint = Point(x: xScale.map(annotation.x),
       y: yScale.map(annotation.y))
@@ -848,7 +917,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
         result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
-      of mkBar, mkArea, mkRibbon, mkBoxPlot:
+      of mkBar, mkArea, mkRibbon, mkBoxPlot, mkTile:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
         result.addPath(swatch, entry.color)

@@ -145,6 +145,28 @@ suite "plot composition":
         check shared.nodes[index].text == expected.nodes[index].text
         check shared.nodes[index].position == expected.nodes[index].position
 
+  test "share categorical y domains in first-seen panel order":
+    let
+      first = heatmapPlot(["x", "x"], ["north", "south"], [1.0, 2.0])
+      second = heatmapPlot(["x", "x"], ["east", "north"], [3.0, 4.0])
+    var expectedFirst = first
+    var expectedSecond = second
+    expectedFirst.yCategories(["north", "south", "east"])
+    expectedSecond.yCategories(["north", "south", "east"])
+    let
+      shared = compileGrid([first, second], 2,
+        Size(width: 816, height: 300), sharedY = true)
+      expected = compileGrid([expectedFirst, expectedSecond], 2,
+        Size(width: 816, height: 300))
+    check shared.nodes.len == expected.nodes.len
+    for index in 0 ..< shared.nodes.len:
+      check shared.nodes[index].kind == expected.nodes[index].kind
+      case shared.nodes[index].kind
+      of snPath: check $shared.nodes[index].path == $expected.nodes[index].path
+      of snText:
+        check shared.nodes[index].text == expected.nodes[index].text
+        check shared.nodes[index].position == expected.nodes[index].position
+
   test "facet specifications retain category order and complete semantics":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0, 3.0])

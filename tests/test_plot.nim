@@ -203,6 +203,39 @@ suite "plot compilation":
       yQ1 = "q1", yQ3 = "q3"))
     expect PlotError: discard spec.compileScene()
 
+  test "categorical heatmaps preserve both band axes and absent cells":
+    var spec = heatmapPlot(
+      ["left", "right", "left"], ["north", "north", "south"],
+      [1.0, 4.0, NaN])
+    check spec.layers.len == 1
+    check spec.layers[0].mark == mkTile
+    check spec.data.rowCount == 4
+    check spec.legendSpec.visible
+    check not heatmapPlot(["x"], ["y"], [1.0], legend = "").legendSpec.visible
+    spec.yCategories(["south", "north", "reserved"])
+    let scene = spec.compileScene()
+    var
+      foundSouth, foundReserved, foundGuide = false
+      paintedTiles = 0
+    for node in scene.nodes:
+      if node.kind == snText and node.text == "south": foundSouth = true
+      if node.kind == snText and node.text == "reserved": foundReserved = true
+      if node.kind == snText and node.text == "value": foundGuide = true
+      if node.kind == snPath and node.id != 0: inc paintedTiles
+    check foundSouth and foundReserved and foundGuide
+    check paintedTiles == 2
+    spec.clearYCategories()
+    check not spec.yScaleSpec.categories.configured
+    var numeric = linePlot([0.0, 1.0], [1.0, 2.0])
+    numeric.geomTile(aes("x", "y"))
+    expect PlotError: discard numeric.compileScene()
+    var categoricalFrame = initDataFrame()
+    categoricalFrame.addColumn("x", ["a"])
+    categoricalFrame.addColumn("y", ["b"])
+    var categorical = plot(categoricalFrame)
+    categorical.geomPoint(aes("x", "y"))
+    expect PlotError: discard categorical.compileScene()
+
   test "references reject invalid values and categorical x coordinates":
     var spec = sample()
     when defined(release):

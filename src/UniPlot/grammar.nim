@@ -19,6 +19,7 @@ type
     mkErrorBar
     mkRibbon
     mkBoxPlot
+    mkTile
 
   LineStyle* = enum
     SolidLine
@@ -285,6 +286,12 @@ proc geomBoxPlot*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
       missingValues = missingValues)
     spec.layers[^1].boxWidth = boxWidth
 
+proc geomTile*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
+    legend = ""; missingValues = DropMissing) =
+  ## Add categorical x-by-y cells; numeric color mappings use UniColor.
+  spec.addLayer(mkTile, mapping, color, legend = legend,
+    missingValues = missingValues)
+
 proc labels*(spec: var PlotSpec; title = ""; x = ""; y = "") =
   spec.title = title
   spec.xLabel = x
@@ -438,6 +445,25 @@ proc yLimits*(spec: var PlotSpec; minimum, maximum: float64) {.contractual.} =
         "y limits must be finite and strictly increasing")
     spec.yScaleSpec.domain = AxisDomainSpec(configured: true,
       minimum: minimum, maximum: maximum)
+    spec.yScaleSpec.categories = AxisCategoryDomainSpec()
+
+proc yCategories*(spec: var PlotSpec; values: openArray[string]) {.
+    contractual.} =
+  ## Fix categorical y order while retaining categories absent from the data.
+  require:
+    values.len > 0
+  body:
+    if values.len == 0:
+      raise newException(PlotError, "y category domain cannot be empty")
+    var copied = newSeqOfCap[string](values.len)
+    for value in values:
+      if value in copied:
+        raise newException(PlotError,
+          "y category domain cannot contain duplicates")
+      copied.add value
+    spec.yScaleSpec.categories = AxisCategoryDomainSpec(configured: true,
+      values: copied)
+    spec.yScaleSpec.domain = AxisDomainSpec()
 
 proc clearXLimits*(spec: var PlotSpec) =
   ## Restore automatic x-domain training.
@@ -450,6 +476,10 @@ proc clearXCategories*(spec: var PlotSpec) =
 proc clearYLimits*(spec: var PlotSpec) =
   ## Restore automatic y-domain training.
   spec.yScaleSpec.domain = AxisDomainSpec()
+
+proc clearYCategories*(spec: var PlotSpec) =
+  ## Restore automatic categorical y-domain training.
+  spec.yScaleSpec.categories = AxisCategoryDomainSpec()
 
 proc addReference(spec: var PlotSpec; kind: ReferenceKind; minimum,
     maximum: float64; color: string; width: float32; label: string) =
@@ -580,3 +610,24 @@ proc boxPlot*(groups: openArray[string]; values: openArray[float64];
       yMax = "upperWhisker", yQ1 = "firstQuartile",
       yQ3 = "thirdQuartile"), color, legend = legend)
     result.geomPoint(aes("category", "outlier"), outlierColor, radius = 3)
+
+proc heatmapPlot*(xs, ys: openArray[string]; values: openArray[float64];
+    aggregation = agMean; legend = "value"): PlotSpec =
+  ## Aggregate observations into a complete categorical x-by-y tile matrix.
+  let cells = aggregate2D(xs, ys, values, aggregation)
+  var
+    xValues = newSeqOfCap[string](cells.len)
+    yValues = newSeqOfCap[string](cells.len)
+    aggregated = newSeqOfCap[float64](cells.len)
+  for cell in cells:
+    xValues.add cell.x
+    yValues.add cell.y
+    aggregated.add cell.value
+  var frame = initDataFrame()
+  frame.addColumn("x", xValues)
+  frame.addColumn("y", yValues)
+  frame.addColumn("value", aggregated)
+  result = plot(frame)
+  result.geomTile(aes("x", "y", color = "value"), legend = legend)
+  if legend.len > 0:
+    result.legend()
