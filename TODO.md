@@ -80,7 +80,8 @@ silently claimed by the focused 1.0 publication contract.
   Nim, C and Python.
 - [x] Categorical heatmaps with complete count/sum/mean/min/max aggregation in
   Nim, C and Python.
-- [ ] Violin plots, density, contours and numeric/raster heatmaps.
+- [x] Variable-size numeric vector-cell heatmaps in Nim, C and Python.
+- [ ] Violin plots, kernel density, contours and raster/image heatmaps.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [x] First-seen categorical two-dimensional aggregation with explicit absent
   cells and UniAccurate compensated sum/mean.
