@@ -62,6 +62,19 @@ suite "plot compilation":
     expect PlotError: discard barPlot(["a"], [1.0, 2.0])
     expect PlotError: discard histogramPlot([1.0], 0)
 
+  test "point shapes and line styles are explicit layer semantics":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y", shape = "group"), shape = DiamondMarker)
+    spec.geomLine(aes("x", "y", lineStyle = "series"),
+      lineStyle = DotDashLine)
+    check spec.layers[0].shape == DiamondMarker
+    check spec.layers[0].mapping.shape == "group"
+    check spec.layers[1].lineStyle == DotDashLine
+    check spec.layers[1].mapping.lineStyle == "series"
+
   test "named layers produce a deterministic optional legend":
     var spec = sample()
     spec.layers[0].legendLabel = "Trend"

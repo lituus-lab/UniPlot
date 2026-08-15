@@ -1,8 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import UniColor
+from UniVector import MarkerShape, CircleMarker, SquareMarker, TriangleMarker,
+  DiamondMarker, PlusMarker, CrossMarker
 import contracts
 import UniPlot/[common, data, scales, stats]
+
+export MarkerShape
 
 type
   MarkKind* = enum
@@ -11,6 +15,13 @@ type
     mkBar
     mkArea
     mkText
+
+  LineStyle* = enum
+    SolidLine
+    DashedLine
+    DottedLine
+    DotDashLine
+    LongDashLine
 
   LegendPosition* = enum
     lpRight
@@ -30,6 +41,8 @@ type
     color*: string
     size*: string
     alpha*: string
+    shape*: string
+    lineStyle*: string
 
   Layer* = object
     mark*: MarkKind
@@ -37,6 +50,8 @@ type
     color*: Color
     size*: float32
     legendLabel*: string
+    shape*: MarkerShape
+    lineStyle*: LineStyle
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -69,24 +84,27 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
 proc aes*(x, y: string; label = ""; color = ""; size = "";
-    alpha = ""): Aes =
-  Aes(x: x, y: y, label: label, color: color, size: size, alpha: alpha)
+    alpha = ""; shape = ""; lineStyle = ""): Aes =
+  Aes(x: x, y: y, label: label, color: color, size: size, alpha: alpha,
+    shape: shape, lineStyle: lineStyle)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
-    color = "#3366cc"; size = 0'f32; legend = "") =
+    color = "#3366cc"; size = 0'f32; legend = "";
+    shape = CircleMarker; lineStyle = SolidLine) =
   if mapping.x.len == 0 or mapping.y.len == 0:
     raise newException(PlotError, "x and y mappings are required")
   if size < 0 or not size.isFinite:
     raise newException(PlotError, "mark size must be finite and non-negative")
   spec.layers.add Layer(mark: mark, mapping: mapping, color: cssColor(color),
-    size: size, legendLabel: legend)
+    size: size, legendLabel: legend, shape: shape, lineStyle: lineStyle)
 
 proc geomLine*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    width = 0'f32; legend = "") =
-  spec.addLayer(mkLine, mapping, color, width, legend)
+    width = 0'f32; legend = ""; lineStyle = SolidLine) =
+  spec.addLayer(mkLine, mapping, color, width, legend,
+    lineStyle = lineStyle)
 proc geomPoint*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
-    radius = 0'f32; legend = "") =
-  spec.addLayer(mkPoint, mapping, color, radius, legend)
+    radius = 0'f32; legend = ""; shape = CircleMarker) =
+  spec.addLayer(mkPoint, mapping, color, radius, legend, shape = shape)
 proc geomBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
     legend = "") =
   spec.addLayer(mkBar, mapping, color, legend = legend)
