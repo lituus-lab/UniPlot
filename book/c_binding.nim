@@ -108,6 +108,10 @@ int main(void) {
   existing point entry points drop them.
 - `uplot_set_secondary_y(scale, offset, label)` adds the same affine right-side
   guide as Nim; `uplot_clear_secondary_y` removes it.
+- `uplot_annotate_text` and `uplot_annotate_arrow` retain plain annotations in
+  numeric data coordinates; `uplot_clear_annotations` removes them. They are
+  included in schema-v1 JSON and therefore survive the C round trip shown
+  above.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
@@ -131,7 +135,7 @@ let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
 nbRawHtml gallery([
-  svgFigure(cSvg, "A two-dimensional facet matrix produced through the C ABI."),
+  svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
     "A categorical facet matrix rendered through the UniPlot C ABI")
 ])

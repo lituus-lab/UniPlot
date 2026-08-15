@@ -74,6 +74,10 @@ copying it.
 - `title(text)` sets the plot title.
 - `secondary_y(scale=1.0, offset=0.0, label="")` adds an affine right-side
   guide; `clear_secondary_y()` removes it.
+- `annotate_text(x, y, text, color="#202124", font_size=13)` and
+  `annotate_arrow(x, y, x_end, y_end, color="#202124", width=2,
+  head_size=8)` retain numeric data-coordinate annotations;
+  `clear_annotations()` removes them.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
@@ -118,7 +122,7 @@ let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
 nbRawHtml gallery([
-  svgFigure(pythonSvg, "A matrix returned by Python `facet_matrix_svg`."),
+  svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
     "A categorical facet matrix rendered through the UniPlot Python binding")
 ])

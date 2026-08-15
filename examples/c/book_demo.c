@@ -36,7 +36,11 @@ int main(int argc, char **argv) {
       uplot_add_points_shaped(plot, x + 1, y + 1, 4, "#d64255", 5.0f,
                               UPLOT_MARKER_DIAMOND) != UPLOT_OK ||
       uplot_set_title(plot, "C") != UPLOT_OK ||
-      uplot_set_secondary_y(plot, 1.8, 32.0, "F") != UPLOT_OK)
+      uplot_set_secondary_y(plot, 1.8, 32.0, "F") != UPLOT_OK ||
+      uplot_annotate_text(plot, 3.15, 4.65, "peak", "#7a3db8", 13.0f) !=
+        UPLOT_OK ||
+      uplot_annotate_arrow(plot, 3.75, 4.55, 3.0, 4.2, "#7a3db8", 2.0f,
+                           8.0f) != UPLOT_OK)
     goto cleanup;
   if (uplot_plot_to_json(plot, &json, &json_length) != UPLOT_OK) goto cleanup;
   uplot_plot *restored = uplot_plot_from_json(json, json_length, 800, 500);

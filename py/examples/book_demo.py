@@ -20,6 +20,8 @@ def main() -> int:
                  shape=uniplot.MARKER_CROSS)
         .title("Py")
         .secondary_y(1.8, 32.0, "F")
+        .annotate_text(3.15, 4.25, "peak", color="#7a3db8")
+        .annotate_arrow(3.75, 4.15, 3.0, 3.7, color="#7a3db8")
     )
     figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
     figure.categorical_column(
