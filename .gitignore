@@ -33,6 +33,7 @@ dnimcache/
 # docs output
 pages/
 docs/
+book/__site/
 *.html
 nimdoc.out.css
 

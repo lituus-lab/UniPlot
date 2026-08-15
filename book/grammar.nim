@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
+import nimib, nimibook
+import book_utils
+
+nbInit(theme = useNimibook)
+nbRawHtml bookStyle()
+nbText: """
+# Recipes and layered grammar
+
+UniPlot offers two construction styles backed by one engine. Recipes provide a
+concise procedural entry point; the grammar composes mappings and layers in a
+ggplot2-like workflow. Both return the same `PlotSpec` type.
+
+## Concise recipes
+"""
+
+nbCode:
+  import UniPlot
+  import UniGlyph
+
+  let font = loadTtf("../../tests/DejaVuSans.ttf")
+
+  var recipeLine = linePlot([0.0, 1.0, 2.0, 3.0],
+    [0.5, 2.0, 1.4, 3.2], color = "#3366cc")
+  recipeLine.labels(title = "linePlot", x = "x", y = "y")
+
+  var recipeScatter = scatterPlot([0.0, 1.0, 2.0, 3.0],
+    [2.7, 1.3, 3.1, 2.2], color = "#d1495b")
+  recipeScatter.labels(title = "scatterPlot", x = "x", y = "y")
+
+  var recipeBars = barPlot(["A", "B", "C", "D"],
+    [2.0, 5.0, 3.0, 4.0], color = "#2a9d8f")
+  recipeBars.labels(title = "barPlot", x = "category", y = "value")
+
+  var recipeHistogram = histogramPlot([
+    0.2, 0.3, 0.4, 0.8, 1.0, 1.1, 1.2, 1.4,
+    1.7, 1.8, 2.0, 2.1, 2.4, 2.8, 3.0, 3.2
+  ], binCount = 6, color = "#8e63ce")
+  recipeHistogram.labels(title = "histogramPlot", x = "range", y = "count")
+
+  let recipeSvgs = [
+    recipeLine.compileScene(Size(width: 500, height: 320)).toSvg(font),
+    recipeScatter.compileScene(Size(width: 500, height: 320)).toSvg(font),
+    recipeBars.compileScene(Size(width: 500, height: 320)).toSvg(font),
+    recipeHistogram.compileScene(Size(width: 500, height: 320)).toSvg(font)
+  ]
+
+nbRawHtml gallery([
+  svgFigure(recipeSvgs[0], "Numeric line recipe."),
+  svgFigure(recipeSvgs[1], "Numeric scatter recipe."),
+  svgFigure(recipeSvgs[2], "Categorical bar recipe."),
+  svgFigure(recipeSvgs[3], "Histogram statistic and bar geometry.")
+])
+
+nbText: """
+Recipes are not a separate rendering path. Their result can be labelled,
+themed or extended with additional layers.
+
+## The five geometries
+
+`aes(x, y, label)` maps columns. `geomLine`, `geomPoint`, `geomBar`, `geomArea`
+and `geomText` append typed layers. Multiple layers share trained scales,
+guides and deterministic scene order.
+"""
+
+nbCode:
+  var series = initDataFrame()
+  series.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+  series.addColumn("y", [1.0, 2.8, 2.1, 4.2, 3.7, 5.1])
+  series.addColumn("label", ["A", "B", "C", "D", "E", "F"])
+
+  var layered = plot(series)
+  layered.geomArea(aes("x", "y"), color = "#dbe7ff")
+  layered.geomLine(aes("x", "y"), color = "#3366cc", width = 3)
+  layered.geomPoint(aes("x", "y"), color = "#cc3344", radius = 5)
+  layered.geomText(aes("x", "y", "label"), color = "#202124", size = 13)
+  layered.labels(title = "Area, line, point and text", x = "time", y = "value")
+  let layeredSvg = layered.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(layeredSvg,
+  "Four geometries share numeric scales; geomBar appears in the recipe gallery.")
+
+nbText: """
+Layer order is rendering order. A zero line width or point radius selects the
+theme default; an explicit positive value overrides it for that layer. Text
+requires the mapped label column to be categorical.
+
+## Labels and themes
+
+`labels` sets the title and axis labels. `defaultTheme()` exposes background,
+foreground, grid colour, margins, default point size and default line width.
+"""
+
+nbCode:
+  import UniColor
+
+  var themed = scatterPlot([0.0, 1.0, 2.0, 3.0, 4.0],
+    [1.0, 4.0, 2.0, 5.0, 3.0], color = "#ffb703")
+  themed.labels(title = "Custom theme", x = "sample", y = "score")
+  themed.theme.background = parseColor("#14213d").get
+  themed.theme.foreground = parseColor("#f8f9fa").get
+  themed.theme.gridColor = parseColor("#415a77").get
+  themed.theme.pointSize = 7
+  themed.theme.lineWidth = 3
+  themed.theme.margins = Insets(left: 80, top: 60, right: 35, bottom: 65)
+  let themedSvg = themed.compileScene(Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(themedSvg,
+  "Theme controls the plot surface, guides, text, margins and default sizes.")
+
+nbText: """
+Colours use UniColor's CSS parser. Invalid colours fail while constructing the
+theme or layer. Margins must leave a positive plotting rectangle, and all mark
+sizes must be finite and positive at compilation.
+
+Next: [Scales and statistics](scales_stats.html).
+"""
+
+nbSave
+validatePage("grammar.html", minSvg = 6)

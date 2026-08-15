@@ -17,18 +17,31 @@ requires "https://github.com/lituus-lab/UniImage#main"
 requires "https://github.com/lituus-lab/UniVector#main"
 requires "https://github.com/lituus-lab/UniGlyph#main"
 
+# Book-only dependencies, pinned to the compatible upstream releases used by
+# UniGraph. They never enter the library core dependency graph.
+taskRequires "book", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+taskRequires "docs", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+taskRequires "docsDeps", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+
 task lint, "Fail if nimpretty would reformat a source":
   exec "nim c -r --hints:off -o:build/lint_tool tools/lint.nim"
 
 task checkVGraph, "Fail on an import that climbs the layers in vgraph.cfg":
   exec "nim c -r --hints:off -o:build/vgraph_tool tools/vgraph.nim"
 
-task docsDeps, "Install the docs toolchain (nimib)":
-  exec "nimble install -y nimib"
+task docsDeps, "Install the docs toolchain (nimib + nimibook)":
+  echo "nimib/nimibook installed."
 
-task book, "Build the nimib book (needs nimib)":
-  # nimib compiles and runs the book's code blocks: a drift fails the build.
-  exec "nim c -r --path:src --hints:off -o:build/book book/index.nim"
+task book, "Build the multipage nimib book (needs nimib + nimibook)":
+  # Each Nim chapter is compiled and run: an API drift fails the build.
+  withDir "book":
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim init"
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim clean"
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim build"
+    cpFile "__site/preface.html", "__site/index.html"
 
 task docs, "API reference + book into pages/ — what CI publishes":
   rmDir "pages"
@@ -41,8 +54,8 @@ task docs, "API reference + book into pages/ — what CI publishes":
          module & ".nim"
   exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"
   exec "nimble book"
-  # The book is the landing page; the generated reference sits under api/.
-  cpFile "book/index.html", "pages/index.html"
+  # Nimibook is the landing site; the generated reference remains under api/.
+  cpDir "book/__site", "pages"
 
 # One entry per Nim test so every task (test, testRelease, testCi*,
 # coverage) compiles the same set from a single source of truth.
