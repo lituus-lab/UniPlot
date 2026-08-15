@@ -105,6 +105,25 @@ task uniplot, "Build the uniplot CLI (inspect and render PNG/SVG)":
 task wgpuCheck, "Compile the optional WGPU scene/resource boundary (no native runtime)":
   exec "nim check --path:src src/UniPlot/render/wgpu.nim"
 
+task wgpuDeps, "Install pinned wgpu-native into the ignored .deps directory":
+  exec "nim c -r -d:ssl --path:src -o:build/install_wgpu" &
+       " tools/install_wgpu.nim"
+
+task wgpuTest, "Create a real native WGPU device (run wgpuDeps first)":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r --path:src -o:build/test_wgpu_native" &
+       " tests/test_wgpu_boundary.nim"
+
 # Nim takes `-o:` literally and appends no platform extension.
 const
   sharedLib =
