@@ -115,6 +115,30 @@ setup, so it does not belong in this CPU off-screen baseline. Missing runtimes,
 packages or static export engines are reported as unavailable and are never
 installed implicitly.
 
+## C and Python binding bridge
+
+After building the shared library and Cython extension, run:
+
+```bash
+nimble clib
+nimble buildCython
+nimble benchmarkBindings
+```
+
+`benchmarkBindings` first verifies that the C and Python builders produce
+byte-identical schema-v1 JSON. It then times encoding and decoding separately
+at 100,000 points. The C ABI is invoked through `ctypes`, so those stages
+include the small Python-to-ctypes transition and are not labelled as a native
+C executable benchmark. The Python stages include the Cython wrapper's buffer
+copy, UTF-8 conversion and handle ownership.
+
+On the 2026-08-15 Darwin arm64 reference run, five measured iterations after
+three warmups produced 8.74 ms encode / 18.23 ms decode through ctypes and
+8.85 ms / 18.37 ms through Cython for the same 2,582,209-byte payload. The
+observed wrapper differences of 0.11 ms and 0.15 ms are machine-local and
+within a very small sample; they are regression evidence, not general claims
+about language overhead.
+
 The real WGPU path has a separate pure-Nim benchmark:
 
 ```bash

@@ -196,6 +196,13 @@ decoding averaged 17.80 ms over five measured iterations. The input JSON is
 prepared before the timed decode loop and contains 2,582,339 uncompressed
 bytes. Neither stage includes filesystem, compression or network I/O.
 
+The binding harness additionally requires byte-identical C and Python JSON.
+For a 2,582,209-byte, 100,000-point payload it measured 8.74/18.23 ms
+encode/decode through the C ABI via ctypes and 8.85/18.37 ms through Cython.
+These five-iteration Darwin arm64 measurements include the respective foreign
+call transitions; the ctypes result is not misrepresented as a native C
+executable benchmark.
+
 `benchmarkDeps` is deliberately explicit. It creates isolated environments
 under `build/`, installs Python plotting dependencies there, and only installs
 ggplot2/Plots.jl when their R/Julia runtimes already exist. The normal library

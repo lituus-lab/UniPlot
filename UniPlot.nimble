@@ -120,6 +120,9 @@ task benchmarkScales, "Run cross-library 10^3, 10^5, and 10^6-point workloads":
 task benchmarkThermals, "Compare cold processes with warmed provider stages":
   exec "python3 benchmarks/run_thermal_suite.py"
 
+task benchmarkBindings, "Benchmark an already-built C/Python JSON bridge":
+  exec "python3 benchmarks/benchmark_bindings.py"
+
 task benchmarkDeps, "Install isolated Python/R/Julia benchmark dependencies":
   exec "python3 benchmarks/install_deps.py"
 
