@@ -38,7 +38,13 @@ ranking:
 - `styled_construct_compile` uses a real UniVector dot-dash stroke and
   categorical marker shapes.
 - `continuous_color_construct_compile` samples the configured UniColor ramp
-  for every point and compiles the resulting marker paths.
+  through one prepared sampler per scene, then compiles the resulting marker
+  paths. On the 2026-08-15 Darwin arm64 reference run, 100,000 points averaged
+  31.45 ms over 10 measured iterations, down from 74.18 ms for the immediately
+  preceding prepared-stop-only run. UniColor now also converts palette stops
+  into the interpolation space once. This is a measured 57.6% reduction for
+  this internal stage, not a claim about complete render throughput or other
+  machines; the sampler remains serial rather than SIMD or parallel.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other
