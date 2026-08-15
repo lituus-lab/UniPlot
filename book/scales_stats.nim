@@ -365,12 +365,37 @@ axis domains but have no painted tile. Both categorical axes can be fixed with
 restore first-seen order. Tile rectangles are UniVector paths shared by CPU,
 SVG, PNG and WGPU rendering.
 
-This is deliberately a categorical heatmap. Numeric raster grids, image
-sampling and contour estimation remain separate roadmap items rather than
-being approximated through categorical labels.
+## Numeric heatmap grids
+"""
+
+nbCode:
+  var numericHeat = numericHeatmapPlot(
+    [0.0, 1.0, 3.0, 6.0], [10.0, 20.0, 40.0],
+    [1.0, 4.0, 2.0, 6.0, NaN, 9.0], legend = "response")
+  numericHeat.labels(title = "Variable-size numeric cells", x = "distance",
+    y = "frequency")
+  let numericHeatSvg = numericHeat.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(numericHeatSvg,
+  "Explicit numeric boundaries preserve unequal cell widths and heights.")
+
+nbText: """
+`numericHeatmapPlot(xBreaks, yBreaks, values)` consumes values in row-major
+order: all x cells of the first y interval, then the next y interval. Each
+boundary vector is finite and strictly increasing, every interval width must
+remain finite, and the value count is exactly
+`(xBreaks.len - 1) × (yBreaks.len - 1)`. A non-finite cell value is retained in
+the frame but omitted by the mark's missing-value policy. At least one finite
+cell is needed to train the default continuous colour guide.
+
+The recipe produces ordinary numeric `geomRect` paths and a continuous
+UniColor guide. It is a vector-cell heatmap, not an image sampler: dense raster
+images, image marks and contour estimation remain separate roadmap items.
 
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 8)
+validatePage("scales_stats.html", minSvg = 9)
