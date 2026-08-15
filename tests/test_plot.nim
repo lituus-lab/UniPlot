@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/unittest
+import contracts
 import UniColor
 import UniPlot
 
@@ -111,3 +112,32 @@ suite "plot compilation":
     var area = plot(frame)
     area.geomArea(aes("x", "y", color = "group"))
     expect PlotError: discard area.compileScene()
+
+  test "numeric size and alpha mappings use explicit output ranges":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    frame.addColumn("label", ["low", "high"])
+    frame.addColumn("weight", [0.0, 10.0])
+    frame.addColumn("confidence", [0.0, 1.0])
+    var spec = plot(frame)
+    spec.geomText(aes("x", "y", label = "label", size = "weight",
+      alpha = "confidence"))
+    spec.sizeRange(10, 20)
+    spec.alphaRange(0.25, 1)
+    let scene = spec.compileScene()
+    var sizes: seq[float32]
+    var alphas: seq[float32]
+    for node in scene.nodes:
+      if node.id != 0 and node.kind == snText:
+        sizes.add node.fontSize
+        alphas.add node.color.alpha
+    check sizes == @[10'f32, 20'f32]
+    check alphas == @[0.25'f32, 1'f32]
+
+    when defined(release):
+      expect PlotError: spec.sizeRange(0, 1)
+      expect PlotError: spec.alphaRange(-0.1, 1)
+    else:
+      expect PreConditionDefect: spec.sizeRange(0, 1)
+      expect PreConditionDefect: spec.alphaRange(-0.1, 1)

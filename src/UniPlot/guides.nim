@@ -55,6 +55,13 @@ proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
       result.add LegendEntry(mark: layer.mark, color: mapped.get,
         label: label, category: category, size: layer.size)
 
+proc withOpacity(value: Color; opacity: float32): Color =
+  let adjusted = color(value.spaceTag, value.comp(0), value.comp(1),
+    value.comp(2), value.alpha * opacity)
+  if adjusted.isErr:
+    raise newException(PlotError, "cannot apply mapped alpha to color")
+  adjusted.get
+
 proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     height: 500)): Scene =
   size.validate()
@@ -78,9 +85,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.columns[layer.mapping.color].kind != ckCategorical):
       raise newException(PlotError,
         "color mappings must reference categorical columns")
-    if layer.mark == mkArea and layer.mapping.color.len > 0:
+    for mapping in [layer.mapping.size, layer.mapping.alpha]:
+      if mapping.len > 0 and (mapping notin spec.data.columns or
+          spec.data.columns[mapping].kind != ckNumeric):
+        raise newException(PlotError,
+          "size and alpha mappings must reference numeric columns")
+    if layer.mark == mkArea and (layer.mapping.color.len > 0 or
+        layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0):
       raise newException(PlotError,
-        "area layers do not support per-row color mappings")
+        "area layers do not support per-row aesthetic mappings")
     if layer.mark == mkText and (layer.mapping.label.len == 0 or
         layer.mapping.label notin spec.data.columns or
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
@@ -164,9 +177,13 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.categorical(layer.mapping.x)
       else:
         @[]
-    let rows = spec.data.finiteRows([layer.mapping.x, layer.mapping.y])
+    var finiteColumns = @[layer.mapping.x, layer.mapping.y]
+    if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
+    if layer.mapping.alpha.len > 0: finiteColumns.add layer.mapping.alpha
+    let rows = spec.data.finiteRows(finiteColumns)
     var points: seq[Point]
     var colors: seq[Color]
+    var sizes: seq[float32]
     var categoryColors = initTable[string, Color]()
     if layer.mapping.color.len > 0:
       for entry in spec.categoricalEntries(layer):
@@ -175,6 +192,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       for row in rows: colors.add categoryColors[mappedValues[row]]
     else:
       for _ in rows: colors.add layer.color
+    if layer.mapping.alpha.len > 0:
+      let values = spec.data.numeric(layer.mapping.alpha)
+      let scale = trainContinuous(values, spec.mappedAlphaRange.minimum,
+        spec.mappedAlphaRange.maximum)
+      for i, row in rows: colors[i] = colors[i].withOpacity(scale.map(values[row]))
+    if layer.mapping.size.len > 0:
+      let values = spec.data.numeric(layer.mapping.size)
+      let scale = trainContinuous(values, spec.mappedSizeRange.minimum,
+        spec.mappedSizeRange.maximum)
+      for row in rows: sizes.add scale.map(values[row])
+    else:
+      let fallback = if layer.size > 0: layer.size else:
+        case layer.mark
+        of mkPoint: spec.theme.pointSize
+        of mkLine: spec.theme.lineWidth
+        of mkText: 12'f32
+        of mkBar, mkArea: 0'f32
+      for _ in rows: sizes.add fallback
     for row in rows:
       let x = if xKind == ckNumeric:
         xScale.map(numericXs[row])
@@ -183,13 +218,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       points.add Point(x: x, y: yScale.map(ys[row]))
     case layer.mark
     of mkPoint:
-      let radius = if layer.size > 0: layer.size else: spec.theme.pointSize
       for i, point in points:
-        result.addPath(circle(point, radius), colors[i], nodeId); inc nodeId
+        result.addPath(circle(point, sizes[i]), colors[i], nodeId); inc nodeId
     of mkLine:
-      let width = if layer.size > 0: layer.size else: spec.theme.lineWidth
       for i in 1 ..< points.len:
-        result.addPath(segmentPath(points[i - 1], points[i], width),
+        result.addPath(segmentPath(points[i - 1], points[i], sizes[i]),
             colors[i],
           nodeId); inc nodeId
     of mkBar:
@@ -198,7 +231,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       let base = yScale.map(0.0)
       for i, point in points:
         var path = newPath()
-        path.rect(point.x - barWidth * 0.5, min(point.y, base), barWidth,
+        let width = if layer.mapping.size.len > 0: sizes[i] else: barWidth
+        path.rect(point.x - width * 0.5, min(point.y, base), width,
           abs(base - point.y))
         result.addPath(path, colors[i], nodeId); inc nodeId
     of mkArea:
@@ -213,8 +247,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         raise newException(PlotError, "text layers require a label mapping")
       let labels = spec.data.categorical(layer.mapping.label)
       for i, row in rows:
-        result.addText(labels[row], points[i], if layer.size >
-            0: layer.size else: 12,
+        result.addText(labels[row], points[i], sizes[i],
           colors[i], nodeId); inc nodeId
   if legendEntries.len > 0:
     let legendX = area.xMax + 24
