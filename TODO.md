@@ -121,7 +121,10 @@ than introducing competing geometry or text implementations.
   direct-stream buffers and explicit hit/miss/upload/eviction tests. The byte
   budget covers allocated prepared-buffer capacities. Cross-rebuild semantic
   identity remains in the broader item above.
-- [ ] Chunked uploads, streaming/ring buffers and bounded memory policies.
+- [x] Split vertex/index queue uploads into configurable aligned byte-bounded
+  writes, with exact call/byte diagnostics and pixel-identity tests.
+- [ ] Add rotating/ring streaming buffers and a total backend memory policy;
+  the prepared-cache and per-write bounds do not cover target/readback storage.
 - [ ] Level-of-detail, decimation and visibility culling for large series.
 - [ ] Instanced points, lines and rectangles; indirect draws where supported.
 - [ ] Timestamp-query instrumentation with wall-clock fallback.
