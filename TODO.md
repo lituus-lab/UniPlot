@@ -76,7 +76,9 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Date/time, duration, additional transforms and polar coordinates.
 - [x] Error bars and ribbons with explicit numeric bounds and missing-value
       policies.
-- [ ] Box/violin plots, density, contours and heatmaps.
+- [x] Grouped box plots with type-7 quartiles, Tukey whiskers and outliers in
+  Nim, C and Python.
+- [ ] Violin plots, density, contours and heatmaps.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [ ] Statistical transforms: binning variants, smoothing, grouped
   aggregation and confidence intervals.
