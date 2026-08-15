@@ -86,6 +86,13 @@ ranking:
   the 2026-08-15 Darwin arm64 run it averaged 21.47 ms for 100,000 points over
   five measured iterations, versus 21.37 ms for the default theme in the same
   process. The 0.10 ms difference is within run-to-run noise.
+- `grid_construct_compile` compiles four independent panels containing a
+  combined point count equal to the common workload, then composes their paths,
+  text and namespaced IDs. On the 2026-08-15 Darwin arm64 run at 100,000 total
+  points, it averaged 31.95 ms over three iterations after one warmup, versus
+  21.55 ms for one panel in the same process. The additional 10.40 ms includes
+  three extra sets of scales and guides plus scene translation; it is not a
+  cross-library faceting comparison.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

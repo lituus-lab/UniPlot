@@ -31,6 +31,12 @@ proc measurePng(scene: PreparedScene): tuple[ms: float64; bytes: int] =
   let output = scene.encodePng()
   (elapsedMs(started), output.len)
 
+template measureScene(body: untyped): tuple[ms: float64; nodes: int] =
+  block:
+    let measuredStarted = getMonoTime()
+    let measuredScene = body
+    (elapsedMs(measuredStarted), measuredScene.nodes.len)
+
 proc sampleSpec(count: int): PlotSpec =
   var x = newSeq[float64](count)
   var y = newSeq[float64](count)
@@ -118,13 +124,16 @@ when isMainModule:
   let referenceSpec = sampleSpec(pointCount)
   let reference = referenceSpec.compileScene(size)
   let referencePrepared = reference.prepareScene(font)
+  let panelPointCount = max(1, pointCount div 4)
+  let gridSpecs = [sampleSpec(panelPointCount), sampleSpec(panelPointCount),
+    sampleSpec(panelPointCount), sampleSpec(panelPointCount)]
   let referenceX = referenceSpec.data.numeric("x")
   let referenceJson = referenceSpec.toJson
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
-      jsonDecodeTimes, prepareSceneTimes, preparedSvgTimes,
+      jsonDecodeTimes, gridCompileTimes, prepareSceneTimes, preparedSvgTimes,
       preparedPngTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
@@ -139,30 +148,16 @@ when isMainModule:
       if rowFilter.rowIsFinite(row): inc finiteCount
     let rowFilterMs = elapsedMs(started)
 
-    started = getMonoTime()
-    let scene = sampleSpec(pointCount).compileScene(size)
-    let compileMs = elapsedMs(started)
-
-    started = getMonoTime()
-    let styledScene = styledSpec(pointCount).compileScene(size)
-    let styledCompileMs = elapsedMs(started)
-
-    started = getMonoTime()
-    let continuousColorScene = continuousColorSpec(pointCount).compileScene(
-      size)
-    let continuousColorCompileMs = elapsedMs(started)
-
-    started = getMonoTime()
-    let referenceScene = annotatedSpec(pointCount).compileScene(size)
-    let referenceCompileMs = elapsedMs(started)
-
-    started = getMonoTime()
-    let uncertaintyScene = uncertaintySpec(pointCount).compileScene(size)
-    let uncertaintyCompileMs = elapsedMs(started)
-
-    started = getMonoTime()
-    let themedScene = themedSpec(pointCount).compileScene(size)
-    let themedCompileMs = elapsedMs(started)
+    let sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
+    let styledResult = measureScene(styledSpec(pointCount).compileScene(size))
+    let continuousColorResult = measureScene(
+      continuousColorSpec(pointCount).compileScene(size))
+    let referenceResult = measureScene(
+      annotatedSpec(pointCount).compileScene(size))
+    let uncertaintyResult = measureScene(
+      uncertaintySpec(pointCount).compileScene(size))
+    let themedResult = measureScene(themedSpec(pointCount).compileScene(size))
+    let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
 
     started = getMonoTime()
     let encodedSpec = referenceSpec.toJson
@@ -189,22 +184,23 @@ when isMainModule:
       svgResult = reference.measureSvg(font)
       preparedPngResult = referencePrepared.measurePng()
       pngResult = reference.measurePng(font)
-    consumed += svgResult.bytes + pngResult.bytes + scene.nodes.len +
-      styledScene.nodes.len +
-      continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
-      uncertaintyScene.nodes.len + themedScene.nodes.len +
+    consumed += svgResult.bytes + pngResult.bytes + sceneResult.nodes +
+      styledResult.nodes + continuousColorResult.nodes +
+      referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
+      themedResult.nodes + gridResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
       preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
       rowFilterTimes.push rowFilterMs
-      compileTimes.push compileMs
-      styledCompileTimes.push styledCompileMs
-      continuousColorCompileTimes.push continuousColorCompileMs
-      referenceCompileTimes.push referenceCompileMs
-      uncertaintyCompileTimes.push uncertaintyCompileMs
-      themedCompileTimes.push themedCompileMs
+      compileTimes.push sceneResult.ms
+      styledCompileTimes.push styledResult.ms
+      continuousColorCompileTimes.push continuousColorResult.ms
+      referenceCompileTimes.push referenceResult.ms
+      uncertaintyCompileTimes.push uncertaintyResult.ms
+      themedCompileTimes.push themedResult.ms
+      gridCompileTimes.push gridResult.ms
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
       prepareSceneTimes.push prepareSceneMs
@@ -232,6 +228,7 @@ when isMainModule:
       "reference_construct_compile": summary(referenceCompileTimes),
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "themed_construct_compile": summary(themedCompileTimes),
+      "grid_construct_compile": summary(gridCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
       "cpu_prepare_scene": summary(prepareSceneTimes),
