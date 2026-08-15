@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[os, unittest]
+import std/[os, sequtils, unittest]
 import contracts
 import UniColor
+import UniGlyph
 import UniPlot
 import UniVector
 import UniPlot/render/wgpu
@@ -47,5 +48,17 @@ suite "WGPU boundary":
       let center = (5 * 10 + 5) * 4
       check meshPixels[center .. center + 3] == @[255'u8, 0, 0, 255]
       check meshPixels[0 .. 3] == @[255'u8, 255, 255, 255]
+      var scene = initScene(Size(width: 64, height: 32),
+        parseColor("#ffffff").get)
+      scene.addPath(parsePath("M 2 2 L 20 2 L 20 20 L 2 20 Z"),
+        parseColor("#ff0000").get)
+      scene.addText("A", Point(x: 24, y: 20), 16,
+        parseColor("#000000").get)
+      let scenePixels = backend.renderWgpuScene(scene,
+        loadTtf("tests/DejaVuSans.ttf"))
+      check scenePixels.len == 64 * 32 * 4
+      check scenePixels[(10 * 64 + 10) * 4 .. (10 * 64 + 10) * 4 + 3] ==
+        @[255'u8, 0, 0, 255]
+      check scenePixels.anyIt(it != 255'u8)
       backend.close()
       check backend.state == wbsUnavailable
