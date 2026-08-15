@@ -1,8 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/[math, tables]
+import UniColor
 import UniVector
 import UniPlot/[common, data, scales, grammar, scene]
+
+type LegendEntry = object
+  mark: MarkKind
+  color: Color
+  label: string
+  category: string
+  size: float32
 
 proc polygon(points: openArray[Point]): Path =
   result = newPath()
@@ -27,6 +35,26 @@ proc segmentPath(a, b: Point; width: float32): Path =
     Point(x: b.x + nx, y: b.y + ny), Point(x: b.x - nx, y: b.y - ny),
     Point(x: a.x - nx, y: a.y - ny)])
 
+proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
+  if layer.mapping.color.len == 0: return
+  var seen = initTable[string, bool]()
+  for category in spec.data.categorical(layer.mapping.color):
+    if category notin seen:
+      seen[category] = true
+      let index = result.len
+      if index >= spec.categoricalColors.len:
+        raise newException(PlotError,
+          "categorical color mapping exceeds palette capacity")
+      let mapped = spec.categoricalColors.colorAt(index)
+      if mapped.isErr:
+        raise newException(PlotError, "cannot read categorical palette color")
+      let label = if layer.legendLabel.len > 0:
+        layer.legendLabel & ": " & category
+      else:
+        category
+      result.add LegendEntry(mark: layer.mark, color: mapped.get,
+        label: label, category: category, size: layer.size)
+
 proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     height: 500)): Scene =
   size.validate()
@@ -39,36 +67,48 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       spec.theme.lineWidth <= 0 or not spec.theme.lineWidth.isFinite:
     raise newException(PlotError,
       "theme point size and line width must be finite and positive")
-  result = initScene(size, spec.theme.background)
-  var legendLayers: seq[Layer]
-  if spec.legendSpec.visible:
-    for layer in spec.layers:
-      if layer.legendLabel.len > 0: legendLayers.add layer
-  var area = Bounds(xMin: spec.theme.margins.left,
-    yMin: spec.theme.margins.top, xMax: float32(size.width) -
-        spec.theme.margins.right,
-    yMax: float32(size.height) - spec.theme.margins.bottom)
-  const legendWidth = 150'f32
-  if legendLayers.len > 0:
-    if spec.legendSpec.position != lpRight:
-      raise newException(PlotError, "unsupported legend position")
-    area.xMax -= legendWidth
-  if area.width <= 0 or area.height <= 0:
-    raise newException(PlotError, "plot margins leave no drawing area")
-  let legendRows = legendLayers.len + ord(spec.legendSpec.title.len > 0)
-  if legendRows > 0 and float32(legendRows * 24) > area.height:
-    raise newException(PlotError, "legend does not fit the drawing height")
   for layer in spec.layers:
     if layer.mapping.x notin spec.data.columns or
         layer.mapping.y notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
     if spec.data.columns[layer.mapping.y].kind != ckNumeric:
       raise newException(PlotError, "y mappings must reference numeric columns")
+    if layer.mapping.color.len > 0 and
+        (layer.mapping.color notin spec.data.columns or
+        spec.data.columns[layer.mapping.color].kind != ckCategorical):
+      raise newException(PlotError,
+        "color mappings must reference categorical columns")
+    if layer.mark == mkArea and layer.mapping.color.len > 0:
+      raise newException(PlotError,
+        "area layers do not support per-row color mappings")
     if layer.mark == mkText and (layer.mapping.label.len == 0 or
         layer.mapping.label notin spec.data.columns or
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
       raise newException(PlotError,
         "text label mappings must reference categorical columns")
+  result = initScene(size, spec.theme.background)
+  var legendEntries: seq[LegendEntry]
+  if spec.legendSpec.visible:
+    for layer in spec.layers:
+      if layer.mapping.color.len > 0:
+        legendEntries.add spec.categoricalEntries(layer)
+      elif layer.legendLabel.len > 0:
+        legendEntries.add LegendEntry(mark: layer.mark, color: layer.color,
+          label: layer.legendLabel, size: layer.size)
+  var area = Bounds(xMin: spec.theme.margins.left,
+    yMin: spec.theme.margins.top, xMax: float32(size.width) -
+        spec.theme.margins.right,
+    yMax: float32(size.height) - spec.theme.margins.bottom)
+  const legendWidth = 150'f32
+  if legendEntries.len > 0:
+    if spec.legendSpec.position != lpRight:
+      raise newException(PlotError, "unsupported legend position")
+    area.xMax -= legendWidth
+  if area.width <= 0 or area.height <= 0:
+    raise newException(PlotError, "plot margins leave no drawing area")
+  let legendRows = legendEntries.len + ord(spec.legendSpec.title.len > 0)
+  if legendRows > 0 and float32(legendRows * 24) > area.height:
+    raise newException(PlotError, "legend does not fit the drawing height")
   let xKind = spec.data.columns[spec.layers[0].mapping.x].kind
   var allX, allY: seq[float64]
   var allCategories: seq[string]
@@ -126,6 +166,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         @[]
     let rows = spec.data.finiteRows([layer.mapping.x, layer.mapping.y])
     var points: seq[Point]
+    var colors: seq[Color]
+    var categoryColors = initTable[string, Color]()
+    if layer.mapping.color.len > 0:
+      for entry in spec.categoricalEntries(layer):
+        categoryColors[entry.category] = entry.color
+      let mappedValues = spec.data.categorical(layer.mapping.color)
+      for row in rows: colors.add categoryColors[mappedValues[row]]
+    else:
+      for _ in rows: colors.add layer.color
     for row in rows:
       let x = if xKind == ckNumeric:
         xScale.map(numericXs[row])
@@ -135,23 +184,23 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     case layer.mark
     of mkPoint:
       let radius = if layer.size > 0: layer.size else: spec.theme.pointSize
-      for point in points:
-        result.addPath(circle(point, radius), layer.color, nodeId); inc nodeId
+      for i, point in points:
+        result.addPath(circle(point, radius), colors[i], nodeId); inc nodeId
     of mkLine:
       let width = if layer.size > 0: layer.size else: spec.theme.lineWidth
       for i in 1 ..< points.len:
         result.addPath(segmentPath(points[i - 1], points[i], width),
-            layer.color,
+            colors[i],
           nodeId); inc nodeId
     of mkBar:
       let barWidth = if xKind == ckCategorical: xBand.bandwidth
         else: max(1'f32, area.width / float32(max(1, points.len)) * 0.8)
       let base = yScale.map(0.0)
-      for point in points:
+      for i, point in points:
         var path = newPath()
         path.rect(point.x - barWidth * 0.5, min(point.y, base), barWidth,
           abs(base - point.y))
-        result.addPath(path, layer.color, nodeId); inc nodeId
+        result.addPath(path, colors[i], nodeId); inc nodeId
     of mkArea:
       if points.len > 0:
         let base = yScale.map(0.0)
@@ -166,31 +215,31 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       for i, row in rows:
         result.addText(labels[row], points[i], if layer.size >
             0: layer.size else: 12,
-          layer.color, nodeId); inc nodeId
-  if legendLayers.len > 0:
+          colors[i], nodeId); inc nodeId
+  if legendEntries.len > 0:
     let legendX = area.xMax + 24
     var legendY = area.yMin + 14
     if spec.legendSpec.title.len > 0:
       result.addText(spec.legendSpec.title, Point(x: legendX, y: legendY), 13,
         spec.theme.foreground)
       legendY += 24
-    for layer in legendLayers:
+    for entry in legendEntries:
       let center = Point(x: legendX + 10, y: legendY - 4)
-      case layer.mark
+      case entry.mark
       of mkLine:
-        let width = if layer.size > 0: layer.size else: spec.theme.lineWidth
+        let width = if entry.size > 0: entry.size else: spec.theme.lineWidth
         result.addPath(segmentPath(Point(x: legendX, y: center.y),
-          Point(x: legendX + 20, y: center.y), width), layer.color)
+          Point(x: legendX + 20, y: center.y), width), entry.color)
       of mkPoint:
-        let radius = if layer.size > 0: layer.size else: spec.theme.pointSize
-        result.addPath(circle(center, min(radius, 7'f32)), layer.color)
+        let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
+        result.addPath(circle(center, min(radius, 7'f32)), entry.color)
       of mkBar, mkArea:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
-        result.addPath(swatch, layer.color)
+        result.addPath(swatch, entry.color)
       of mkText:
         result.addText("T", Point(x: legendX + 4, y: legendY), 13,
-          layer.color)
-      result.addText(layer.legendLabel, Point(x: legendX + 30, y: legendY),
+          entry.color)
+      result.addText(entry.label, Point(x: legendX + 30, y: legendY),
         12, spec.theme.foreground)
       legendY += 24

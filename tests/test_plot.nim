@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/unittest
+import UniColor
 import UniPlot
 
 proc sample(): PlotSpec =
@@ -86,3 +87,27 @@ suite "plot compilation":
     for node in scene.nodes:
       if node.kind == snText and node.text == "Observed": found = true
     check found
+
+  test "categorical color mappings use UniColor and derive legend entries":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 3.0])
+    frame.addColumn("group", ["A", "B", "A"])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y", color = "group"))
+    spec.legend(title = "Group")
+    let scene = spec.compileScene()
+    var markColors: seq[Color]
+    var legendLabels: seq[string]
+    for node in scene.nodes:
+      if node.id != 0: markColors.add node.color
+      if node.kind == snText and node.text in ["Group", "A", "B"]:
+        legendLabels.add node.text
+    check markColors.len == 3
+    check markColors[0] == markColors[2]
+    check markColors[0] != markColors[1]
+    check legendLabels == @["Group", "A", "B"]
+
+    var area = plot(frame)
+    area.geomArea(aes("x", "y", color = "group"))
+    expect PlotError: discard area.compileScene()
