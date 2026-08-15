@@ -84,8 +84,12 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [x] First-seen categorical two-dimensional aggregation with explicit absent
   cells and UniAccurate compensated sum/mean.
-- [ ] Statistical transforms: binning variants, smoothing, general grouped
-  aggregation and confidence intervals.
+- [x] Explicit finite, strictly ordered histogram boundaries in Nim, C and
+  Python, with documented out-of-domain handling.
+- [ ] Statistical transforms: automatic bin-selection rules after UniMath
+  exposes the required float64 roots/transcendentals, numeric variable-width
+  histogram geometry/densities, smoothing, general grouped aggregation and
+  confidence intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
