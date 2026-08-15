@@ -201,3 +201,43 @@ suite "plot compilation":
     var badStyle = plot(frame)
     badStyle.geomPoint(aes("x", "y", lineStyle = "missing"))
     expect PlotError: discard badStyle.compileScene()
+
+  test "shape and line-style mappings derive semantic legends":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 1.0])
+    frame.addColumn("kind", ["A", "B", "A"])
+    var shapes = plot(frame)
+    shapes.geomPoint(aes("x", "y", shape = "kind"))
+    shapes.legend(title = "Shape")
+    let shapeScene = shapes.compileScene()
+    var shapeLabels: seq[string]
+    for node in shapeScene.nodes:
+      if node.kind == snText and node.text in ["Shape", "A", "B"]:
+        shapeLabels.add node.text
+    check shapeLabels == @["Shape", "A", "B"]
+
+    var styles = plot(frame)
+    styles.geomLine(aes("x", "y", lineStyle = "kind"))
+    styles.legend(title = "Style")
+    let styleScene = styles.compileScene()
+    var styleLabels: seq[string]
+    for node in styleScene.nodes:
+      if node.kind == snText and node.text in ["Style", "A", "B"]:
+        styleLabels.add node.text
+    check styleLabels == @["Style", "A", "B"]
+
+  test "a shared categorical column produces one combined legend":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [1.0, 2.0])
+    frame.addColumn("kind", ["A", "B"])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y", color = "kind", shape = "kind"))
+    spec.legend()
+    let scene = spec.compileScene()
+    var labels: seq[string]
+    for node in scene.nodes:
+      if node.kind == snText and node.text in ["A", "B"]:
+        labels.add node.text
+    check labels == @["A", "B"]

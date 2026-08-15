@@ -11,6 +11,8 @@ type LegendEntry = object
   label: string
   category: string
   size: float32
+  shape: MarkerShape
+  lineStyle: LineStyle
 
 proc polygon(points: openArray[Point]): Path =
   result = newPath()
@@ -86,7 +88,41 @@ proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
       else:
         category
       result.add LegendEntry(mark: layer.mark, color: mapped.get,
-        label: label, category: category, size: layer.size)
+        label: label, category: category, size: layer.size,
+        shape: if layer.mapping.shape == layer.mapping.color:
+          mappedShape(index) else: layer.shape,
+        lineStyle: if layer.mapping.lineStyle == layer.mapping.color:
+          mappedLineStyle(index) else: layer.lineStyle)
+
+proc shapeEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
+  if layer.mapping.shape.len == 0: return
+  var seen = initTable[string, bool]()
+  for category in spec.data.categorical(layer.mapping.shape):
+    if category notin seen:
+      seen[category] = true
+      let index = result.len
+      let label = if layer.legendLabel.len > 0:
+        layer.legendLabel & ": " & category
+      else:
+        category
+      result.add LegendEntry(mark: layer.mark, color: layer.color,
+        label: label, category: category, size: layer.size,
+        shape: mappedShape(index), lineStyle: layer.lineStyle)
+
+proc lineStyleEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
+  if layer.mapping.lineStyle.len == 0: return
+  var seen = initTable[string, bool]()
+  for category in spec.data.categorical(layer.mapping.lineStyle):
+    if category notin seen:
+      seen[category] = true
+      let index = result.len
+      let label = if layer.legendLabel.len > 0:
+        layer.legendLabel & ": " & category
+      else:
+        category
+      result.add LegendEntry(mark: layer.mark, color: layer.color,
+        label: label, category: category, size: layer.size,
+        shape: layer.shape, lineStyle: mappedLineStyle(index))
 
 proc withOpacity(value: Color; opacity: float32): Color =
   let adjusted = color(value.spaceTag, value.comp(0), value.comp(1),
@@ -150,9 +186,17 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     for layer in spec.layers:
       if layer.mapping.color.len > 0:
         legendEntries.add spec.categoricalEntries(layer)
-      elif layer.legendLabel.len > 0:
+      if layer.mapping.shape.len > 0 and
+          layer.mapping.shape != layer.mapping.color:
+        legendEntries.add spec.shapeEntries(layer)
+      if layer.mapping.lineStyle.len > 0 and
+          layer.mapping.lineStyle != layer.mapping.color:
+        legendEntries.add spec.lineStyleEntries(layer)
+      if layer.mapping.color.len == 0 and layer.mapping.shape.len == 0 and
+          layer.mapping.lineStyle.len == 0 and layer.legendLabel.len > 0:
         legendEntries.add LegendEntry(mark: layer.mark, color: layer.color,
-          label: layer.legendLabel, size: layer.size)
+          label: layer.legendLabel, size: layer.size, shape: layer.shape,
+          lineStyle: layer.lineStyle)
   var area = Bounds(xMin: spec.theme.margins.left,
     yMin: spec.theme.margins.top, xMax: float32(size.width) -
         spec.theme.margins.right,
@@ -336,11 +380,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       case entry.mark
       of mkLine:
         let width = if entry.size > 0: entry.size else: spec.theme.lineWidth
-        result.addPath(segmentPath(Point(x: legendX, y: center.y),
-          Point(x: legendX + 20, y: center.y), width), entry.color)
+        result.addPath(linePath([Point(x: legendX, y: center.y),
+          Point(x: legendX + 20, y: center.y)], width, entry.lineStyle),
+          entry.color)
       of mkPoint:
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
-        result.addPath(markerPath(CircleMarker, vec2(center.x, center.y),
+        result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
       of mkBar, mkArea:
         var swatch = newPath()
