@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/unittest
+import contracts
 import UniPlot
 
 suite "statistics":
@@ -17,3 +18,36 @@ suite "statistics":
   test "histograms reject invalid bin counts and ignore non-finite input":
     expect PlotError: discard histogram([1.0], 0)
     check histogram([NaN, Inf], 3).len == 0
+
+  test "quantiles use type-seven interpolation and ignore non-finite values":
+    let values = [4.0, 1.0, NaN, 3.0, 2.0, Inf]
+    check quantile(values, 0.0) == 1.0
+    check quantile(values, 0.25) == 1.75
+    check quantile(values, 0.5) == 2.5
+    check quantile(values, 0.75) == 3.25
+    check quantile(values, 1.0) == 4.0
+    check quantile([-1e308, 1e308], 0.5) == 0.0
+    expect PlotError: discard quantile([NaN, Inf], 0.5)
+    when defined(release):
+      expect PlotError: discard quantile([1.0], -0.1)
+    else:
+      expect PreConditionDefect: discard quantile([1.0], -0.1)
+
+  test "descriptive summaries retain Tukey whiskers and outliers":
+    let summary = summarize([1.0, 2.0, 2.0, 3.0, 4.0, 100.0, NaN])
+    check summary.count == 6
+    check summary.minimum == 1.0
+    check summary.firstQuartile == 2.0
+    check summary.median == 2.5
+    check summary.thirdQuartile == 3.75
+    check summary.maximum == 100.0
+    check summary.lowerWhisker == 1.0
+    check summary.upperWhisker == 4.0
+    check summary.outliers == @[100.0]
+    check abs(summary.mean - 18.666666666666668) < 1e-12
+    check summarize([1e308, 1e308]).mean == 1e308
+    expect PlotError: discard summarize([NaN])
+    when defined(release):
+      expect PlotError: discard summarize([1.0], -1.0)
+    else:
+      expect PreConditionDefect: discard summarize([1.0], -1.0)
