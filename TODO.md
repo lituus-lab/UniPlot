@@ -62,7 +62,7 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Facets, subplot grids, shared axes and secondary axes.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
-- [ ] Fill, shape and line-style aesthetic mappings.
+- [x] Fill, shape and line-style aesthetic mappings.
 - [ ] Continuous colour maps, discrete palettes and colour bars.
 - [ ] Date/time, duration, transformed, reversed and polar coordinates.
 - [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.
@@ -75,10 +75,10 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Deterministic PDF output through a lower-level Uni* backend.
 - [ ] Declarative JSON serialization with a versioned schema.
 
-Dash arrays and marker placement belong in UniVector before UniPlot can expose
-them consistently across CPU and GPU. Advanced shaping, fallback and glyph
-atlas policy belong in UniGlyph. UniPlot must stop and propose those lower-level
-changes rather than introducing competing geometry or text implementations.
+Dash arrays and marker placement now come from UniVector and are shared by the
+CPU, SVG and WGPU paths. Advanced shaping, fallback and glyph atlas policy
+belong in UniGlyph. UniPlot must stop and propose lower-level changes rather
+than introducing competing geometry or text implementations.
 
 ## Interactive and large-data parity after 1.0
 

@@ -18,6 +18,8 @@ rendering engines.
 - linear, logarithmic and categorical scales;
 - CSS colour styling through UniColor;
 - categorical colour mappings backed by immutable UniColor palettes;
+- categorical fill and marker-shape mappings with semantic legends;
+- solid, dashed, dotted, dot-dash and long-dash line styles;
 - numeric size and alpha mappings with explicit output ranges;
 - line, point, bar, area and text layers, plus histogram recipes;
 - Cartesian axes, ticks, labels, titles and themes;
@@ -114,7 +116,8 @@ Install the pinned runtime with `nimble wgpuDeps`, then validate the native
 device path with `nimble wgpuTest`. Both tasks are implemented in Nim; the
 downloaded runtime stays in the ignored `.deps` directory.
 
-`prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once.
+`prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once,
+including UniVector marker geometry and expanded dashed strokes.
 `submitWgpuPrepared` reuses that geometry without readback;
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
 prepare on each call. `nimble wgpuBenchmark` measures preparation, submission

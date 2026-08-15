@@ -141,6 +141,36 @@ Point, bar, text and line layers support categorical colours. A line segment
 uses the category of its ending row. An area is one polygon and therefore
 rejects per-row colour mappings instead of silently choosing one colour.
 
+## Fill, shape and line-style mappings
+
+`fill` maps categorical colours specifically for filled point and bar marks.
+`shape` maps point categories to UniVector's circle, square, triangle, diamond,
+plus and cross paths. A line selects `SolidLine`, `DashedLine`, `DottedLine`,
+`DotDashLine` or `LongDashLine`; the non-solid forms are expanded by
+UniVector's validated dash engine before any backend sees the scene.
+"""
+
+nbCode:
+  var styled = plot(groupedData)
+  styled.geomLine(aes("x", "y"), color = "#495057", width = 2,
+    lineStyle = DotDashLine, legend = "trend")
+  styled.geomPoint(aes("x", "y", fill = "group", shape = "group"),
+    radius = 7)
+  styled.labels(title = "UniVector plot geometry", x = "sample", y = "value")
+  styled.legend(title = "Group")
+  let styledSvg = styled.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(styledSvg,
+  "Fill and shape share one categorical legend; the trend uses a dot-dash stroke.")
+
+nbText: """
+First-occurrence order is deterministic. A shape mapping accepts at most the
+six distinct UniVector markers, and a line-style mapping at most five styles;
+exceeding either visual capacity is a typed error rather than silent recycling.
+`color` and `fill` cannot both be mapped on one layer because the current scene
+stores one paint per filled path.
+
 ## Numeric size and alpha mappings
 
 The `size` and `alpha` aesthetics map numeric columns through the existing
