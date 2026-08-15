@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright 2026 lituus-lab -->
-# The Book
+# UniPlot Book
 
-Placeholder for the nimib book each `Uni*` library carries. Replace with
-`book/docs/` pages for the domain when cloning; build with `nimble docs`.
+Executable nimib documentation for UniPlot. `nimble book` compiles and runs
+every code block before writing `book/index.html`; `nimble docs` publishes it
+alongside the generated API reference.
