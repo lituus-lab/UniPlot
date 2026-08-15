@@ -110,12 +110,13 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "prepared-lru-2-v1",
+    "residency": "prepared-lru-byte-budget-2-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
       "upload_submit": "cycle three identities through two slots and enqueue",
       "submit": "alternate two resident identities without upload/readback",
-      "publication_frame": "submit resident geometry and read back RGBA8"
+      "publication_frame": "submit resident geometry and read back RGBA8",
+      "prepared_cache_bytes": "allocated prepared vertex/index capacities only"
     },
     "preparation": summary(preparationTimes),
     "upload_submit": summary(uploadSubmitTimes),
@@ -125,6 +126,11 @@ proc main() =
     "prepared_cache_hits": backend.wgpuDiagnostics.preparedCacheHits,
     "prepared_cache_misses": backend.wgpuDiagnostics.preparedCacheMisses,
     "prepared_cache_evictions": backend.wgpuDiagnostics.preparedCacheEvictions,
+    "prepared_cache_bytes": backend.wgpuDiagnostics.preparedCacheBytes,
+    "prepared_cache_peak_bytes":
+      backend.wgpuDiagnostics.preparedCachePeakBytes,
+    "prepared_cache_byte_budget":
+      backend.wgpuDiagnostics.preparedCacheByteBudget,
     "guard": consumed
   }
   echo $report
