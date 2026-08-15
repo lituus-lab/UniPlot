@@ -23,6 +23,7 @@ type
   Aes* = object
     x*, y*: string
     label*: string
+    color*: string
 
   Layer* = object
     mark*: MarkKind
@@ -42,6 +43,7 @@ type
     title*, xLabel*, yLabel*: string
     theme*: Theme
     legendSpec*: LegendSpec
+    categoricalColors*: Palette
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -55,9 +57,10 @@ proc defaultTheme*(): Theme =
 
 proc plot*(data: DataFrame): PlotSpec =
   PlotSpec(data: data, theme: defaultTheme(),
-    legendSpec: LegendSpec(position: lpRight))
+    legendSpec: LegendSpec(position: lpRight), categoricalColors: okabeIto())
 
-proc aes*(x, y: string; label = ""): Aes = Aes(x: x, y: y, label: label)
+proc aes*(x, y: string; label = ""; color = ""): Aes =
+  Aes(x: x, y: y, label: label, color: color)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "") =
@@ -93,6 +96,13 @@ proc legend*(spec: var PlotSpec; title = ""; position = lpRight) =
   ## Configure a legend derived from layers carrying a non-empty legend label.
   spec.legendSpec = LegendSpec(visible: position != lpNone, title: title,
     position: position)
+
+proc categoricalPalette*(spec: var PlotSpec; colors: Palette) =
+  ## Select the discrete UniColor palette used by categorical color mappings.
+  if colors.tag notin {palOrdered, palUnordered, palScientific, palTerminal,
+      palCategorical}:
+    raise newException(PlotError, "categorical mappings require a discrete palette")
+  spec.categoricalColors = colors
 
 proc linePlot*(x, y: openArray[float64]; color = "#3366cc";
     legend = ""): PlotSpec =
