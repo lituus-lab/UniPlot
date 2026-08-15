@@ -188,7 +188,7 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
   if spec.secondaryYSpec.enabled:
     yScale["secondary"] = %*{"scale": spec.secondaryYSpec.scale,
       "offset": spec.secondaryYSpec.offset, "label": spec.secondaryYSpec.label}
-  %*{
+  result = %*{
     "schema": "org.lituus-lab.uniplot.plot-spec",
     "version": PlotSpecSchemaVersion,
     "data": spec.data.dataNode,
@@ -211,6 +211,14 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
     "yScale": yScale,
     "references": references
   }
+  if spec.annotations.len > 0:
+    var annotations = newJArray()
+    for annotation in spec.annotations:
+      annotations.add %*{"kind": $annotation.kind, "x": annotation.x,
+        "y": annotation.y, "xEnd": annotation.xEnd, "yEnd": annotation.yEnd,
+        "text": annotation.text, "color": annotation.color.colorNode,
+        "size": annotation.size, "headSize": annotation.headSize}
+    result["annotations"] = annotations
 
 proc toJson*(spec: PlotSpec; pretty = false): string =
   ## Encode a PlotSpec using the stable schema-v1 field order.
@@ -301,6 +309,17 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
       color: node.field("color", JObject).decodeColor,
       width: float32(node.finiteNumber("width")),
       label: node.field("label", JString).getStr)
+  result.annotations.setLen(0)
+  if root.hasKey("annotations"):
+    for node in root.field("annotations", JArray):
+      result.annotations.add Annotation(
+        kind: enumValue[AnnotationKind](node, "kind"),
+        x: node.finiteNumber("x"), y: node.finiteNumber("y"),
+        xEnd: node.finiteNumber("xEnd"), yEnd: node.finiteNumber("yEnd"),
+        text: node.field("text", JString).getStr,
+        color: node.field("color", JObject).decodeColor,
+        size: float32(node.finiteNumber("size")),
+        headSize: float32(node.finiteNumber("headSize")))
 
 proc fromJson*(payload: string): PlotSpec =
   ## Parse and decode schema-v1 JSON as PlotError on all malformed input.

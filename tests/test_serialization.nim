@@ -65,6 +65,15 @@ suite "PlotSpec JSON schema":
     check encoded["yScale"]["secondary"]["scale"].getFloat == 1.8
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "annotations round trip without changing unannotated schema-v1":
+    var spec = completeSpec()
+    check not spec.toJsonNode.hasKey("annotations")
+    spec.annotateText(1.0, 2.0, "label", fontSize = 15)
+    spec.annotateArrow(1.0, 2.0, 4.0, 5.0, width = 3, headSize = 9)
+    let encoded = spec.toJsonNode
+    check encoded["annotations"].len == 2
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])
@@ -93,6 +102,13 @@ suite "PlotSpec JSON schema":
     root["mappedAlphaRange"]["maximum"] = %2.0
     let decoded = root.fromJsonNode
     expect PlotError: discard decoded.compileScene()
+    var annotationSpec = completeSpec()
+    annotationSpec.annotateText(1.0, 2.0, "valid")
+    var annotated = annotationSpec.toJsonNode
+    annotated["annotations"][0]["text"] = %""
+    annotated["annotations"][0]["size"] = %(-1.0)
+    let decodedAnnotation = fromJsonNode(annotated)
+    expect PlotError: discard decodedAnnotation.compileScene()
 
   test "unsupported semantic palette metadata is never silently lost":
     var roles = initTable[string, int]()
