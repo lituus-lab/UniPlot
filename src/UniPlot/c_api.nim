@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/locks
+import std/[locks, tables]
 import UniGlyph
 import UniPlot
 
@@ -44,6 +44,19 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
 
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
 
+proc resizeFrame(frame: var DataFrame; rowCount: int) =
+  if rowCount <= frame.rowCount: return
+  for name in frame.order:
+    case frame.columns[name].kind
+    of ckNumeric:
+      let previous = frame.columns[name].numbers.len
+      frame.columns[name].numbers.setLen(rowCount)
+      for row in previous ..< rowCount:
+        frame.columns[name].numbers[row] = NaN
+    of ckCategorical:
+      frame.columns[name].categories.setLen(rowCount)
+  frame.rowCount = rowCount
+
 proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     mark: MarkKind; color: cstring; size: float32;
     lineStyle = SolidLine; shape = CircleMarker;
@@ -54,12 +67,17 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     return UPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
-    var xv = newSeq[float64](int(count))
-    var yv = newSeq[float64](int(count))
+    let inputCount = int(count)
+    let targetCount = max(inputCount, h.spec.data.rowCount)
+    h.spec.data.resizeFrame(targetCount)
+    var xv = newSeq[float64](targetCount)
+    var yv = newSeq[float64](targetCount)
     let xa = cast[ptr UncheckedArray[float64]](xs)
     let ya = cast[ptr UncheckedArray[float64]](ys)
-    for i in 0 ..< int(count):
+    for i in 0 ..< inputCount:
       xv[i] = xa[i]; yv[i] = ya[i]
+    for i in inputCount ..< targetCount:
+      xv[i] = NaN; yv[i] = NaN
     let xName = "x" & $h.nextColumn
     let yName = "y" & $h.nextColumn
     inc h.nextColumn

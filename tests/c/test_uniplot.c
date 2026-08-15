@@ -39,6 +39,7 @@ int main(void) {
   const double gap_y[] = {1.0, NAN, 2.0};
   assert(uplot_add_line(plot, x, gap_y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
+  assert(uplot_add_points(plot, x, y, 2, "#cc3333", 4.0f) == UPLOT_OK);
   assert(uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
                                UPLOT_LINE_DOT_DASH) == UPLOT_OK);
   assert(uplot_add_points_shaped(plot, x, y, 3, "#cc3333", 4.0f,
