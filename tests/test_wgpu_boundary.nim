@@ -34,8 +34,13 @@ suite "WGPU boundary":
     else:
       let backend = openWgpuBackend(libraryPath)
       check backend.state == wbsReady
-      check wgpuCapabilities(backend).available
-      check wgpuCapabilities(backend).storageBuffers
+      let capabilities = wgpuCapabilities(backend)
+      check capabilities.available
+      check capabilities.storageBuffers
+      check capabilities.adapterName.len > 0
+      check capabilities.backend.len > 0
+      check capabilities.maxTextureDimension2D >= 64
+      check capabilities.maxBufferSize > 0
       let pixels = backend.readWgpuClearTarget(Size(width: 17, height: 9),
         parseColor("#204060").get)
       check pixels.len == 17 * 9 * 4

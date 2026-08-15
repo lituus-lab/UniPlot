@@ -8,6 +8,39 @@ type
     data: cstring
     length: csize_t
 
+  WgpuAdapterInfo {.bycopy.} = object
+    nextInChain: pointer
+    vendor, architecture, device, description: WgpuStringView
+    backendType, adapterType, vendorId, deviceId: uint32
+    subgroupMinSize, subgroupMaxSize: uint32
+
+  WgpuLimits {.bycopy.} = object
+    nextInChain: pointer
+    maxTextureDimension1D, maxTextureDimension2D, maxTextureDimension3D: uint32
+    maxTextureArrayLayers, maxBindGroups: uint32
+    maxBindGroupsPlusVertexBuffers, maxBindingsPerBindGroup: uint32
+    maxDynamicUniformBuffersPerPipelineLayout: uint32
+    maxDynamicStorageBuffersPerPipelineLayout: uint32
+    maxSampledTexturesPerShaderStage, maxSamplersPerShaderStage: uint32
+    maxStorageBuffersPerShaderStage, maxStorageTexturesPerShaderStage: uint32
+    maxUniformBuffersPerShaderStage: uint32
+    maxUniformBufferBindingSize, maxStorageBufferBindingSize: uint64
+    minUniformBufferOffsetAlignment, minStorageBufferOffsetAlignment: uint32
+    maxVertexBuffers: uint32
+    maxBufferSize: uint64
+    maxVertexAttributes, maxVertexBufferArrayStride: uint32
+    maxInterStageShaderVariables, maxColorAttachments: uint32
+    maxColorAttachmentBytesPerSample, maxComputeWorkgroupStorageSize: uint32
+    maxComputeInvocationsPerWorkgroup: uint32
+    maxComputeWorkgroupSizeX, maxComputeWorkgroupSizeY: uint32
+    maxComputeWorkgroupSizeZ, maxComputeWorkgroupsPerDimension: uint32
+    maxImmediateSize: uint32
+
+  NativeAdapterCapabilities* = object
+    name*, vendor*, architecture*, description*, backend*: string
+    vendorId*, deviceId*, maxTextureDimension2D*: uint32
+    maxBufferSize*: uint64
+
   WgpuFuture {.bycopy.} = object
     id: uint64
 
@@ -190,6 +223,11 @@ type
   RequestDeviceProc = proc(adapter, descriptor: pointer;
       callbackInfo: WgpuRequestDeviceCallbackInfo): WgpuFuture {.cdecl.}
   HasFeatureProc = proc(adapter: pointer; feature: uint32): uint32 {.cdecl.}
+  GetAdapterInfoProc = proc(adapter: pointer;
+      info: ptr WgpuAdapterInfo): uint32 {.cdecl.}
+  FreeAdapterInfoProc = proc(info: WgpuAdapterInfo) {.cdecl.}
+  GetAdapterLimitsProc = proc(adapter: pointer;
+      limits: ptr WgpuLimits): uint32 {.cdecl.}
   GetQueueProc = proc(device: pointer): pointer {.cdecl.}
   GetVersionProc = proc(): uint32 {.cdecl.}
   ReleaseProc = proc(handle: pointer) {.cdecl.}
@@ -256,6 +294,7 @@ type
     releaseInstance, releaseAdapter, releaseDevice, releaseQueue: ReleaseProc
     releaseShader, releasePipeline: ReleaseProc
     releaseTexture, releaseView, releaseBuffer: ReleaseProc
+    adapterCapabilities: NativeAdapterCapabilities
 
 const
   CallbackAllowProcessEvents = 2'u32
@@ -287,6 +326,7 @@ const
   BlendFactorSrcAlpha = 5'u32
   BlendFactorOneMinusSrcAlpha = 6'u32
   ColorWriteMaskAll = 0xF'u64
+  StatusSuccess = 1'u32
 
 proc loadSymbol[T](library: LibHandle; name: string): T =
   let address = library.symAddr(name)
@@ -381,6 +421,25 @@ proc close*(runtime: NativeWgpuRuntime) =
     runtime.library.unloadLib()
     runtime.library = nil
 
+proc toString(view: WgpuStringView): string =
+  if view.data == nil or view.length == 0: return ""
+  if uint64(view.length) > uint64(high(int)):
+    raise newException(LibraryError, "wgpu-native returned an oversized string")
+  result = newString(int(view.length))
+  copyMem(addr result[0], view.data, result.len)
+
+proc backendName(value: uint32): string =
+  case value
+  of 1: "null"
+  of 2: "webgpu"
+  of 3: "d3d11"
+  of 4: "d3d12"
+  of 5: "metal"
+  of 6: "vulkan"
+  of 7: "opengl"
+  of 8: "opengles"
+  else: "unknown"
+
 proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
   let library = loadLib(libraryPath)
@@ -398,6 +457,12 @@ proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
       processEvents = loadSymbol[ProcessEventsProc](library,
           "wgpuInstanceProcessEvents")
       getQueue = loadSymbol[GetQueueProc](library, "wgpuDeviceGetQueue")
+      getAdapterInfo = loadSymbol[GetAdapterInfoProc](library,
+          "wgpuAdapterGetInfo")
+      freeAdapterInfo = loadSymbol[FreeAdapterInfoProc](library,
+          "wgpuAdapterInfoFreeMembers")
+      getAdapterLimits = loadSymbol[GetAdapterLimitsProc](library,
+          "wgpuAdapterGetLimits")
     result.getVersion = loadSymbol[GetVersionProc](library, "wgpuGetVersion")
     result.processEvents = processEvents
     result.pollDevice = loadSymbol[PollDeviceProc](library, "wgpuDevicePoll")
@@ -429,6 +494,26 @@ proc openNativeWgpu*(libraryPath: string): NativeWgpuRuntime =
     result.adapter = adapters[0]
     for i in 1 ..< adapters.len:
       result.releaseAdapter(adapters[i])
+
+    var adapterInfo: WgpuAdapterInfo
+    if getAdapterInfo(result.adapter, addr adapterInfo) != StatusSuccess:
+      raise newException(LibraryError, "wgpu-native adapter info failed")
+    try:
+      result.adapterCapabilities.name = adapterInfo.device.toString()
+      result.adapterCapabilities.vendor = adapterInfo.vendor.toString()
+      result.adapterCapabilities.architecture = adapterInfo.architecture.toString()
+      result.adapterCapabilities.description = adapterInfo.description.toString()
+      result.adapterCapabilities.backend = backendName(adapterInfo.backendType)
+      result.adapterCapabilities.vendorId = adapterInfo.vendorId
+      result.adapterCapabilities.deviceId = adapterInfo.deviceId
+    finally:
+      freeAdapterInfo(adapterInfo)
+    var limits: WgpuLimits
+    if getAdapterLimits(result.adapter, addr limits) != StatusSuccess:
+      raise newException(LibraryError, "wgpu-native adapter limits failed")
+    result.adapterCapabilities.maxTextureDimension2D =
+      limits.maxTextureDimension2D
+    result.adapterCapabilities.maxBufferSize = limits.maxBufferSize
 
     let request = cast[ptr DeviceRequest](allocShared0(sizeof(DeviceRequest)))
     if request == nil:
@@ -472,6 +557,11 @@ proc implementationVersion*(runtime: NativeWgpuRuntime): uint32 =
 proc supportsTimestampQueries*(runtime: NativeWgpuRuntime): bool =
   not runtime.isNil and runtime.adapter != nil and runtime.hasFeature != nil and
     runtime.hasFeature(runtime.adapter, FeatureTimestampQuery) != 0
+
+proc adapterCapabilities*(runtime: NativeWgpuRuntime): NativeAdapterCapabilities =
+  if runtime.isNil or runtime.adapter == nil:
+    raise newException(LibraryError, "wgpu-native runtime is not ready")
+  runtime.adapterCapabilities
 
 proc deviceLostReason*(runtime: NativeWgpuRuntime): uint32 =
   if runtime.isNil or runtime.events == nil: 0'u32

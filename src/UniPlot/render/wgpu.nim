@@ -23,6 +23,10 @@ type
     available*: bool
     picking*, storageBuffers*, timestampQueries*: bool
     implementationVersion*: string
+    adapterName*, adapterVendor*, adapterArchitecture*: string
+    adapterDescription*, backend*: string
+    vendorId*, deviceId*, maxTextureDimension2D*: uint32
+    maxBufferSize*: uint64
 
   WgpuResourceKind* = enum
     wrPathMesh
@@ -96,9 +100,19 @@ proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
   ## Report runtime availability without causing implicit library loading.
   result.implementationVersion = WgpuNativeTargetVersion
   if not backend.isNil and backend.state == wbsReady:
+    let adapter = backend.runtime.adapterCapabilities()
     result.available = true
     result.storageBuffers = true
     result.timestampQueries = backend.runtime.supportsTimestampQueries()
+    result.adapterName = adapter.name
+    result.adapterVendor = adapter.vendor
+    result.adapterArchitecture = adapter.architecture
+    result.adapterDescription = adapter.description
+    result.backend = adapter.backend
+    result.vendorId = adapter.vendorId
+    result.deviceId = adapter.deviceId
+    result.maxTextureDimension2D = adapter.maxTextureDimension2D
+    result.maxBufferSize = adapter.maxBufferSize
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =
