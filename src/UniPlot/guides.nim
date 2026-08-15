@@ -102,14 +102,23 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     result.addText(spec.yLabel, Point(x: 5, y: area.yMin - 20), 13,
       spec.theme.foreground)
   for layer in spec.layers:
-    let ys = spec.data.numeric(layer.mapping.y)
+    let
+      ys = spec.data.numeric(layer.mapping.y)
+      numericXs = if xKind == ckNumeric:
+        spec.data.numeric(layer.mapping.x)
+      else:
+        @[]
+      categoricalXs = if xKind == ckCategorical:
+        spec.data.categorical(layer.mapping.x)
+      else:
+        @[]
     let rows = spec.data.finiteRows([layer.mapping.x, layer.mapping.y])
     var points: seq[Point]
     for row in rows:
       let x = if xKind == ckNumeric:
-        xScale.map(spec.data.numeric(layer.mapping.x)[row])
+        xScale.map(numericXs[row])
       else:
-        xBand.map(spec.data.categorical(layer.mapping.x)[row])
+        xBand.map(categoricalXs[row])
       points.add Point(x: x, y: yScale.map(ys[row]))
     case layer.mark
     of mkPoint:
