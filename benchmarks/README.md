@@ -345,6 +345,16 @@ cache capacity or GPU frame rate. The baseline records this controlled result
 and includes a residency-version field so incompatible semantics fail instead
 of being compared.
 
+The byte-budget follow-up retains the same two-entry workload while also
+bounding allocated prepared vertex/index capacities. The three 50-iteration
+runs held exactly 20 MiB at peak under the default 256 MiB budget. Preparation
+averaged 73.7487 ms, forced-miss upload plus submission 1.0437 ms, resident
+submission 0.0926 ms and publication 3.0782 ms. The 6.4% increase over the
+preceding forced-miss mean includes actual buffer release and allocation on
+every LRU eviction; it is not attributed to byte accounting alone. Streaming
+buffers, render targets and readback storage are outside this prepared-cache
+measurement, so 20 MiB is not a total GPU-memory claim.
+
 The optional fourth argument compares the current means with a baseline only
 after adapter, backend, workload, canvas and residency semantics match. Each
 phase carries its own ratio derived from repeated runs, because asynchronous

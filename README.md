@@ -121,12 +121,14 @@ downloaded runtime stays in the ignored `.deps` directory.
 `prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once,
 including UniVector marker geometry and expanded dashed strokes.
 The first `submitWgpuPrepared` uploads that geometry; repeated submission or
-publication keeps up to four prepared scenes resident by default and does not
-issue another upload on a cache hit. `openWgpuBackend` accepts a contractual
-`preparedCacheCapacity` from 1 to 64. Least-recently-used entries are evicted;
-direct mesh rendering uses separate streaming buffers and cannot corrupt or
-evict prepared entries. The bound is an entry count, not a hidden byte-budget
-claim.
+publication keeps prepared scenes resident and does not issue another upload
+on a cache hit. `openWgpuBackend` accepts contractual bounds of 1 through 64
+entries and at least 512 bytes; the defaults are four entries and 256 MiB.
+Least-recently-used entries are evicted until both bounds are satisfied, and a
+single prepared scene larger than the byte budget is rejected. The byte count
+covers allocated prepared vertex/index capacities. Direct streaming buffers,
+the render target and readback storage are separate and are not included in
+that prepared-cache budget.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
 prepare on each call. `nimble wgpuBenchmark` measures preparation,
 forced LRU misses, alternating resident submission and publication separately.

@@ -56,10 +56,13 @@ wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 `prepareWgpuScene(scene, font)` uses the same UniGlyph layouts and UniVector
 tessellation as the CPU backends. Its first submission uploads and enqueues the
 retained indexed geometry. Reusing that exact prepared handle keeps its
-vertex/index pair resident. A backend retains four prepared handles by default;
-call `openWgpuBackend(path, preparedCacheCapacity = n)` to choose 1 through 64.
-Eviction is least-recently-used, while direct mesh rendering has separate
-streaming buffers. `renderWgpuPrepared` additionally returns unpadded RGBA8
+vertex/index pair resident. A backend retains at most four prepared handles and
+256 MiB of their allocated vertex/index capacities by default. Configure the
+contractual limits with `preparedCacheCapacity` (1 through 64) and
+`preparedCacheByteBudget` (at least 512 bytes). Eviction is least-recently-used
+until both limits hold; a single scene exceeding the byte budget is rejected.
+Direct streaming buffers, render targets and readback storage are outside that
+prepared-cache budget. `renderWgpuPrepared` additionally returns unpadded RGBA8
 pixels. The convenience scene overloads prepare on every call. The headless
 validation task checks individual pixels, exact CPU/GPU parity, direct uploads,
 cache hits and LRU eviction. Run `nimble wgpuBenchmark` to measure preparation,
