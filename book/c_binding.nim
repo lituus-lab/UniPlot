@@ -85,8 +85,11 @@ int main(void) {
   remain ABI-compatible aliases for two false flags.
 - `uplot_add_categorical_column` copies a complete string column into the
   retained frame. `uplot_render_facet_grid_svg` and its PNG counterpart split
-  one handle by that column; their sharing flags follow the same numeric-domain
-  contract.
+  one handle by that column; their flags follow the same shared-domain
+  contract as plot grids.
+- `uplot_render_facet_matrix_svg` and its PNG counterpart take distinct row
+  and column fields. They retain the full Cartesian layout and render absent
+  combinations as labelled empty panels.
 - `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
   ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
   explicit output dimensions and returns null for malformed or unsupported
@@ -126,9 +129,9 @@ let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
 nbRawHtml gallery([
-  svgFigure(cSvg, "Two facets produced through the C ABI."),
-  pngFigure(cPng, "The same categorical facets rendered as PNG.",
-    "Two categorical facets rendered through the UniPlot C ABI")
+  svgFigure(cSvg, "A two-dimensional facet matrix produced through the C ABI."),
+  pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
+    "A categorical facet matrix rendered through the UniPlot C ABI")
 ])
 
 nbSave

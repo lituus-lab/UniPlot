@@ -18,16 +18,18 @@ def main() -> int:
               style=uniplot.LINE_DASHED)
         .scatter(x[1:-1], y[1:-1], color="#dc7c28", radius=5.0,
                  shape=uniplot.MARKER_CROSS)
-        .title("UniPlot Python binding")
+        .title("Python")
     )
     figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
     figure.categorical_column(
         "region", ["west", "west", "west", "east", "east", "east"])
-    svg_path.write_bytes(uniplot.facet_svg(
-        figure, "region", font, columns=2, width=1000, height=420, gap=16,
+    figure.categorical_column(
+        "phase", ["early", "late", "late", "late", "late", "late"])
+    svg_path.write_bytes(uniplot.facet_matrix_svg(
+        figure, "region", "phase", font, width=1000, height=700, gap=16,
         shared_x=True, shared_y=True))
-    png_path.write_bytes(uniplot.facet_png(
-        figure, "region", font, columns=2, width=1000, height=420, gap=16,
+    png_path.write_bytes(uniplot.facet_matrix_png(
+        figure, "region", "phase", font, width=1000, height=700, gap=16,
         shared_x=True, shared_y=True))
     return 0
 

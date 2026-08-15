@@ -82,6 +82,9 @@ copying it.
   frame. `facet_svg(plot, column, font_path, columns, ...)` and `facet_png`
   partition that plot in first-seen category order and accept the same shared
   domain flags.
+- `facet_matrix_svg(plot, row_column, column_column, font_path, ...)` and its
+  PNG counterpart preserve the Cartesian row-by-column matrix, including
+  labelled empty combinations.
 - `to_json()` returns the complete schema-v1 specification as `str`;
   `Plot.from_json(payload, width, height)` accepts `str` or UTF-8 `bytes` and
   restores a full Nim grammar specification.
@@ -113,9 +116,9 @@ let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
 nbRawHtml gallery([
-  svgFigure(pythonSvg, "Two facets returned by Python `facet_svg`."),
-  pngFigure(pythonPng, "The same Python facets rendered as PNG.",
-    "Two categorical facets rendered through the UniPlot Python binding")
+  svgFigure(pythonSvg, "A matrix returned by Python `facet_matrix_svg`."),
+  pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
+    "A categorical facet matrix rendered through the UniPlot Python binding")
 ])
 
 nbSave

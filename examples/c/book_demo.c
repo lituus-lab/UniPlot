@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
   const double x[] = {0, 1, 2, 3, 4, 5};
   const double y[] = {1.0, 2.8, 2.1, 4.2, 3.4, 5.0};
   const char *groups[] = {"west", "west", "west", "east", "east", "east"};
+  const char *phases[] = {"early", "late", "late", "late", "late", "late"};
   uint8_t *svg = NULL;
   uint8_t *png = NULL;
   uint8_t *json = NULL;
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
                             UPLOT_LINE_DOT_DASH) != UPLOT_OK ||
       uplot_add_points_shaped(plot, x + 1, y + 1, 4, "#d64255", 5.0f,
                               UPLOT_MARKER_DIAMOND) != UPLOT_OK ||
-      uplot_set_title(plot, "C ABI facets") != UPLOT_OK)
+      uplot_set_title(plot, "C") != UPLOT_OK)
     goto cleanup;
   if (uplot_plot_to_json(plot, &json, &json_length) != UPLOT_OK) goto cleanup;
   uplot_plot *restored = uplot_plot_from_json(json, json_length, 800, 500);
@@ -43,10 +44,14 @@ int main(int argc, char **argv) {
   plot = restored;
   if (uplot_add_categorical_column(plot, "region", groups, 6) != UPLOT_OK)
     goto cleanup;
-  if (uplot_render_facet_grid_svg(plot, "region", 2, 1000, 420, 16, 1, 1,
-                                  argv[1], &svg, &svg_length) != UPLOT_OK ||
-      uplot_render_facet_grid_png(plot, "region", 2, 1000, 420, 16, 1, 1,
-                                  argv[1], &png, &png_length) != UPLOT_OK)
+  if (uplot_add_categorical_column(plot, "phase", phases, 6) != UPLOT_OK)
+    goto cleanup;
+  if (uplot_render_facet_matrix_svg(plot, "region", "phase", 1000, 700, 16,
+                                    1, 1, argv[1], &svg,
+                                    &svg_length) != UPLOT_OK ||
+      uplot_render_facet_matrix_png(plot, "region", "phase", 1000, 700, 16,
+                                    1, 1, argv[1], &png,
+                                    &png_length) != UPLOT_OK)
     goto cleanup;
   if (!write_bytes(argv[2], svg, svg_length) ||
       !write_bytes(argv[3], png, png_length))
