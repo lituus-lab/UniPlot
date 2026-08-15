@@ -161,6 +161,19 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       spec.theme.lineWidth <= 0 or not spec.theme.lineWidth.isFinite:
     raise newException(PlotError,
       "theme point size and line width must be finite and positive")
+  if spec.mappedSizeRange.minimum <= 0 or
+      not spec.mappedSizeRange.minimum.isFinite or
+      spec.mappedSizeRange.maximum < spec.mappedSizeRange.minimum or
+      not spec.mappedSizeRange.maximum.isFinite:
+    raise newException(PlotError,
+      "size range must be finite, positive and ordered")
+  if spec.mappedAlphaRange.minimum < 0 or
+      not spec.mappedAlphaRange.minimum.isFinite or
+      spec.mappedAlphaRange.maximum < spec.mappedAlphaRange.minimum or
+      spec.mappedAlphaRange.maximum > 1 or
+      not spec.mappedAlphaRange.maximum.isFinite:
+    raise newException(PlotError,
+      "alpha range must be finite, ordered and within [0, 1]")
   var usesContinuousColors = false
   for layer in spec.layers:
     let bounded = layer.mark in {mkErrorBar, mkRibbon}
