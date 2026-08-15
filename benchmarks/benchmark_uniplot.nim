@@ -175,6 +175,10 @@ proc explicitHistogramSpec(count: int): PlotSpec =
   let inputs = histogramBreakInputs(count)
   histogramBreaksPlot(inputs.values, inputs.breaks)
 
+proc numericHistogramDensitySpec(count: int): PlotSpec =
+  let inputs = histogramBreakInputs(count)
+  histogramPlot(inputs.values, inputs.breaks, density = true)
+
 proc facetedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   var groups = newSeqOfCap[string](count)
@@ -238,6 +242,7 @@ when isMainModule:
       aggregate2DTimes, categoricalHeatmapCompileTimes, aggregateGroupTimes,
       groupedAggregateCompileTimes,
       explicitHistogramTimes, explicitHistogramCompileTimes,
+      numericHistogramDensityCompileTimes,
       jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
@@ -307,6 +312,8 @@ when isMainModule:
       groupedAggregateSpec(pointCount).compileScene(size))
     let explicitHistogramResult = measureScene(
       explicitHistogramSpec(pointCount).compileScene(size))
+    let numericHistogramDensityResult = measureScene(
+      numericHistogramDensitySpec(pointCount).compileScene(size))
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
     let sharedGridResult = measureScene(compileGrid(gridSpecs, 2, size,
       gap = 12, sharedX = true, sharedY = true))
@@ -357,6 +364,7 @@ when isMainModule:
       categoricalHeatmapResult.nodes + groupedAggregateResult.nodes +
       aggregated.len + groupAggregates.len +
       explicitHistogramResult.nodes + explicitBins.len +
+      numericHistogramDensityResult.nodes +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
@@ -383,6 +391,7 @@ when isMainModule:
       groupedAggregateCompileTimes.push groupedAggregateResult.ms
       explicitHistogramTimes.push explicitHistogramMs
       explicitHistogramCompileTimes.push explicitHistogramResult.ms
+      numericHistogramDensityCompileTimes.push numericHistogramDensityResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
       categoricalGridCompileTimes.push categoricalGridResult.ms
@@ -432,6 +441,8 @@ when isMainModule:
       "explicit_histogram_breaks": summary(explicitHistogramTimes),
       "explicit_histogram_construct_compile": summary(
         explicitHistogramCompileTimes),
+      "numeric_histogram_density_construct_compile": summary(
+        numericHistogramDensityCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "categorical_grid_construct_compile": summary(

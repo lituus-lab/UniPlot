@@ -215,6 +215,13 @@ allocation. Constructing the samples and 65 boundaries, binning, materialising
 labels/counts and compiling the 64-bar UniVector scene averaged 1.41 ms
 (1.38–1.46 ms). Rendering is excluded from both stages.
 
+The numeric density variant constructs the same 100,000 samples and 65
+boundaries, bins and area-normalises them, materialises numeric rectangle
+bounds and compiles 64 UniVector rectangles. A 2026-08-16 Darwin arm64 run
+averaged 1.36 ms over five iterations after three warmups (1.35–1.38 ms).
+SVG, PNG and WGPU rendering are excluded; the small difference from the
+categorical construction stage is within ordinary run variability.
+
 Versioned PlotSpec JSON is measured in two stages. For 100,000 rows on the
 same 2026-08-15 Darwin arm64 run, in-memory encoding averaged 8.04 ms and
 decoding averaged 17.80 ms over five measured iterations. The input JSON is

@@ -185,6 +185,13 @@ UniPlot also reports internal diagnostics excluded from cross-library ranking:
   boundaries, bins them, materialises labels/counts and compiles the 64-bar
   UniVector scene. The same run averaged 1.41 ms (1.38–1.46 ms). SVG, PNG and
   WGPU rendering are excluded.
+- `numeric_histogram_density_construct_compile` constructs 100,000 samples and
+  65 boundaries, bins and area-normalises them, materialises explicit numeric
+  bounds and compiles 64 UniVector rectangles. On the 2026-08-16 Darwin arm64
+  run it averaged 1.36 ms over five iterations after three warmups
+  (1.35–1.38 ms). This is a construction/scene regression baseline; SVG, PNG
+  and WGPU rendering are excluded, and the small difference from the
+  categorical histogram stage is within run variability.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the
