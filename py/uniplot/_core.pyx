@@ -34,6 +34,12 @@ cdef extern from "UniPlot.h":
                                const char *, uint8_t **, size_t *)
     int uplot_render_grid_png(uplot_plot **, size_t, int, int, int, int,
                                const char *, uint8_t **, size_t *)
+    int uplot_render_grid_svg_shared(uplot_plot **, size_t, int, int, int, int,
+                                      int, int, const char *, uint8_t **,
+                                      size_t *)
+    int uplot_render_grid_png_shared(uplot_plot **, size_t, int, int, int, int,
+                                      int, int, const char *, uint8_t **,
+                                      size_t *)
     void uplot_buffer_free(void *, size_t)
     void uplot_plot_free(uplot_plot *)
 
@@ -154,7 +160,7 @@ cdef class Plot:
     def png(self, font): return self._render(font, False)
 
 cdef bytes _render_grid(plots, font, int columns, int width, int height,
-                        int gap, bint svg):
+                        int gap, bint svg, bint shared_x, bint shared_y):
     cdef Py_ssize_t count = len(plots)
     cdef uplot_plot **handles
     cdef Py_ssize_t index
@@ -173,13 +179,13 @@ cdef bytes _render_grid(plots, font, int columns, int width, int height,
                 raise TypeError("plot grid entries must be Plot instances")
             handles[index] = (<Plot>plots[index])._handle
         if svg:
-            status = uplot_render_grid_svg(handles, count, columns, width,
-                                            height, gap, encoded, &output,
-                                            &length)
+            status = uplot_render_grid_svg_shared(
+                handles, count, columns, width, height, gap, shared_x,
+                shared_y, encoded, &output, &length)
         else:
-            status = uplot_render_grid_png(handles, count, columns, width,
-                                            height, gap, encoded, &output,
-                                            &length)
+            status = uplot_render_grid_png_shared(
+                handles, count, columns, width, height, gap, shared_x,
+                shared_y, encoded, &output, &length)
         if status == 1:
             raise ValueError("invalid plot grid arguments")
         if status != 0:
@@ -190,12 +196,14 @@ cdef bytes _render_grid(plots, font, int columns, int width, int height,
         uplot_buffer_free(output, length)
 
 def grid_svg(plots, font, int columns, int width=1200, int height=800,
-             int gap=16):
-    return _render_grid(plots, font, columns, width, height, gap, True)
+             int gap=16, bint shared_x=False, bint shared_y=False):
+    return _render_grid(plots, font, columns, width, height, gap, True,
+                        shared_x, shared_y)
 
 def grid_png(plots, font, int columns, int width=1200, int height=800,
-             int gap=16):
-    return _render_grid(plots, font, columns, width, height, gap, False)
+             int gap=16, bint shared_x=False, bint shared_y=False):
+    return _render_grid(plots, font, columns, width, height, gap, False,
+                        shared_x, shared_y)
 
 def version(): return uplot_version().decode("ascii")
 def abi_version(): return uplot_abi_version()

@@ -24,7 +24,7 @@ def test_plot_grid_renders_svg_and_png():
         height=240).startswith(b"<svg")
     assert uniplot.grid_png(
         [first, second], FONT, columns=2, width=656,
-        height=240).startswith(b"\x89PNG")
+        height=240, shared_x=True, shared_y=True).startswith(b"\x89PNG")
     with pytest.raises(ValueError):
         uniplot.grid_svg([], FONT, columns=1)
     with pytest.raises(ValueError):
