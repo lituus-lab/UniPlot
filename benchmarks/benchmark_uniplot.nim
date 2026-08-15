@@ -133,8 +133,9 @@ when isMainModule:
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
-      jsonDecodeTimes, gridCompileTimes, prepareSceneTimes, preparedSvgTimes,
-      preparedPngTimes, pngTimes: RunningStat
+      jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
+      prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
+        pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -158,6 +159,8 @@ when isMainModule:
       uncertaintySpec(pointCount).compileScene(size))
     let themedResult = measureScene(themedSpec(pointCount).compileScene(size))
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
+    let sharedGridResult = measureScene(compileGrid(gridSpecs, 2, size,
+      gap = 12, sharedX = true, sharedY = true))
 
     started = getMonoTime()
     let encodedSpec = referenceSpec.toJson
@@ -188,6 +191,7 @@ when isMainModule:
       styledResult.nodes + continuousColorResult.nodes +
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + gridResult.nodes +
+      sharedGridResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
       preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
@@ -201,6 +205,7 @@ when isMainModule:
       uncertaintyCompileTimes.push uncertaintyResult.ms
       themedCompileTimes.push themedResult.ms
       gridCompileTimes.push gridResult.ms
+      sharedGridCompileTimes.push sharedGridResult.ms
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
       prepareSceneTimes.push prepareSceneMs
@@ -229,6 +234,7 @@ when isMainModule:
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "themed_construct_compile": summary(themedCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
+      "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
       "cpu_prepare_scene": summary(prepareSceneTimes),

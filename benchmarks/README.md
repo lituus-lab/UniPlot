@@ -93,6 +93,13 @@ ranking:
   21.55 ms for one panel in the same process. The additional 10.40 ms includes
   three extra sets of scales and guides plus scene translation; it is not a
   cross-library faceting comparison.
+- `shared_grid_construct_compile` uses the same four-panel workload while
+  deriving common numeric x and y domains before compilation. On the
+  2026-08-15 Darwin arm64 run at 100,000 total points, it averaged 34.00 ms
+  over five iterations after three warmups, versus 32.26 ms for independent
+  domains in the same process. The measured 1.74 ms (5.39%) is the cost of the
+  additional domain scans and contract-preserving union on this workload; it
+  is neither a rendering measurement nor a cross-library comparison.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the
