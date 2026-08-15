@@ -75,7 +75,7 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Free annotations, arrows and rich text.
 - [ ] Image marks and raster layers.
 - [x] Missing-value policies and intentional line breaks.
-- [ ] Theme inheritance, reusable style sheets and publication presets.
+- [x] Theme inheritance, reusable style values and publication presets.
 - [ ] Deterministic PDF output through a lower-level Uni* backend.
 - [ ] Declarative JSON serialization with a versioned schema.
 

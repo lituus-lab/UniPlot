@@ -347,34 +347,49 @@ area layer produces one polygon.
 
 ## Labels and themes
 
-`labels` sets the title and axis labels. `defaultTheme()` exposes background,
-foreground, grid colour, margins, default point size and default line width.
+`labels` sets the title and axis labels. Themes are ordinary reusable values.
+`defaultTheme`, `minimalTheme` and `darkTheme` provide explicit presets;
+`deriveTheme` inherits unspecified colours and sizes, while `withMargins`
+replaces all four margins without sentinel values.
 """
 
 nbCode:
-  import UniColor
+  let publicationStyle = minimalTheme().deriveTheme(
+    foreground = "#162238", pointSize = 6)
+  let compactPublicationStyle = publicationStyle.withMargins(
+    Insets(left: 58, top: 48, right: 24, bottom: 54))
 
-  var themed = scatterPlot([0.0, 1.0, 2.0, 3.0, 4.0],
+  var lightPlot = scatterPlot([0.0, 1.0, 2.0, 3.0, 4.0],
     [1.0, 4.0, 2.0, 5.0, 3.0], color = "#ffb703")
-  themed.labels(title = "Custom theme", x = "sample", y = "score")
-  themed.theme.background = parseColor("#14213d").get
-  themed.theme.foreground = parseColor("#f8f9fa").get
-  themed.theme.gridColor = parseColor("#415a77").get
-  themed.theme.pointSize = 7
-  themed.theme.lineWidth = 3
-  themed.theme.margins = Insets(left: 80, top: 60, right: 35, bottom: 65)
-  let themedSvg = themed.compileScene(Size(width: 720, height: 420)).toSvg(font)
+  lightPlot.labels(title = "Reusable publication style", x = "sample",
+    y = "score")
+  lightPlot.applyTheme(compactPublicationStyle)
 
-nbRawHtml svgFigure(themedSvg,
-  "Theme controls the plot surface, guides, text, margins and default sizes.")
+  var darkPlot = linePlot([0.0, 1.0, 2.0, 3.0, 4.0],
+    [1.0, 4.0, 2.0, 5.0, 3.0], color = "#63d2ff")
+  darkPlot.geomPoint(aes("x", "y"), color = "#ffcf56", radius = 5)
+  darkPlot.labels(title = "Dark preset", x = "sample", y = "score")
+  darkPlot.applyTheme(darkTheme())
+
+  let themeSvgs = [
+    lightPlot.compileScene(Size(width: 500, height: 320)).toSvg(font),
+    darkPlot.compileScene(Size(width: 500, height: 320)).toSvg(font)
+  ]
+
+nbRawHtml gallery([
+  svgFigure(themeSvgs[0], "A derived minimal publication style."),
+  svgFigure(themeSvgs[1], "The reusable dark preset.")
+])
 
 nbText: """
-Colours use UniColor's CSS parser. Invalid colours fail while constructing the
-theme or layer. Margins must leave a positive plotting rectangle, and all mark
-sizes must be finite and positive at compilation.
+Colours use UniColor's CSS parser. Invalid colours fail during derivation.
+Sizes and margins have debug contracts plus release-mode runtime guards, and
+`compileScene` revalidates public fields. Applying one `Theme` to several plots
+does not introduce shared mutable state because colours and theme values are
+immutable/value-oriented.
 
 Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 11)
+validatePage("grammar.html", minSvg = 12)
