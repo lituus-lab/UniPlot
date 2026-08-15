@@ -16,7 +16,7 @@ type LegendEntry = object
 
 type ContinuousGuide = object
   label: string
-  palette: Palette
+  sampler: PreparedPaletteSampler
   scale: ContinuousScale
 
 proc polygon(points: openArray[Point]): Path =
@@ -149,6 +149,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       spec.theme.lineWidth <= 0 or not spec.theme.lineWidth.isFinite:
     raise newException(PlotError,
       "theme point size and line width must be finite and positive")
+  var usesContinuousColors = false
   for layer in spec.layers:
     if layer.mapping.x notin spec.data.columns or
         layer.mapping.y notin spec.data.columns:
@@ -167,6 +168,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     if layer.mapping.color.len > 0 and layer.mapping.fill.len > 0:
       raise newException(PlotError,
         "a layer cannot map both color and fill")
+    let paintMapping = if layer.mapping.fill.len > 0:
+      layer.mapping.fill else: layer.mapping.color
+    if paintMapping.len > 0 and
+        spec.data.columns[paintMapping].kind == ckNumeric:
+      usesContinuousColors = true
     if layer.mapping.shape.len > 0 and
         (layer.mark != mkPoint or layer.mapping.shape notin spec.data.columns or
         spec.data.columns[layer.mapping.shape].kind != ckCategorical):
@@ -194,6 +200,13 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
       raise newException(PlotError,
         "text label mappings must reference categorical columns")
+  var continuousSampler: PreparedPaletteSampler
+  if usesContinuousColors:
+    let prepared = spec.continuousColors.prepareSampler()
+    if prepared.isErr:
+      raise newException(PlotError,
+        "cannot prepare the continuous color palette")
+    continuousSampler = prepared.get
   result = initScene(size, spec.theme.background)
   var legendEntries: seq[LegendEntry]
   var continuousGuides: seq[ContinuousGuide]
@@ -213,7 +226,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
             continuousGuides.add ContinuousGuide(
               label: if layer.legendLabel.len > 0:
                 layer.legendLabel else: paintMapping,
-              palette: spec.continuousColors, scale: scale)
+              sampler: continuousSampler, scale: scale)
       if layer.mapping.shape.len > 0 and
           layer.mapping.shape != paintMapping:
         legendEntries.add spec.shapeEntries(layer)
@@ -375,7 +388,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       var paint = if categoricalPaintValues.len > 0:
         categoryColors[categoricalPaintValues[row]] else: layer.color
       if numericPaintValues.len > 0:
-        let sampled = spec.continuousColors.sample(
+        let sampled = continuousSampler.sample(
           float64(paintScale.map(numericPaintValues[row])))
         if sampled.isErr:
           raise newException(PlotError,
@@ -494,7 +507,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       let stepHeight = colorBarHeight / float32(colorBarSteps)
       for index in 0 ..< colorBarSteps:
         let t = 1.0 - (float64(index) + 0.5) / float64(colorBarSteps)
-        let sampled = guide.palette.sample(t)
+        let sampled = guide.sampler.sample(t)
         if sampled.isErr:
           raise newException(PlotError,
             "cannot sample the continuous color guide")
