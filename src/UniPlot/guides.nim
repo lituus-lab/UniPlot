@@ -70,10 +70,11 @@ proc linePath(points: openArray[Point]; width: float32;
   result = result.preparePath().strokeToPath(
     lineStrokeStyle(width, lineStyle))
 
-proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
-  if layer.mapping.color.len == 0: return
+proc categoricalEntries(spec: PlotSpec; layer: Layer;
+                        mapping: string): seq[LegendEntry] =
+  if mapping.len == 0: return
   var seen = initTable[string, bool]()
-  for category in spec.data.categorical(layer.mapping.color):
+  for category in spec.data.categorical(mapping):
     if category notin seen:
       seen[category] = true
       let index = result.len
@@ -89,9 +90,9 @@ proc categoricalEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
         category
       result.add LegendEntry(mark: layer.mark, color: mapped.get,
         label: label, category: category, size: layer.size,
-        shape: if layer.mapping.shape == layer.mapping.color:
+        shape: if layer.mapping.shape == mapping:
           mappedShape(index) else: layer.shape,
-        lineStyle: if layer.mapping.lineStyle == layer.mapping.color:
+        lineStyle: if layer.mapping.lineStyle == mapping:
           mappedLineStyle(index) else: layer.lineStyle)
 
 proc shapeEntries(spec: PlotSpec; layer: Layer): seq[LegendEntry] =
@@ -154,6 +155,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.columns[layer.mapping.color].kind != ckCategorical):
       raise newException(PlotError,
         "color mappings must reference categorical columns")
+    if layer.mapping.fill.len > 0 and
+        (layer.mark notin {mkPoint, mkBar} or
+        layer.mapping.fill notin spec.data.columns or
+        spec.data.columns[layer.mapping.fill].kind != ckCategorical):
+      raise newException(PlotError,
+        "fill mappings require a categorical point or bar column")
+    if layer.mapping.color.len > 0 and layer.mapping.fill.len > 0:
+      raise newException(PlotError,
+        "a layer cannot map both color and fill")
     if layer.mapping.shape.len > 0 and
         (layer.mark != mkPoint or layer.mapping.shape notin spec.data.columns or
         spec.data.columns[layer.mapping.shape].kind != ckCategorical):
@@ -171,6 +181,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         raise newException(PlotError,
           "size and alpha mappings must reference numeric columns")
     if layer.mark == mkArea and (layer.mapping.color.len > 0 or
+        layer.mapping.fill.len > 0 or
         layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
         layer.mapping.shape.len > 0 or layer.mapping.lineStyle.len > 0):
       raise newException(PlotError,
@@ -184,15 +195,17 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   var legendEntries: seq[LegendEntry]
   if spec.legendSpec.visible:
     for layer in spec.layers:
-      if layer.mapping.color.len > 0:
-        legendEntries.add spec.categoricalEntries(layer)
+      let paintMapping = if layer.mapping.fill.len > 0:
+        layer.mapping.fill else: layer.mapping.color
+      if paintMapping.len > 0:
+        legendEntries.add spec.categoricalEntries(layer, paintMapping)
       if layer.mapping.shape.len > 0 and
-          layer.mapping.shape != layer.mapping.color:
+          layer.mapping.shape != paintMapping:
         legendEntries.add spec.shapeEntries(layer)
       if layer.mapping.lineStyle.len > 0 and
-          layer.mapping.lineStyle != layer.mapping.color:
+          layer.mapping.lineStyle != paintMapping:
         legendEntries.add spec.lineStyleEntries(layer)
-      if layer.mapping.color.len == 0 and layer.mapping.shape.len == 0 and
+      if paintMapping.len == 0 and layer.mapping.shape.len == 0 and
           layer.mapping.lineStyle.len == 0 and layer.legendLabel.len > 0:
         legendEntries.add LegendEntry(mark: layer.mark, color: layer.color,
           label: layer.legendLabel, size: layer.size, shape: layer.shape,
@@ -276,10 +289,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var shapes: seq[MarkerShape]
     var lineStyles: seq[LineStyle]
     var categoryColors = initTable[string, Color]()
-    if layer.mapping.color.len > 0:
-      for entry in spec.categoricalEntries(layer):
+    let paintMapping = if layer.mapping.fill.len > 0:
+      layer.mapping.fill else: layer.mapping.color
+    if paintMapping.len > 0:
+      for entry in spec.categoricalEntries(layer, paintMapping):
         categoryColors[entry.category] = entry.color
-      let mappedValues = spec.data.categorical(layer.mapping.color)
+      let mappedValues = spec.data.categorical(paintMapping)
       for row in rows: colors.add categoryColors[mappedValues[row]]
     else:
       for _ in rows: colors.add layer.color
@@ -333,6 +348,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         inc nodeId
     of mkLine:
       let hasRowAesthetics = layer.mapping.color.len > 0 or
+        layer.mapping.fill.len > 0 or
         layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
         layer.mapping.lineStyle.len > 0
       if not hasRowAesthetics and points.len > 1:

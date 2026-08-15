@@ -39,6 +39,7 @@ type
     x*, y*: string
     label*: string
     color*: string
+    fill*: string
     size*: string
     alpha*: string
     shape*: string
@@ -83,10 +84,10 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedSizeRange: AestheticRange(minimum: 2, maximum: 10),
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
-proc aes*(x, y: string; label = ""; color = ""; size = "";
-    alpha = ""; shape = ""; lineStyle = ""): Aes =
-  Aes(x: x, y: y, label: label, color: color, size: size, alpha: alpha,
-    shape: shape, lineStyle: lineStyle)
+proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
+    shape = ""; lineStyle = ""; fill = ""): Aes =
+  Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
+    alpha: alpha, shape: shape, lineStyle: lineStyle)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";

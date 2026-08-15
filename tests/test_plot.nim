@@ -241,3 +241,27 @@ suite "plot compilation":
       if node.kind == snText and node.text in ["A", "B"]:
         labels.add node.text
     check labels == @["A", "B"]
+
+  test "categorical fill mappings color filled marks through UniColor":
+    var frame = initDataFrame()
+    frame.addColumn("x", ["A", "B", "C"])
+    frame.addColumn("y", [1.0, 2.0, 3.0])
+    frame.addColumn("group", ["low", "high", "low"])
+    var spec = plot(frame)
+    spec.geomBar(aes("x", "y", fill = "group"))
+    spec.legend(title = "Fill")
+    let scene = spec.compileScene()
+    var colors: seq[Color]
+    var labels: seq[string]
+    for node in scene.nodes:
+      if node.id != 0: colors.add node.color
+      if node.kind == snText and node.text in ["Fill", "low", "high"]:
+        labels.add node.text
+    check colors.len == 3
+    check colors[0] == colors[2]
+    check colors[0] != colors[1]
+    check labels == @["Fill", "low", "high"]
+
+    var ambiguous = plot(frame)
+    ambiguous.geomPoint(aes("x", "y", color = "group", fill = "group"))
+    expect PlotError: discard ambiguous.compileScene()
