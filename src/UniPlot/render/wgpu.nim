@@ -221,8 +221,9 @@ proc prepareWgpuScene*(scene: Scene;
       let path = case node.kind
         of snPath: node.path
         of snText:
-          layoutText(textStyle(font, node.fontSize), node.text)
-            .combinedPath(vec2(node.position.x, node.position.y))
+          let layout = layoutText(textStyle(font, node.fontSize), node.text)
+          layout.combinedPath(vec2(node.anchor.anchoredTextX(node.position.x,
+            layout.width), node.position.y))
       let mesh = path.preparePath().tessellateFill()
       let converted = node.color.to(tagSRGB)
       if converted.isErr:

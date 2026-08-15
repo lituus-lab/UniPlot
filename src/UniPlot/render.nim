@@ -36,7 +36,8 @@ proc nodePath(node: SceneNode; font: Font): Path =
   of snPath: node.path
   of snText:
     let layout = layoutText(textStyle(font, node.fontSize), node.text)
-    layout.combinedPath(vec2(node.position.x, node.position.y))
+    let x = node.anchor.anchoredTextX(node.position.x, layout.width)
+    layout.combinedPath(vec2(x, node.position.y))
 
 proc prepareScene*(scene: Scene; font: Font): PreparedScene =
   ## Shape text and flatten all paths once for repeated CPU/SVG rendering.

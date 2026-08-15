@@ -10,6 +10,11 @@ type
     snPath
     snText
 
+  TextAnchor* = enum
+    textStart
+    textMiddle
+    textEnd
+
   SceneNode* = object
     id*: uint64
     color*: Color
@@ -20,11 +25,20 @@ type
       text*: string
       position*: Point
       fontSize*: float32
+      anchor*: TextAnchor
 
   Scene* = object
     size*: Size
     background*: Color
     nodes*: seq[SceneNode]
+
+func anchoredTextX*(anchor: TextAnchor; x, width: float32): float32 {.
+    inline.} =
+  ## Resolve the left edge of shaped text from its semantic anchor.
+  case anchor
+  of textStart: x
+  of textMiddle: x - width * 0.5'f32
+  of textEnd: x - width
 
 proc initScene*(size: Size; background: Color): Scene {.contractual.} =
   require:
@@ -39,7 +53,8 @@ proc addPath*(scene: var Scene; path: Path; color: Color; id = 0'u64) =
   scene.nodes.add SceneNode(kind: snPath, id: id, color: color, path: path)
 
 proc addText*(scene: var Scene; text: string; position: Point;
-    fontSize: float32; color: Color; id = 0'u64) {.contractual.} =
+    fontSize: float32; color: Color; id = 0'u64;
+    anchor = textStart) {.contractual.} =
   require:
     fontSize > 0 and fontSize.isFinite
     position.x.isFinite and position.y.isFinite
@@ -49,4 +64,4 @@ proc addText*(scene: var Scene; text: string; position: Point;
     if not position.x.isFinite or not position.y.isFinite:
       raise newException(PlotError, "text position must be finite")
     scene.nodes.add SceneNode(kind: snText, id: id, color: color, text: text,
-      position: position, fontSize: fontSize)
+      position: position, fontSize: fontSize, anchor: anchor)

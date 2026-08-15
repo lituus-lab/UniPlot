@@ -74,4 +74,4 @@ proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
           result.addText(node.text,
             Point(x: node.position.x + float32(dx),
               y: node.position.y + float32(dy)),
-            node.fontSize, node.color, id)
+            node.fontSize, node.color, id, node.anchor)

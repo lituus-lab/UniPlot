@@ -356,11 +356,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       result.addPath(segmentPath(Point(x: x, y: area.yMin),
         Point(x: x, y: area.yMax), 1), spec.theme.gridColor)
       result.addText(tickLabel(value), Point(x: x, y: area.yMax + 20), 11,
-        spec.theme.foreground)
+        spec.theme.foreground, anchor = textMiddle)
   else:
     for value in xBand.domain:
       result.addText(value, Point(x: xBand.map(value), y: area.yMax + 20), 11,
-        spec.theme.foreground)
+        spec.theme.foreground, anchor = textMiddle)
   for value in yScale.ticks():
     let y = yScale.map(value)
     result.addPath(segmentPath(Point(x: area.xMin, y: y),
@@ -372,7 +372,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       spec.theme.foreground)
   if spec.xLabel.len > 0:
     result.addText(spec.xLabel, Point(x: (area.xMin + area.xMax) * 0.5,
-      y: float32(size.height) - 20), 13, spec.theme.foreground)
+      y: float32(size.height) - 20), 13, spec.theme.foreground,
+      anchor = textMiddle)
   if spec.yLabel.len > 0:
     result.addText(spec.yLabel, Point(x: 5, y: area.yMin - 20), 13,
       spec.theme.foreground)

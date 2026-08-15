@@ -7,6 +7,16 @@ from UniVector import lineTo
 import UniPlot
 
 suite "rendering":
+  test "text anchors resolve against shaped width":
+    check textStart.anchoredTextX(100'f32, 40'f32) == 100'f32
+    check textMiddle.anchoredTextX(100'f32, 40'f32) == 80'f32
+    check textEnd.anchoredTextX(100'f32, 40'f32) == 60'f32
+    var scene = initScene(Size(width: 200, height: 80),
+      defaultTheme().background)
+    scene.addText("centered", Point(x: 100, y: 20), 12,
+      defaultTheme().foreground, anchor = textMiddle)
+    check scene.nodes[0].anchor == textMiddle
+
   test "SVG and PNG render from the same scene":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])
