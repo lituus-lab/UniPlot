@@ -111,5 +111,5 @@ than introducing competing geometry or text implementations.
 - [ ] Track peak resident memory and bytes allocated per rendered frame.
 - [ ] Add 10³, 10⁵ and 10⁶-point workloads with explicit output semantics.
 - [ ] Compare warm and cold paths separately for every provider.
-- [ ] Keep benchmark dependency installation explicit and outside library
+- [x] Keep benchmark dependency installation explicit and outside library
   installation.
