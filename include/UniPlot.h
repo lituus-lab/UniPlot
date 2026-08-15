@@ -63,6 +63,14 @@ int uplot_render_grid_svg(uplot_plot *const *, size_t count, int columns,
 int uplot_render_grid_png(uplot_plot *const *, size_t count, int columns,
                           int width, int height, int gap,
                           const char *font_path, uint8_t **, size_t *);
+int uplot_render_grid_svg_shared(uplot_plot *const *, size_t count, int columns,
+                                 int width, int height, int gap, int shared_x,
+                                 int shared_y, const char *font_path,
+                                 uint8_t **, size_t *);
+int uplot_render_grid_png_shared(uplot_plot *const *, size_t count, int columns,
+                                 int width, int height, int gap, int shared_x,
+                                 int shared_y, const char *font_path,
+                                 uint8_t **, size_t *);
 void uplot_buffer_free(void *, size_t);
 void uplot_plot_free(uplot_plot *);
 

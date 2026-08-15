@@ -211,7 +211,7 @@ proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
 
 proc renderGrid(values: ptr pointer; count: csize_t; columns, width, height,
     gap: cint; fontPath: cstring; output: ptr ptr uint8;
-    outputLen: ptr csize_t; svg: bool): cint =
+    outputLen: ptr csize_t; svg, sharedX, sharedY: bool): cint =
   if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
   output[] = nil
   outputLen[] = 0
@@ -227,7 +227,7 @@ proc renderGrid(values: ptr pointer; count: csize_t; columns, width, height,
       if handles[index].isNil: return UPLOT_ERR_ARGUMENT
       specs.add handle(handles[index]).spec
     let composed = compileGrid(specs, int(columns),
-      Size(width: int(width), height: int(height)), int(gap))
+      Size(width: int(width), height: int(height)), int(gap), sharedX, sharedY)
     let font = loadTtf($fontPath)
     if svg:
       copyBuffer(composed.toSvg(font), output, outputLen)
@@ -243,14 +243,38 @@ proc uplot_render_grid_svg*(values: ptr pointer; count: csize_t;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
-    outputLen, true)
+    outputLen, true, false, false)
 
 proc uplot_render_grid_png*(values: ptr pointer; count: csize_t;
     columns, width, height, gap: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
-    outputLen, false)
+    outputLen, false, false, false)
+
+proc renderSharedGrid(values: ptr pointer; count: csize_t; columns, width,
+    height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t; svg: bool): cint =
+  if sharedX notin 0 .. 1 or sharedY notin 0 .. 1:
+    if not output.isNil: output[] = nil
+    if not outputLen.isNil: outputLen[] = 0
+    return UPLOT_ERR_ARGUMENT
+  renderGrid(values, count, columns, width, height, gap, fontPath, output,
+    outputLen, svg, sharedX == 1, sharedY == 1)
+
+proc uplot_render_grid_svg_shared*(values: ptr pointer; count: csize_t;
+    columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderSharedGrid(values, count, columns, width, height, gap, sharedX,
+    sharedY, fontPath, output, outputLen, true)
+
+proc uplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
+    columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
+    exportc, dynlib, cdecl.} =
+  renderSharedGrid(values, count, columns, width, height, gap, sharedX,
+    sharedY, fontPath, output, outputLen, false)
 
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =

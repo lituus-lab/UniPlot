@@ -71,6 +71,18 @@ int main(void) {
                                &svg, &svg_len) == UPLOT_OK);
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
   uplot_buffer_free(svg, svg_len);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_grid_svg_shared(panels, 2, 2, 656, 240, 16, 1, 1,
+                                      TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  svg = (uint8_t *)1;
+  svg_len = 1;
+  assert(uplot_render_grid_svg_shared(panels, 2, 2, 656, 240, 16, 2, 0,
+                                      TEST_FONT, &svg, &svg_len) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(svg == NULL && svg_len == 0);
   svg = (uint8_t *)1;
   svg_len = 1;
   assert(uplot_render_grid_svg(NULL, 2, 2, 656, 240, 16, TEST_FONT,
