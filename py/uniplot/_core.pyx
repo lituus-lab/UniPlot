@@ -32,6 +32,11 @@ cdef extern from "UniPlot.h":
     int uplot_set_title(uplot_plot *, const char *)
     int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
     int uplot_clear_secondary_y(uplot_plot *)
+    int uplot_annotate_text(uplot_plot *, double, double, const char *,
+                             const char *, float)
+    int uplot_annotate_arrow(uplot_plot *, double, double, double, double,
+                              const char *, float, float)
+    int uplot_clear_annotations(uplot_plot *)
     int uplot_render_png(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_svg(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_grid_svg(uplot_plot **, size_t, int, int, int, int,
@@ -190,6 +195,29 @@ cdef class Plot:
     def clear_secondary_y(self):
         if uplot_clear_secondary_y(self._handle) != 0:
             raise RuntimeError("cannot clear secondary y axis")
+        return self
+
+    def annotate_text(self, double x, double y, text, color="#202124",
+                      float font_size=13.0):
+        cdef bytes encoded_text = str(text).encode("utf-8")
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        if uplot_annotate_text(self._handle, x, y, encoded_text,
+                               encoded_color, font_size) != 0:
+            raise ValueError("invalid text annotation")
+        return self
+
+    def annotate_arrow(self, double x, double y, double x_end, double y_end,
+                       color="#202124", float width=2.0,
+                       float head_size=8.0):
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        if uplot_annotate_arrow(self._handle, x, y, x_end, y_end,
+                                encoded_color, width, head_size) != 0:
+            raise ValueError("invalid arrow annotation")
+        return self
+
+    def clear_annotations(self):
+        if uplot_clear_annotations(self._handle) != 0:
+            raise RuntimeError("cannot clear annotations")
         return self
 
     cdef bytes _render(self, font, bint svg):
