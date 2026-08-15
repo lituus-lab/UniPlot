@@ -97,6 +97,29 @@ proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
   addSeries(value, xs, ys, count, mkPoint, color, radius,
     shape = MarkerShape(shape))
 
+proc uplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
+    count: csize_t; color: cstring; width: float32; lineStyle,
+    missingValues: cint): cint {.exportc, dynlib, cdecl.} =
+  if lineStyle < cint(low(LineStyle).ord) or
+      lineStyle > cint(high(LineStyle).ord) or
+      missingValues < cint(low(MissingValuePolicy).ord) or
+      missingValues > cint(high(MissingValuePolicy).ord):
+    return UPLOT_ERR_ARGUMENT
+  addSeries(value, xs, ys, count, mkLine, color, width,
+    LineStyle(lineStyle), missingValues = MissingValuePolicy(missingValues))
+
+proc uplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
+    count: csize_t; color: cstring; radius: float32; shape,
+    missingValues: cint): cint {.exportc, dynlib, cdecl.} =
+  if shape < cint(low(MarkerShape).ord) or
+      shape > cint(high(MarkerShape).ord) or
+      missingValues < cint(low(MissingValuePolicy).ord) or
+      missingValues > cint(high(MissingValuePolicy).ord):
+    return UPLOT_ERR_ARGUMENT
+  addSeries(value, xs, ys, count, mkPoint, color, radius,
+    shape = MarkerShape(shape),
+    missingValues = MissingValuePolicy(missingValues))
+
 proc uplot_set_title*(value: pointer; title: cstring): cint {.
     exportc, dynlib, cdecl.} =
   if value.isNil or title.isNil: return UPLOT_ERR_ARGUMENT

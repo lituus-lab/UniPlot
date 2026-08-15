@@ -26,6 +26,11 @@ typedef enum {
   UPLOT_MARKER_PLUS = 4,
   UPLOT_MARKER_CROSS = 5
 } uplot_marker_shape;
+typedef enum {
+  UPLOT_MISSING_DROP = 0,
+  UPLOT_MISSING_BREAK = 1,
+  UPLOT_MISSING_REJECT = 2
+} uplot_missing_policy;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -40,6 +45,12 @@ int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,
                           const char *color, float width, int line_style);
 int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
                             size_t, const char *color, float radius, int shape);
+int uplot_add_line_configured(uplot_plot *, const double *, const double *,
+                              size_t, const char *color, float width,
+                              int line_style, int missing_policy);
+int uplot_add_points_configured(uplot_plot *, const double *, const double *,
+                                size_t, const char *color, float radius,
+                                int shape, int missing_policy);
 int uplot_set_title(uplot_plot *, const char *title);
 int uplot_render_png(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_svg(uplot_plot *, const char *font_path, uint8_t **, size_t *);
