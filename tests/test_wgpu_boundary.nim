@@ -64,8 +64,10 @@ suite "WGPU boundary":
         parseColor("#ff0000").get)
       scene.addText("A", Point(x: 24, y: 20), 16,
         parseColor("#000000").get)
-      let scenePixels = backend.renderWgpuScene(scene,
-        loadTtf("tests/DejaVuSans.ttf"))
+      let font = loadTtf("tests/DejaVuSans.ttf")
+      backend.submitWgpuScene(scene, font)
+      backend.submitWgpuScene(scene, font)
+      let scenePixels = backend.renderWgpuScene(scene, font)
       check scenePixels.len == 64 * 32 * 4
       check scenePixels[(10 * 64 + 10) * 4 .. (10 * 64 + 10) * 4 + 3] ==
         @[255'u8, 0, 0, 255]

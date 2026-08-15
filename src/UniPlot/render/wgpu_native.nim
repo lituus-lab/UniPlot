@@ -487,12 +487,17 @@ proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
                   meshVertices: openArray[float32];
-                  meshIndices: openArray[uint32]): seq[byte] =
+                  meshIndices: openArray[uint32];
+                  readback: bool): seq[byte] =
   ## Render, read back, and remove WebGPU's per-row copy padding.
   if runtime.isNil or runtime.device == nil or runtime.queue == nil:
     raise newException(LibraryError, "wgpu-native runtime is not ready")
   if width == 0 or height == 0:
     raise newException(LibraryError, "WGPU target dimensions must be positive")
+  if runtime.deviceLostReason() != 0'u32:
+    raise newException(LibraryError, "wgpu-native device was lost")
+  if runtime.takeUncapturedError() != 0'u32:
+    raise newException(LibraryError, "wgpu-native reported an uncaptured error")
   let
     createTexture = loadSymbol[CreateTextureProc](runtime.library,
         "wgpuDeviceCreateTexture")
@@ -706,39 +711,50 @@ struct VertexOut {
     drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
   endPass(renderPass)
   releasePass(renderPass)
-  let unpaddedRow = uint64(width) * 4'u64
-  let paddedRow = (unpaddedRow + 255'u64) and not 255'u64
-  if paddedRow > uint64(high(uint32)) or
-      paddedRow > uint64(high(int)) div uint64(height):
-    raise newException(LibraryError, "WGPU readback size exceeds host limits")
-  let bufferSize = paddedRow * uint64(height)
-  if runtime.readbackCapacity < bufferSize:
-    if runtime.readbackBuffer != nil:
-      releaseBuffer(runtime.readbackBuffer)
-      runtime.readbackBuffer = nil
-    runtime.readbackCapacity = grownCapacity(runtime.readbackCapacity, bufferSize)
-    var descriptor = WgpuBufferDescriptor(label: emptyLabel,
-      usage: BufferUsageMapRead or BufferUsageCopyDst,
-      size: runtime.readbackCapacity)
-    runtime.readbackBuffer = createBuffer(runtime.device, addr descriptor)
-    if runtime.readbackBuffer == nil:
-      runtime.readbackCapacity = 0
-      raise newException(LibraryError,
-        "wgpu-native did not create a readback buffer")
-  var source = WgpuTexelCopyTextureInfo(texture: runtime.targetTexture,
-    aspect: TextureAspectAll)
-  var destination = WgpuTexelCopyBufferInfo(
-    layout: WgpuTexelCopyBufferLayout(bytesPerRow: uint32(paddedRow),
-      rowsPerImage: height), buffer: runtime.readbackBuffer)
-  var copySize = WgpuExtent3D(width: width, height: height,
-    depthOrArrayLayers: 1)
-  copyTextureToBuffer(encoder, addr source, addr destination, addr copySize)
+  var unpaddedRow, paddedRow, bufferSize: uint64
+  if readback:
+    unpaddedRow = uint64(width) * 4'u64
+    paddedRow = (unpaddedRow + 255'u64) and not 255'u64
+    if paddedRow > uint64(high(uint32)) or
+        paddedRow > uint64(high(int)) div uint64(height):
+      raise newException(LibraryError, "WGPU readback size exceeds host limits")
+    bufferSize = paddedRow * uint64(height)
+    if runtime.readbackCapacity < bufferSize:
+      if runtime.readbackBuffer != nil:
+        releaseBuffer(runtime.readbackBuffer)
+        runtime.readbackBuffer = nil
+      runtime.readbackCapacity = grownCapacity(runtime.readbackCapacity,
+        bufferSize)
+      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+        usage: BufferUsageMapRead or BufferUsageCopyDst,
+        size: runtime.readbackCapacity)
+      runtime.readbackBuffer = createBuffer(runtime.device, addr descriptor)
+      if runtime.readbackBuffer == nil:
+        runtime.readbackCapacity = 0
+        raise newException(LibraryError,
+          "wgpu-native did not create a readback buffer")
+    var source = WgpuTexelCopyTextureInfo(texture: runtime.targetTexture,
+      aspect: TextureAspectAll)
+    var destination = WgpuTexelCopyBufferInfo(
+      layout: WgpuTexelCopyBufferLayout(bytesPerRow: uint32(paddedRow),
+        rowsPerImage: height), buffer: runtime.readbackBuffer)
+    var copySize = WgpuExtent3D(width: width, height: height,
+      depthOrArrayLayers: 1)
+    copyTextureToBuffer(encoder, addr source, addr destination, addr copySize)
   let command = finishEncoder(encoder, nil)
   if command == nil:
     raise newException(LibraryError, "wgpu-native did not create a command buffer")
   defer: releaseCommand(command)
   var submittedCommand = command
   submit(runtime.queue, 1, addr submittedCommand)
+  if not readback:
+    processEvents(runtime.instance)
+    if runtime.deviceLostReason() != 0'u32:
+      raise newException(LibraryError, "wgpu-native device was lost")
+    if runtime.takeUncapturedError() != 0'u32:
+      raise newException(LibraryError,
+        "wgpu-native reported an uncaptured error")
+    return @[]
   let request = cast[ptr MapRequest](allocShared0(sizeof(MapRequest)))
   if request == nil:
     raise newException(LibraryError, "cannot allocate WGPU map state")
@@ -773,11 +789,17 @@ struct VertexOut {
 
 proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                         red, green, blue, alpha: float64): seq[byte] =
-  runtime.renderPixels(width, height, red, green, blue, alpha, [], [])
+  runtime.renderPixels(width, height, red, green, blue, alpha, [], [], true)
 
 proc renderMeshPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                        red, green, blue, alpha: float64;
                        vertices: openArray[float32];
                        indices: openArray[uint32]): seq[byte] =
   runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices)
+    vertices, indices, true)
+
+proc submitMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
+                 red, green, blue, alpha: float64;
+                 vertices: openArray[float32]; indices: openArray[uint32]) =
+  discard runtime.renderPixels(width, height, red, green, blue, alpha,
+    vertices, indices, false)
