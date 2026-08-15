@@ -59,8 +59,8 @@ def main() -> int:
     histogram = (uniplot.Plot(760, 440)
                  .histogram(
                      [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0],
-                     [0.0, 0.5, 1.0, 2.0], color="#267a5e")
-                 .title("Python explicit histogram breaks"))
+                     [0.0, 0.5, 1.0, 2.0], color="#267a5e", density=True)
+                 .title("Python variable-width density"))
     histogram_svg_path.write_bytes(histogram.svg(font))
     histogram_png_path.write_bytes(histogram.png(font))
     grouped = (uniplot.Plot(760, 440)

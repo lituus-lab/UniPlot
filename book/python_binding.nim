@@ -84,9 +84,10 @@ copying it.
 - `heatmap(x, y, values, aggregation=AGG_MEAN)` builds a complete categorical
   matrix on an empty `Plot`. `AGG_COUNT`, `AGG_SUM`, `AGG_MEAN`,
   `AGG_MINIMUM` and `AGG_MAXIMUM` expose the native aggregation choices.
-- `histogram(values, breaks, color="#3366cc")` builds explicit lower-inclusive
-  bins on an empty `Plot`; the last supplied boundary is included. Interval
-  labels retain the boundaries while categorical bars use equal screen widths.
+- `histogram(values, breaks, color="#3366cc", density=False)` builds numeric
+  variable-width rectangles on an empty `Plot`; the last supplied boundary is
+  included. With `density=True`, total rectangle area is one for a non-empty
+  in-domain sample.
 - `aggregate(groups, values, aggregation=AGG_MEAN, color="#3366cc")`
   computes a first-seen categorical count, sum, mean, minimum or maximum on an
   empty `Plot`. Non-finite observations do not contribute.
@@ -154,10 +155,10 @@ nbRawHtml gallery([
   pngFigure(pythonHeatPng, "The same Python heatmap as an embedded PNG.",
     "A categorical heatmap rendered through the UniPlot Python binding"),
   svgFigure(pythonHistogramSvg,
-    "An explicit-break histogram built through `Plot.histogram`."),
+    "A variable-width probability density built through `Plot.histogram`."),
   pngFigure(pythonHistogramPng,
     "The same Python histogram as an embedded PNG.",
-    "An explicit-break histogram rendered through the Python binding"),
+    "A numeric histogram density rendered through the Python binding"),
   svgFigure(pythonGroupedSvg,
     "First-seen grouped means built through `Plot.aggregate`."),
   pngFigure(pythonGroupedPng,

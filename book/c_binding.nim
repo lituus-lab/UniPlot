@@ -124,6 +124,9 @@ int main(void) {
   boundaries into a categorical histogram on an empty handle. Values outside
   the supplied domain are excluded and the final boundary is included. Bars
   have equal screen width even when numeric intervals differ.
+- `uplot_add_numeric_histogram` uses the same validated breaks as numeric
+  data-coordinate rectangles. Its `density` flag is exactly `0` or `1`; the
+  latter normalises rectangle area to one for a non-empty in-domain sample.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.
@@ -168,9 +171,9 @@ nbRawHtml gallery([
   pngFigure(cHeatPng, "The same C heatmap as an embedded PNG.",
     "A categorical heatmap rendered through the UniPlot C ABI"),
   svgFigure(cHistogramSvg,
-    "An explicit-break histogram built through the C ABI."),
-  pngFigure(cHistogramPng, "The same C histogram as an embedded PNG.",
-    "An explicit-break histogram rendered through the UniPlot C ABI"),
+    "A variable-width probability density built through the C ABI."),
+  pngFigure(cHistogramPng, "The same C density as an embedded PNG.",
+    "A numeric histogram density rendered through the UniPlot C ABI"),
   svgFigure(cGroupedSvg,
     "First-seen grouped means built through `uplot_add_grouped_aggregate`."),
   pngFigure(cGroupedPng, "The same grouped aggregate as an embedded PNG.",
