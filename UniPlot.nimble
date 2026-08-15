@@ -164,7 +164,6 @@ task pyWheel, "wheel":
   cd ".."
 
 task pySdist, "Python source distribution":
-  exec "nimble pyLib"
   exec "nimble pyDeps"
   cd "py"
   exec "python3 setup.py sdist"

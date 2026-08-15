@@ -93,7 +93,8 @@ def ensure_lib_built():
 # `sdist` packages source only -- it never compiles anything, so it must not
 # require a prebuilt lib. Every other command (build_ext, bdist_wheel, ...)
 # needs a real lib to link against, built locally or, from an sdist, via nimble.
-if "sdist" in sys.argv:
+IS_SDIST = "sdist" in sys.argv
+if IS_SDIST:
     vendor_nim_source()
     INCLUDE, LIB_DIR = os.path.join(ROOT, "include"), ROOT
 else:
@@ -125,7 +126,9 @@ ext_modules = cythonize([ext], language_level=3) if ext.sources[0].endswith(".py
 setup(
     ext_modules=ext_modules,
     include_package_data=True,
-    package_data={"uniplot": [LIB_NAME] if BUNDLED else []},
-    exclude_package_data={"uniplot": ["_core.c"]},
+    package_data={"uniplot": [LIB_NAME] if BUNDLED and not IS_SDIST else []},
+    exclude_package_data={
+        "uniplot": ["_core.c", LIB_NAME] if IS_SDIST else ["_core.c"]
+    },
     zip_safe=False,
 )
