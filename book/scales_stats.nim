@@ -230,8 +230,48 @@ UniVector scene paths, so CPU, SVG, PNG and WGPU share the same geometry.
 Its `boxWidth` is a fraction in `(0, 1]` of the categorical band (or the
 available numeric slot), while its outline width is in screen pixels.
 
+## Categorical heatmaps and two-dimensional aggregation
+"""
+
+nbCode:
+  let heatX = ["morning", "morning", "afternoon", "evening", "evening"]
+  let heatY = ["north", "north", "north", "north", "south"]
+  let heatValues = [2.0, 4.0, 7.0, 5.0, 9.0]
+  let cells = aggregate2D(heatX, heatY, heatValues, agMean)
+  for cell in cells:
+    echo cell.x, " / ", cell.y, ": ", cell.value, " (n=", cell.count, ")"
+
+  var heat = heatmapPlot(heatX, heatY, heatValues, agMean,
+    legend = "mean response")
+  heat.labels(title = "Categorical response matrix", x = "period",
+    y = "region")
+  let heatSvg = heat.compileScene(Size(width: 720, height: 420)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(heatSvg,
+  "Repeated observations are averaged; an unobserved pair remains empty.")
+
+nbText: """
+`aggregate2D` supports `agCount`, `agSum`, `agMean`, `agMinimum` and
+`agMaximum`. It filters non-finite observations, preserves first-seen x and y
+order, and returns the complete Cartesian matrix. An unobserved pair has
+`count == 0` and `value == NaN`; count aggregation instead represents an
+observed pair containing only missing values as zero. Sum and mean delegate
+compensated accumulation to UniAccurate.
+
+`heatmapPlot` builds a categorical x/y tile layer from this matrix and maps its
+finite values to a continuous colour guide. Missing cells are retained in the
+axis domains but have no painted tile. Both categorical axes can be fixed with
+`xCategories` and `yCategories`; `clearXCategories` and `clearYCategories`
+restore first-seen order. Tile rectangles are UniVector paths shared by CPU,
+SVG, PNG and WGPU rendering.
+
+This is deliberately a categorical heatmap. Numeric raster grids, image
+sampling and contour estimation remain separate roadmap items rather than
+being approximated through categorical labels.
+
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 4)
+validatePage("scales_stats.html", minSvg = 5)
