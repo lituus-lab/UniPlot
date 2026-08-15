@@ -99,5 +99,19 @@ suite "WGPU boundary":
       check scenePixels[(10 * 64 + 10) * 4 .. (10 * 64 + 10) * 4 + 3] ==
         @[255'u8, 0, 0, 255]
       check scenePixels.anyIt(it != 255'u8)
+      var styledFrame = initDataFrame()
+      styledFrame.addColumn("x", [0.0, 1.0, 2.0])
+      styledFrame.addColumn("y", [1.0, 2.0, 1.0])
+      var styledSpec = plot(styledFrame)
+      styledSpec.geomLine(aes("x", "y"), color = "#3366cc", width = 2,
+        lineStyle = DotDashLine)
+      styledSpec.geomPoint(aes("x", "y"), color = "#cc3344", radius = 3,
+        shape = DiamondMarker)
+      let styledSize = Size(width: 320, height: 240)
+      let styledPrepared = styledSpec.compileScene(styledSize).prepareWgpuScene(
+        font)
+      let styledPixels = backend.renderWgpuPrepared(styledPrepared)
+      check styledPixels.len == styledSize.width * styledSize.height * 4
+      check styledPixels.anyIt(it != 255'u8)
       backend.close()
       check backend.state == wbsUnavailable
