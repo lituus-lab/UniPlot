@@ -1,5 +1,6 @@
 # build artifacts
 build/
+.deps/
 # Keep the CLI source under bin/, ignore only its generated executable.
 /bin/uniplot
 /bin/uniplot.exe
