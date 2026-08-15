@@ -18,6 +18,8 @@ cdef extern from "UniPlot.h":
                        const char *, float)
     int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                          const char *, float)
+    int uplot_add_categorical_column(uplot_plot *, const char *,
+                                      const char **, size_t)
     int uplot_add_line_styled(uplot_plot *, const double *, const double *,
                               size_t, const char *, float, int)
     int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
@@ -40,6 +42,12 @@ cdef extern from "UniPlot.h":
     int uplot_render_grid_png_shared(uplot_plot **, size_t, int, int, int, int,
                                       int, int, const char *, uint8_t **,
                                       size_t *)
+    int uplot_render_facet_grid_svg(uplot_plot *, const char *, int, int, int,
+                                     int, int, int, const char *, uint8_t **,
+                                     size_t *)
+    int uplot_render_facet_grid_png(uplot_plot *, const char *, int, int, int,
+                                     int, int, int, const char *, uint8_t **,
+                                     size_t *)
     void uplot_buffer_free(void *, size_t)
     void uplot_plot_free(uplot_plot *)
 
@@ -136,6 +144,29 @@ cdef class Plot:
                 shape=MARKER_CIRCLE, missing=MISSING_DROP):
         return self._series(x, y, color, radius, True, shape, missing)
 
+    def categorical_column(self, name, values):
+        values = list(values)
+        if len(values) == 0:
+            raise ValueError("categorical columns cannot be empty")
+        cdef bytes encoded_name = str(name).encode("utf-8")
+        cdef list encoded_values = [str(value).encode("utf-8")
+                                    for value in values]
+        cdef size_t count = len(encoded_values)
+        cdef const char **items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef size_t index
+        if items == NULL:
+            raise MemoryError()
+        try:
+            for index in range(count):
+                items[index] = encoded_values[index]
+            if uplot_add_categorical_column(
+                    self._handle, encoded_name, items, count) != 0:
+                raise ValueError("invalid categorical column")
+        finally:
+            free(items)
+        return self
+
     def title(self, value):
         cdef bytes encoded = str(value).encode("utf-8")
         if uplot_set_title(self._handle, encoded) != 0: raise ValueError("invalid title")
@@ -204,6 +235,43 @@ def grid_png(plots, font, int columns, int width=1200, int height=800,
              int gap=16, bint shared_x=False, bint shared_y=False):
     return _render_grid(plots, font, columns, width, height, gap, False,
                         shared_x, shared_y)
+
+cdef bytes _render_facets(Plot plot, column, font, int columns, int width,
+                          int height, int gap, bint svg, bint shared_x,
+                          bint shared_y):
+    cdef bytes encoded_column = str(column).encode("utf-8")
+    cdef bytes encoded_font = str(font).encode("utf-8")
+    cdef uint8_t *output = NULL
+    cdef size_t length = 0
+    cdef int status
+    if svg:
+        status = uplot_render_facet_grid_svg(
+            plot._handle, encoded_column, columns, width, height, gap,
+            shared_x, shared_y, encoded_font, &output, &length)
+    else:
+        status = uplot_render_facet_grid_png(
+            plot._handle, encoded_column, columns, width, height, gap,
+            shared_x, shared_y, encoded_font, &output, &length)
+    try:
+        if status == 1:
+            raise ValueError("invalid facet grid arguments")
+        if status != 0:
+            raise RuntimeError("facet grid render failed")
+        return PyBytes_FromStringAndSize(<char *>output, length)
+    finally:
+        uplot_buffer_free(output, length)
+
+def facet_svg(Plot plot, column, font, int columns, int width=1200,
+              int height=800, int gap=16, bint shared_x=False,
+              bint shared_y=False):
+    return _render_facets(plot, column, font, columns, width, height, gap,
+                          True, shared_x, shared_y)
+
+def facet_png(Plot plot, column, font, int columns, int width=1200,
+              int height=800, int gap=16, bint shared_x=False,
+              bint shared_y=False):
+    return _render_facets(plot, column, font, columns, width, height, gap,
+                          False, shared_x, shared_y)
 
 def version(): return uplot_version().decode("ascii")
 def abi_version(): return uplot_abi_version()

@@ -32,6 +32,22 @@ def test_plot_grid_renders_svg_and_png():
     with pytest.raises(TypeError):
         uniplot.grid_svg([first, object()], FONT, columns=2)
 
+def test_categorical_facets_render_svg_and_png():
+    plot = (uniplot.Plot()
+            .line([0, 1, 2, 3], [1, 3, 2, 4])
+            .categorical_column(
+                "group", (value for value in ["west", "east", "west", "east"])))
+    assert uniplot.facet_svg(
+        plot, "group", FONT, columns=2, width=656, height=240,
+        shared_x=True, shared_y=True).startswith(b"<svg")
+    assert uniplot.facet_png(
+        plot, "group", FONT, columns=2, width=656,
+        height=240).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.categorical_column("bad", ["short"])
+    with pytest.raises(RuntimeError):
+        uniplot.facet_svg(plot, "missing", FONT, columns=2)
+
 def test_series_shape_is_checked():
     with pytest.raises(ValueError):
         uniplot.Plot().line([1], [1, 2])
