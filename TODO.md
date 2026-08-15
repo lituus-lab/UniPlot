@@ -60,7 +60,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Legends derived from named layers with explicit visibility and title
   control.
 - [ ] Facets, subplot grids, shared axes and secondary axes.
-- [ ] Colour, fill, size, shape, alpha and line-style aesthetic mappings.
+- [x] Categorical colour aesthetic mappings through UniColor palettes.
+- [ ] Fill, size, shape, alpha and line-style aesthetic mappings.
 - [ ] Continuous colour maps, discrete palettes and colour bars.
 - [ ] Date/time, duration, transformed, reversed and polar coordinates.
 - [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.

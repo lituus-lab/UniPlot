@@ -112,6 +112,35 @@ Legend entries are opt-in: unnamed layers never appear accidentally. The guide
 reserves layout space before scales are trained, so it cannot cover the data
 area. SVG, PNG and WGPU need no legend-specific rendering code.
 
+## Categorical colour mapping
+
+The optional `color` aesthetic names a categorical column. UniPlot preserves
+first-occurrence order and indexes an immutable UniColor discrete palette. The
+default is UniColor's Okabe–Ito palette; `categoricalPalette` accepts another
+discrete `Palette` explicitly.
+"""
+
+nbCode:
+  var groupedData = initDataFrame()
+  groupedData.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+  groupedData.addColumn("y", [1.0, 2.6, 1.8, 3.8, 3.1, 4.7])
+  groupedData.addColumn("group", ["control", "treated", "control",
+    "treated", "control", "treated"])
+  var grouped = plot(groupedData)
+  grouped.geomPoint(aes("x", "y", color = "group"), radius = 6)
+  grouped.labels(title = "Categorical colour", x = "sample", y = "value")
+  grouped.legend(title = "Group")
+  let groupedSvg = grouped.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(groupedSvg,
+  "Categories share stable UniColor values and generate matching swatches.")
+
+nbText: """
+Point, bar, text and line layers support categorical colours. A line segment
+uses the category of its ending row. An area is one polygon and therefore
+rejects per-row colour mappings instead of silently choosing one colour.
+
 ## Labels and themes
 
 `labels` sets the title and axis labels. `defaultTheme()` exposes background,
@@ -144,4 +173,4 @@ Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 7)
+validatePage("grammar.html", minSvg = 8)
