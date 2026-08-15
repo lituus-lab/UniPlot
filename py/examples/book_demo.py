@@ -7,13 +7,15 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 12:
+    if len(sys.argv) != 14:
         raise SystemExit(
             "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
-            "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png")
+            "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png "
+            "NUMHEAT.svg NUMHEAT.png")
     (font, svg_path, png_path, box_svg_path, box_png_path,
      heat_svg_path, heat_png_path, histogram_svg_path,
-     histogram_png_path, grouped_svg_path, grouped_png_path) = map(
+     histogram_png_path, grouped_svg_path, grouped_png_path,
+     numeric_heat_svg_path, numeric_heat_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -71,6 +73,13 @@ def main() -> int:
                .title("Python grouped mean"))
     grouped_svg_path.write_bytes(grouped.svg(font))
     grouped_png_path.write_bytes(grouped.png(font))
+    numeric_heatmap = (uniplot.Plot(760, 440)
+                       .numeric_heatmap(
+                           [0.0, 1.0, 3.0, 6.0], [10.0, 20.0, 40.0],
+                           [1.0, 4.0, 2.0, 6.0, float("nan"), 9.0])
+                       .title("Python numeric cell grid"))
+    numeric_heat_svg_path.write_bytes(numeric_heatmap.svg(font))
+    numeric_heat_png_path.write_bytes(numeric_heatmap.png(font))
     return 0
 
 

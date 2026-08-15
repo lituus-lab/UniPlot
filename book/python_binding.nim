@@ -84,6 +84,9 @@ copying it.
 - `heatmap(x, y, values, aggregation=AGG_MEAN)` builds a complete categorical
   matrix on an empty `Plot`. `AGG_COUNT`, `AGG_SUM`, `AGG_MEAN`,
   `AGG_MINIMUM` and `AGG_MAXIMUM` expose the native aggregation choices.
+- `numeric_heatmap(x_breaks, y_breaks, values)` builds variable-size numeric
+  cells from row-major values. Boundary arrays are strictly increasing and the
+  value count must equal their Cartesian interval count.
 - `histogram(values, breaks, color="#3366cc", density=False)` builds numeric
   variable-width rectangles on an empty `Plot`; the last supplied boundary is
   included. With `density=True`, total rectangle area is one for a non-empty
@@ -144,6 +147,10 @@ let
   pythonGroupedSvg = readFile("../assets/generated/python_grouped.svg")
   pythonGroupedPng = pngDataUri(
     readFile("../assets/generated/python_grouped.png"))
+  pythonNumericHeatSvg = readFile(
+    "../assets/generated/python_numeric_heatmap.svg")
+  pythonNumericHeatPng = pngDataUri(
+    readFile("../assets/generated/python_numeric_heatmap.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
@@ -163,8 +170,13 @@ nbRawHtml gallery([
     "First-seen grouped means built through `Plot.aggregate`."),
   pngFigure(pythonGroupedPng,
     "The same Python grouped aggregate as an embedded PNG.",
-    "Grouped means rendered through the Python binding")
+    "Grouped means rendered through the Python binding"),
+  svgFigure(pythonNumericHeatSvg,
+    "A variable-size numeric cell grid built through `Plot.numeric_heatmap`."),
+  pngFigure(pythonNumericHeatPng,
+    "The same Python numeric heatmap as an embedded PNG.",
+    "A numeric heatmap rendered through the Python binding")
 ])
 
 nbSave
-validatePage("python_binding.html", minSvg = 5, requirePng = true)
+validatePage("python_binding.html", minSvg = 6, requirePng = true)

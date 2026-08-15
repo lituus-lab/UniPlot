@@ -120,6 +120,9 @@ int main(void) {
   `UPLOT_AGG_COUNT`, `SUM`, `MEAN`, `MINIMUM` or `MAXIMUM`. It also requires an
   otherwise empty handle. First-seen axis order and missing Cartesian cells
   follow the Nim `aggregate2D` contract.
+- `uplot_add_numeric_heatmap` copies explicit x/y boundary arrays and a
+  row-major value matrix. The value count must equal the Cartesian cell count;
+  finite values become variable-size numeric UniVector rectangles.
 - `uplot_add_histogram_breaks` copies samples and finite, strictly increasing
   boundaries into a categorical histogram on an empty handle. Values outside
   the supplied domain are excluded and the final boundary is included. Bars
@@ -160,6 +163,9 @@ let
   cHistogramPng = pngDataUri(readFile("../assets/generated/c_histogram.png"))
   cGroupedSvg = readFile("../assets/generated/c_grouped.svg")
   cGroupedPng = pngDataUri(readFile("../assets/generated/c_grouped.png"))
+  cNumericHeatSvg = readFile("../assets/generated/c_numeric_heatmap.svg")
+  cNumericHeatPng = pngDataUri(
+    readFile("../assets/generated/c_numeric_heatmap.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
@@ -177,8 +183,13 @@ nbRawHtml gallery([
   svgFigure(cGroupedSvg,
     "First-seen grouped means built through `uplot_add_grouped_aggregate`."),
   pngFigure(cGroupedPng, "The same grouped aggregate as an embedded PNG.",
-    "Grouped means rendered through the UniPlot C ABI")
+    "Grouped means rendered through the UniPlot C ABI"),
+  svgFigure(cNumericHeatSvg,
+    "A variable-size numeric cell grid built through the C ABI."),
+  pngFigure(cNumericHeatPng,
+    "The same C numeric heatmap as an embedded PNG.",
+    "A numeric heatmap rendered through the UniPlot C ABI")
 ])
 
 nbSave
-validatePage("c_binding.html", minSvg = 5, requirePng = true)
+validatePage("c_binding.html", minSvg = 6, requirePng = true)
