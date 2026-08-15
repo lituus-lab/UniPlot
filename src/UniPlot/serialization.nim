@@ -178,6 +178,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
   if spec.xScaleSpec.domain.configured:
     xScale["domain"] = %*{"minimum": spec.xScaleSpec.domain.minimum,
       "maximum": spec.xScaleSpec.domain.maximum}
+  if spec.xScaleSpec.categories.configured:
+    xScale["categories"] = %spec.xScaleSpec.categories.values
   var yScale = %*{"kind": $spec.yScaleSpec.kind,
     "reversed": spec.yScaleSpec.reversed}
   if spec.yScaleSpec.domain.configured:
@@ -266,6 +268,13 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
     result.xScaleSpec.domain = AxisDomainSpec(configured: true,
       minimum: domain.finiteNumber("minimum"),
       maximum: domain.finiteNumber("maximum"))
+  if xScale.hasKey("categories"):
+    let categories = xScale.field("categories", JArray)
+    result.xScaleSpec.categories = AxisCategoryDomainSpec(configured: true)
+    for category in categories:
+      if category.kind != JString:
+        raise fail("x scale categories must be strings")
+      result.xScaleSpec.categories.values.add category.getStr
   let yScale = root.field("yScale", JObject)
   result.yScaleSpec = AxisScaleSpec(kind: enumValue[ScaleKind](yScale, "kind"),
     reversed: yScale.field("reversed", JBool).getBool)

@@ -51,6 +51,13 @@ suite "PlotSpec JSON schema":
     check not encoded["yScale"].hasKey("domain")
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "categorical x domains round trip as an optional schema-v1 field":
+    var spec = barPlot(["b", "a"], [2.0, 1.0])
+    spec.xCategories(["c", "a", "b"])
+    let encoded = spec.toJsonNode
+    check encoded["xScale"]["categories"] == %*["c", "a", "b"]
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])
