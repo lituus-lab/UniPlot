@@ -199,6 +199,13 @@ averaged 14.42 ms (14.32–14.59 ms). Neither stage includes SVG, PNG or WGPU
 rendering, and neither is ranked against competitor heatmaps with different
 aggregation and missing-cell semantics.
 
+The numeric grid diagnostic constructs 1,000 x intervals by 100 y intervals,
+materialises 100,000 explicit cell bounds, samples one prepared UniColor ramp
+and compiles 100,000 UniVector rectangles. On the 2026-08-16 Darwin arm64 run
+it averaged 37.01 ms over five iterations after three warmups
+(36.58–37.55 ms). SVG, PNG and WGPU rendering are excluded. This is a dense
+vector-cell benchmark, not a raster texture-upload measurement.
+
 One-dimensional grouped aggregation is measured separately. Grouping 100,000
 prepared observations into 32 first-seen compensated means averaged 3.46 ms
 over five iterations after three warmups (3.33–3.60 ms). Constructing those

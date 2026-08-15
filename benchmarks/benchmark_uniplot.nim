@@ -150,6 +150,20 @@ proc categoricalHeatmapSpec(count: int): PlotSpec =
   let inputs = heatmapInputs(count)
   heatmapPlot(inputs.xs, inputs.ys, inputs.values)
 
+proc numericHeatmapSpec(count: int): PlotSpec =
+  let
+    rowCount = min(100, max(1, count))
+    columnCount = max(1, (count + rowCount - 1) div rowCount)
+  var
+    xBreaks = newSeqOfCap[float64](columnCount + 1)
+    yBreaks = newSeqOfCap[float64](rowCount + 1)
+    values = newSeqOfCap[float64](rowCount * columnCount)
+  for index in 0 .. columnCount: xBreaks.add float64(index)
+  for index in 0 .. rowCount: yBreaks.add float64(index)
+  for index in 0 ..< rowCount * columnCount:
+    values.add sin(float64(index) * 0.013) + float64(index mod 11) * 0.1
+  numericHeatmapPlot(xBreaks, yBreaks, values)
+
 proc groupedInputs(count: int): tuple[groups: seq[string];
     values: seq[float64]] =
   result.groups = newSeqOfCap[string](count)
@@ -240,7 +254,7 @@ when isMainModule:
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
       retainedAnnotationCompileTimes, groupedBoxPlotCompileTimes,
       aggregate2DTimes, categoricalHeatmapCompileTimes, aggregateGroupTimes,
-      groupedAggregateCompileTimes,
+      groupedAggregateCompileTimes, numericHeatmapCompileTimes,
       explicitHistogramTimes, explicitHistogramCompileTimes,
       numericHistogramDensityCompileTimes,
       jsonEncodeTimes,
@@ -308,6 +322,8 @@ when isMainModule:
       groupedBoxPlotSpec(pointCount).compileScene(size))
     let categoricalHeatmapResult = measureScene(
       categoricalHeatmapSpec(pointCount).compileScene(size))
+    let numericHeatmapResult = measureScene(
+      numericHeatmapSpec(pointCount).compileScene(size))
     let groupedAggregateResult = measureScene(
       groupedAggregateSpec(pointCount).compileScene(size))
     let explicitHistogramResult = measureScene(
@@ -362,6 +378,7 @@ when isMainModule:
       retainedAnnotationResult.nodes +
       groupedBoxPlotResult.nodes +
       categoricalHeatmapResult.nodes + groupedAggregateResult.nodes +
+      numericHeatmapResult.nodes +
       aggregated.len + groupAggregates.len +
       explicitHistogramResult.nodes + explicitBins.len +
       numericHistogramDensityResult.nodes +
@@ -387,6 +404,7 @@ when isMainModule:
       groupedBoxPlotCompileTimes.push groupedBoxPlotResult.ms
       aggregate2DTimes.push aggregate2DMs
       categoricalHeatmapCompileTimes.push categoricalHeatmapResult.ms
+      numericHeatmapCompileTimes.push numericHeatmapResult.ms
       aggregateGroupTimes.push aggregateGroupMs
       groupedAggregateCompileTimes.push groupedAggregateResult.ms
       explicitHistogramTimes.push explicitHistogramMs
@@ -435,6 +453,7 @@ when isMainModule:
       "aggregate_2d": summary(aggregate2DTimes),
       "categorical_heatmap_construct_compile": summary(
         categoricalHeatmapCompileTimes),
+      "numeric_heatmap_construct_compile": summary(numericHeatmapCompileTimes),
       "aggregate_groups": summary(aggregateGroupTimes),
       "grouped_aggregate_construct_compile": summary(
         groupedAggregateCompileTimes),

@@ -166,6 +166,12 @@ UniPlot also reports internal diagnostics excluded from cross-library ranking:
   UniVector tiles. The same run averaged 14.42 ms (14.32–14.59 ms). SVG, PNG
   and WGPU rendering are excluded; this stage is not compared with competitor
   heatmaps whose aggregation and missing-cell contracts may differ.
+- `numeric_heatmap_construct_compile` constructs a 1,000-by-100 boundary grid
+  and 100,000 finite values, materialises explicit numeric bounds, samples one
+  prepared UniColor ramp and compiles 100,000 UniVector rectangles. On the
+  2026-08-16 Darwin arm64 run it averaged 37.01 ms over five iterations after
+  three warmups (36.58–37.55 ms). SVG, PNG and WGPU rendering are excluded;
+  this measures a dense vector-cell scene, not raster texture upload.
 - `aggregate_groups` groups prepared categorical labels and values into 32
   first-seen compensated means. On the 2026-08-15 Darwin arm64 reference run,
   100,000 observations averaged 3.46 ms over five iterations after three
