@@ -51,7 +51,7 @@ proc main() =
     font = loadTtf("tests/DejaVuSans.ttf")
     size = Size(width: 800, height: 500)
     scene = sampleSpec(pointCount).compileScene(size)
-    backend = openWgpuBackend(libraryPath)
+    backend = openWgpuBackend(libraryPath, preparedCacheCapacity = 2)
   defer: backend.close()
   let capabilities = wgpuCapabilities(backend)
   var preparationTimes, uploadSubmitTimes, submitTimes, frameTimes: RunningStat
@@ -61,29 +61,36 @@ proc main() =
     prepared = scene.prepareWgpuScene(font)
     let preparationMs = elapsedMs(started)
     if iteration >= 3: preparationTimes.push(preparationMs)
-  let alternatePrepared = scene.prepareWgpuScene(font)
+  let
+    alternatePrepared = scene.prepareWgpuScene(font)
+    thirdPrepared = scene.prepareWgpuScene(font)
   let uploadsBefore = backend.wgpuDiagnostics.meshUploads
   for iteration in 0 ..< iterations + 3:
+    let candidate = case iteration mod 3
+      of 0: prepared
+      of 1: alternatePrepared
+      else: thirdPrepared
     let
-      candidate = if (iteration and 1) == 0: prepared else: alternatePrepared
       started = getMonoTime()
     backend.submitWgpuPrepared(candidate)
     let uploadSubmitMs = elapsedMs(started)
     if iteration >= 3: uploadSubmitTimes.push(uploadSubmitMs)
   if backend.wgpuDiagnostics.meshUploads != uploadsBefore +
       uint64(iterations + 3):
-    quit("alternating prepared scenes did not upload exactly once each", 1)
-  # Make one scene resident before measuring upload-free submissions.
+    quit("three prepared scenes in two cache slots did not upload each time", 1)
+  # Make two scenes resident before measuring upload-free alternation.
   backend.submitWgpuPrepared(prepared)
+  backend.submitWgpuPrepared(alternatePrepared)
   let uploadsBeforeWarm = backend.wgpuDiagnostics.meshUploads
   var consumed = 0'u8
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
-    backend.submitWgpuPrepared(prepared)
+    let candidate = if (iteration and 1) == 0: prepared else: alternatePrepared
+    backend.submitWgpuPrepared(candidate)
     let submitMs = elapsedMs(started)
     if iteration >= 3: submitTimes.push(submitMs)
   if backend.wgpuDiagnostics.meshUploads != uploadsBeforeWarm:
-    quit("resident prepared scene was uploaded during warm submission", 1)
+    quit("resident prepared scenes were uploaded during warm submission", 1)
   # The first publication frame drains the ordered submissions above.
   discard backend.renderWgpuPrepared(prepared)
   for iteration in 0 ..< iterations + 3:
@@ -103,11 +110,11 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "last-prepared-scene-v1",
+    "residency": "prepared-lru-2-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
-      "upload_submit": "switch prepared identities, upload, and enqueue",
-      "submit": "enqueue resident prepared geometry without upload/readback",
+      "upload_submit": "cycle three identities through two slots and enqueue",
+      "submit": "alternate two resident identities without upload/readback",
       "publication_frame": "submit resident geometry and read back RGBA8"
     },
     "preparation": summary(preparationTimes),
@@ -115,6 +122,9 @@ proc main() =
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
     "mesh_uploads": backend.wgpuDiagnostics.meshUploads,
+    "prepared_cache_hits": backend.wgpuDiagnostics.preparedCacheHits,
+    "prepared_cache_misses": backend.wgpuDiagnostics.preparedCacheMisses,
+    "prepared_cache_evictions": backend.wgpuDiagnostics.preparedCacheEvictions,
     "guard": consumed
   }
   echo $report

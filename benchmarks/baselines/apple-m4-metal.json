@@ -3,23 +3,23 @@
   "backend": "metal",
   "points": 1000,
   "canvas": "800x500",
-  "residency": "last-prepared-scene-v1",
+  "residency": "prepared-lru-2-v1",
   "repeated_runs": 3,
   "iterations_per_run": 50,
   "preparation": {
-    "mean_ms": 73.89362802666666,
+    "mean_ms": 73.94014804,
     "max_ratio": 1.1
   },
   "upload_submit": {
-    "mean_ms": 0.9807163866666667,
+    "mean_ms": 0.98069332,
     "max_ratio": 1.25
   },
   "submit": {
-    "mean_ms": 0.09249972,
+    "mean_ms": 0.08547556,
     "max_ratio": 2.5
   },
   "publication_frame": {
-    "mean_ms": 3.09700308,
+    "mean_ms": 3.084171153333333,
     "max_ratio": 1.2
   }
 }
