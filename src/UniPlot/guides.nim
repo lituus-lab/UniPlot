@@ -60,6 +60,25 @@ proc arrowPath(startPoint, endPoint: Point; width,
   result = segmentPath(startPoint, base, width)
   result.addPath polygon([endPoint, left, right])
 
+proc boxOutlinePath(centerX, boxWidth, lowerY, firstQuartileY, medianY,
+    thirdQuartileY, upperY, strokeWidth: float32): Path =
+  let
+    left = centerX - boxWidth * 0.5
+    right = centerX + boxWidth * 0.5
+    capLeft = centerX - boxWidth * 0.25
+    capRight = centerX + boxWidth * 0.25
+  for (first, second) in [
+      (Point(x: centerX, y: lowerY), Point(x: centerX, y: firstQuartileY)),
+      (Point(x: centerX, y: thirdQuartileY), Point(x: centerX, y: upperY)),
+      (Point(x: capLeft, y: lowerY), Point(x: capRight, y: lowerY)),
+      (Point(x: capLeft, y: upperY), Point(x: capRight, y: upperY)),
+      (Point(x: left, y: firstQuartileY), Point(x: right, y: firstQuartileY)),
+      (Point(x: right, y: firstQuartileY), Point(x: right, y: thirdQuartileY)),
+      (Point(x: right, y: thirdQuartileY), Point(x: left, y: thirdQuartileY)),
+      (Point(x: left, y: thirdQuartileY), Point(x: left, y: firstQuartileY)),
+      (Point(x: left, y: medianY), Point(x: right, y: medianY))]:
+    result.addPath segmentPath(first, second, strokeWidth)
+
 func mappedShape(index: int): MarkerShape =
   if index > MarkerShape.high.ord:
     raise newException(PlotError, "shape mapping exceeds marker capacity")
@@ -244,13 +263,20 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
       result.xContinuous.addValues(spec.data.numeric(layer.mapping.x))
     else:
       result.xBand.addValues(spec.data.categorical(layer.mapping.x))
-    if layer.mark in {mkErrorBar, mkRibbon}:
+    if layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot}:
       for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
         if mapping notin spec.data.columns or
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
             "uncertainty bounds must reference numeric columns")
         result.yContinuous.addValues(spec.data.numeric(mapping))
+      if layer.mark == mkBoxPlot:
+        for mapping in [layer.mapping.y, layer.mapping.yQ1, layer.mapping.yQ3]:
+          if mapping notin spec.data.columns or
+              spec.data.columns[mapping].kind != ckNumeric:
+            raise newException(PlotError,
+              "box-plot statistics must reference numeric columns")
+          result.yContinuous.addValues(spec.data.numeric(mapping))
     else:
       if layer.mapping.y notin spec.data.columns or
           spec.data.columns[layer.mapping.y].kind != ckNumeric:
@@ -290,7 +316,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       "alpha range must be finite, ordered and within [0, 1]")
   var usesContinuousColors = false
   for layer in spec.layers:
-    let bounded = layer.mark in {mkErrorBar, mkRibbon}
+    let bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot}
     if layer.size < 0 or not layer.size.isFinite:
       raise newException(PlotError,
         "mark size must be finite and non-negative")
@@ -298,6 +324,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         (layer.capWidth < 0 or not layer.capWidth.isFinite):
       raise newException(PlotError,
         "error-bar cap width must be finite and non-negative")
+    if layer.mark == mkBoxPlot and (layer.boxWidth <= 0 or
+        layer.boxWidth > 1 or not layer.boxWidth.isFinite or layer.size <= 0):
+      raise newException(PlotError, "invalid box-plot dimensions")
     if layer.mapping.x notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
     if bounded:
@@ -306,6 +335,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
             "uncertainty bounds must reference numeric columns")
+      if layer.mark == mkBoxPlot:
+        for mapping in [layer.mapping.y, layer.mapping.yQ1, layer.mapping.yQ3]:
+          if mapping notin spec.data.columns or
+              spec.data.columns[mapping].kind != ckNumeric:
+            raise newException(PlotError,
+              "box-plot statistics must reference numeric columns")
     elif layer.mapping.y notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
     elif spec.data.columns[layer.mapping.y].kind != ckNumeric:
@@ -531,10 +566,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           reference.color)
   for layer in spec.layers:
     let
-      bounded = layer.mark in {mkErrorBar, mkRibbon}
-      ys = if bounded: @[] else: spec.data.numeric(layer.mapping.y)
+      bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot}
+      ys = if not bounded or layer.mark == mkBoxPlot:
+        spec.data.numeric(layer.mapping.y) else: @[]
       lowerValues = if bounded: spec.data.numeric(layer.mapping.yMin) else: @[]
       upperValues = if bounded: spec.data.numeric(layer.mapping.yMax) else: @[]
+      firstQuartileValues = if layer.mark == mkBoxPlot:
+        spec.data.numeric(layer.mapping.yQ1) else: @[]
+      thirdQuartileValues = if layer.mark == mkBoxPlot:
+        spec.data.numeric(layer.mapping.yQ3) else: @[]
       numericXs = if xKind == ckNumeric:
         spec.data.numeric(layer.mapping.x)
       else:
@@ -547,6 +587,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     if bounded:
       finiteColumns.add layer.mapping.yMin
       finiteColumns.add layer.mapping.yMax
+      if layer.mark == mkBoxPlot:
+        finiteColumns.add layer.mapping.y
+        finiteColumns.add layer.mapping.yQ1
+        finiteColumns.add layer.mapping.yQ3
     else:
       finiteColumns.add layer.mapping.y
     if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
@@ -564,7 +608,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var lineStyles: seq[LineStyle]
     var labels: seq[string]
     var breakBefore: seq[bool]
-    var lowerPoints, upperPoints: seq[Point]
+    var lowerPoints, upperPoints, firstQuartilePoints, thirdQuartilePoints:
+      seq[Point]
     var categoryColors = initTable[string, Color]()
     let categoricalPaintValues = if paintMapping.len > 0 and
         spec.data.columns[paintMapping].kind == ckCategorical:
@@ -601,7 +646,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     let fallbackSize = if layer.size > 0: layer.size else:
       case layer.mark
       of mkPoint: spec.theme.pointSize
-      of mkLine, mkErrorBar: spec.theme.lineWidth
+      of mkLine, mkErrorBar, mkBoxPlot: spec.theme.lineWidth
       of mkText: 12'f32
       of mkBar, mkArea, mkRibbon: 0'f32
     var pendingBreak = false
@@ -624,12 +669,26 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         if lowerValues[row] > upperValues[row]:
           raise newException(PlotError,
             "uncertainty lower bound exceeds upper bound")
+        if layer.mark == mkBoxPlot and
+            (lowerValues[row] > firstQuartileValues[row] or
+            firstQuartileValues[row] > ys[row] or
+            ys[row] > thirdQuartileValues[row] or
+            thirdQuartileValues[row] > upperValues[row]):
+          raise newException(PlotError,
+            "box-plot statistics must be monotonically ordered")
         let
           lower = Point(x: x, y: yScale.map(lowerValues[row]))
           upper = Point(x: x, y: yScale.map(upperValues[row]))
         lowerPoints.add lower
         upperPoints.add upper
-        points.add Point(x: x, y: (lower.y + upper.y) * 0.5)
+        if layer.mark == mkBoxPlot:
+          points.add Point(x: x, y: yScale.map(ys[row]))
+          firstQuartilePoints.add Point(x: x,
+            y: yScale.map(firstQuartileValues[row]))
+          thirdQuartilePoints.add Point(x: x,
+            y: yScale.map(thirdQuartileValues[row]))
+        else:
+          points.add Point(x: x, y: (lower.y + upper.y) * 0.5)
       else:
         points.add Point(x: x, y: yScale.map(ys[row]))
       if layer.mark in {mkLine, mkArea, mkRibbon}:
@@ -736,6 +795,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
               result.addPath(polygon(ribbon), layer.color, nodeId)
               inc nodeId
             start = stop
+    of mkBoxPlot:
+      let availableWidth = if xKind == ckCategorical: xBand.bandwidth else:
+        max(1'f32, area.width / float32(max(1, points.len)) * 0.8)
+      let boxWidth = availableWidth * layer.boxWidth
+      for index, point in points:
+        let
+          firstQuartileY = firstQuartilePoints[index].y
+          thirdQuartileY = thirdQuartilePoints[index].y
+        var fill = newPath()
+        fill.rect(point.x - boxWidth * 0.5,
+          min(firstQuartileY, thirdQuartileY), boxWidth,
+          abs(thirdQuartileY - firstQuartileY))
+        result.addPath(fill, colors[index].withOpacity(0.18), nodeId)
+        inc nodeId
+        result.addPath(boxOutlinePath(point.x, boxWidth,
+          lowerPoints[index].y, firstQuartileY, point.y, thirdQuartileY,
+          upperPoints[index].y, sizes[index]), colors[index], nodeId)
+        inc nodeId
   for annotation in spec.annotations:
     let startPoint = Point(x: xScale.map(annotation.x),
       y: yScale.map(annotation.y))
@@ -771,7 +848,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
         result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
-      of mkBar, mkArea, mkRibbon:
+      of mkBar, mkArea, mkRibbon, mkBoxPlot:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
         result.addPath(swatch, entry.color)

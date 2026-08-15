@@ -51,3 +51,19 @@ suite "statistics":
       expect PlotError: discard summarize([1.0], -1.0)
     else:
       expect PreConditionDefect: discard summarize([1.0], -1.0)
+
+  test "box-plot recipe retains summaries and outliers as separate layers":
+    let spec = boxPlot(["a", "a", "a", "a", "a", "b", "b"],
+      [1.0, 2.0, 3.0, 4.0, 100.0, 8.0, 9.0])
+    check spec.layers.len == 2
+    check spec.layers[0].mark == mkBoxPlot
+    check spec.layers[1].mark == mkPoint
+    check spec.data.rowCount == 3
+    check spec.data.categorical("category") == @["a", "a", "b"]
+    check spec.data.numeric("outlier")[1] == 100.0
+    discard spec.compileScene()
+    when defined(release):
+      expect PlotError: discard boxPlot(["a"], [1.0, 2.0])
+    else:
+      expect PreConditionDefect: discard boxPlot(["a"], [1.0, 2.0])
+    expect PlotError: discard boxPlot(["empty"], [NaN])

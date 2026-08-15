@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
+import std/tables
 import UniColor
 from UniVector import MarkerShape, CircleMarker, SquareMarker, TriangleMarker,
   DiamondMarker, PlusMarker, CrossMarker
@@ -17,6 +18,7 @@ type
     mkText
     mkErrorBar
     mkRibbon
+    mkBoxPlot
 
   LineStyle* = enum
     SolidLine
@@ -88,6 +90,7 @@ type
   Aes* = object
     x*, y*: string
     yMin*, yMax*: string
+    yQ1*, yQ3*: string
     label*: string
     color*: string
     fill*: string
@@ -106,6 +109,7 @@ type
     lineStyle*: LineStyle
     missingValues*: MissingValuePolicy
     capWidth*: float32
+    boxWidth*: float32
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -196,9 +200,11 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
-    shape = ""; lineStyle = ""; fill = ""; yMin = ""; yMax = ""): Aes =
+    shape = ""; lineStyle = ""; fill = ""; yMin = ""; yMax = "";
+    yQ1 = ""; yQ3 = ""): Aes =
   Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
-    alpha: alpha, shape: shape, lineStyle: lineStyle, yMin: yMin, yMax: yMax)
+    alpha: alpha, shape: shape, lineStyle: lineStyle, yMin: yMin, yMax: yMax,
+    yQ1: yQ1, yQ3: yQ3)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
@@ -211,6 +217,10 @@ proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
       (mapping.yMin.len == 0 or mapping.yMax.len == 0):
     raise newException(PlotError,
       "error bars and ribbons require yMin and yMax mappings")
+  if mark == mkBoxPlot and (mapping.yMin.len == 0 or mapping.yMax.len == 0 or
+      mapping.yQ1.len == 0 or mapping.yQ3.len == 0):
+    raise newException(PlotError,
+      "box plots require whisker and quartile mappings")
   if size < 0 or not size.isFinite:
     raise newException(PlotError, "mark size must be finite and non-negative")
   spec.layers.add Layer(mark: mark, mapping: mapping, color: cssColor(color),
@@ -259,6 +269,21 @@ proc geomRibbon*(spec: var PlotSpec; mapping: Aes; color = "#6699dd80";
   ## Add a filled uncertainty envelope between yMin and yMax.
   spec.addLayer(mkRibbon, mapping, color, legend = legend,
     missingValues = missingValues)
+
+proc geomBoxPlot*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
+    width = 1'f32; boxWidth = 0.65'f32; legend = "";
+    missingValues = DropMissing) {.contractual.} =
+  ## Add precomputed median, quartile and whisker rows as box plots.
+  require:
+    width > 0 and width.isFinite
+    boxWidth > 0 and boxWidth <= 1 and boxWidth.isFinite
+  body:
+    if width <= 0 or not width.isFinite or boxWidth <= 0 or boxWidth > 1 or
+        not boxWidth.isFinite:
+      raise newException(PlotError, "invalid box-plot dimensions")
+    spec.addLayer(mkBoxPlot, mapping, color, width, legend,
+      missingValues = missingValues)
+    spec.layers[^1].boxWidth = boxWidth
 
 proc labels*(spec: var PlotSpec; title = ""; x = ""; y = "") =
   spec.title = title
@@ -502,3 +527,56 @@ proc histogramPlot*(values: openArray[float64]; binCount = 30;
     labels.add tickLabel(bin.lower) & "–" & tickLabel(bin.upper)
     counts.add float64(bin.count)
   result = barPlot(labels, counts, color, legend)
+
+proc boxPlot*(groups: openArray[string]; values: openArray[float64];
+    whiskerLength = 1.5; color = "#3366cc"; outlierColor = "#cc3344";
+    legend = ""): PlotSpec {.contractual.} =
+  ## Summarize finite values per first-seen group and retain outlier points.
+  require:
+    groups.len == values.len
+    groups.len > 0
+    whiskerLength.isFinite and whiskerLength >= 0
+  body:
+    if groups.len != values.len or groups.len == 0 or
+        not whiskerLength.isFinite or whiskerLength < 0:
+      raise newException(PlotError, "invalid grouped box-plot input")
+    var grouped = initOrderedTable[string, seq[float64]]()
+    for index, group in groups:
+      if group.len == 0:
+        raise newException(PlotError, "box-plot group names cannot be empty")
+      if group notin grouped: grouped[group] = @[]
+      if values[index].isFinite: grouped[group].add values[index]
+    var categories: seq[string]
+    var medians, firstQuartiles, thirdQuartiles, lowerWhiskers,
+      upperWhiskers, outliers: seq[float64]
+    template addRow(category: string; median, q1, q3, lower, upper,
+        outlier: float64) =
+      categories.add category
+      medians.add median
+      firstQuartiles.add q1
+      thirdQuartiles.add q3
+      lowerWhiskers.add lower
+      upperWhiskers.add upper
+      outliers.add outlier
+    for group, samples in grouped:
+      if samples.len == 0:
+        raise newException(PlotError,
+          "every box-plot group requires a finite sample")
+      let summary = summarize(samples, whiskerLength)
+      addRow(group, summary.median, summary.firstQuartile,
+        summary.thirdQuartile, summary.lowerWhisker, summary.upperWhisker, NaN)
+      for outlier in summary.outliers:
+        addRow(group, NaN, NaN, NaN, NaN, NaN, outlier)
+    var frame = initDataFrame()
+    frame.addColumn("category", categories)
+    frame.addColumn("median", medians)
+    frame.addColumn("firstQuartile", firstQuartiles)
+    frame.addColumn("thirdQuartile", thirdQuartiles)
+    frame.addColumn("lowerWhisker", lowerWhiskers)
+    frame.addColumn("upperWhisker", upperWhiskers)
+    frame.addColumn("outlier", outliers)
+    result = plot(frame)
+    result.geomBoxPlot(aes("category", "median", yMin = "lowerWhisker",
+      yMax = "upperWhisker", yQ1 = "firstQuartile",
+      yQ3 = "thirdQuartile"), color, legend = legend)
+    result.geomPoint(aes("category", "outlier"), outlierColor, radius = 3)

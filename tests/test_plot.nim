@@ -190,6 +190,19 @@ suite "plot compilation":
       expect PreConditionDefect: spec.annotateText(1.0, 1.0, "")
       expect PreConditionDefect: spec.annotateArrow(1.0, 1.0, 1.0, 1.0)
 
+  test "box plots reject unordered precomputed statistics":
+    var frame = initDataFrame()
+    frame.addColumn("group", ["a"])
+    frame.addColumn("median", [2.0])
+    frame.addColumn("q1", [3.0])
+    frame.addColumn("q3", [4.0])
+    frame.addColumn("lower", [1.0])
+    frame.addColumn("upper", [5.0])
+    var spec = plot(frame)
+    spec.geomBoxPlot(aes("group", "median", yMin = "lower", yMax = "upper",
+      yQ1 = "q1", yQ3 = "q3"))
+    expect PlotError: discard spec.compileScene()
+
   test "references reject invalid values and categorical x coordinates":
     var spec = sample()
     when defined(release):
