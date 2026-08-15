@@ -14,10 +14,11 @@ proc summary(samples: RunningStat): JsonNode =
 
 proc checkBaseline(report: JsonNode; path: string) =
   let baseline = parseFile(path)
-  for field in ["adapter", "backend", "points", "canvas"]:
+  for field in ["adapter", "backend", "points", "canvas", "residency"]:
     if baseline[field] != report[field]:
       quit("WGPU baseline does not match current " & field, 1)
-  for phase in ["preparation", "submit", "publication_frame"]:
+  for phase in ["preparation", "upload_submit", "submit",
+      "publication_frame"]:
     let
       expected = baseline[phase]["mean_ms"].getFloat
       maxRatio = baseline[phase]["max_ratio"].getFloat
@@ -53,19 +54,36 @@ proc main() =
     backend = openWgpuBackend(libraryPath)
   defer: backend.close()
   let capabilities = wgpuCapabilities(backend)
-  var preparationTimes, submitTimes, frameTimes: RunningStat
+  var preparationTimes, uploadSubmitTimes, submitTimes, frameTimes: RunningStat
   var prepared: WgpuPreparedScene
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
     prepared = scene.prepareWgpuScene(font)
     let preparationMs = elapsedMs(started)
     if iteration >= 3: preparationTimes.push(preparationMs)
+  let alternatePrepared = scene.prepareWgpuScene(font)
+  let uploadsBefore = backend.wgpuDiagnostics.meshUploads
+  for iteration in 0 ..< iterations + 3:
+    let
+      candidate = if (iteration and 1) == 0: prepared else: alternatePrepared
+      started = getMonoTime()
+    backend.submitWgpuPrepared(candidate)
+    let uploadSubmitMs = elapsedMs(started)
+    if iteration >= 3: uploadSubmitTimes.push(uploadSubmitMs)
+  if backend.wgpuDiagnostics.meshUploads != uploadsBefore +
+      uint64(iterations + 3):
+    quit("alternating prepared scenes did not upload exactly once each", 1)
+  # Make one scene resident before measuring upload-free submissions.
+  backend.submitWgpuPrepared(prepared)
+  let uploadsBeforeWarm = backend.wgpuDiagnostics.meshUploads
   var consumed = 0'u8
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
     backend.submitWgpuPrepared(prepared)
     let submitMs = elapsedMs(started)
     if iteration >= 3: submitTimes.push(submitMs)
+  if backend.wgpuDiagnostics.meshUploads != uploadsBeforeWarm:
+    quit("resident prepared scene was uploaded during warm submission", 1)
   # The first publication frame drains the ordered submissions above.
   discard backend.renderWgpuPrepared(prepared)
   for iteration in 0 ..< iterations + 3:
@@ -74,6 +92,8 @@ proc main() =
     let frameMs = elapsedMs(started)
     consumed = consumed xor pixels[(iteration * 4) mod pixels.len]
     if iteration >= 3: frameTimes.push(frameMs)
+  if backend.wgpuDiagnostics.meshUploads != uploadsBeforeWarm:
+    quit("resident prepared scene was uploaded during publication", 1)
   let report = %*{
     "provider": "UniPlot-WGPU",
     "wgpu_native": WgpuNativeTargetVersion,
@@ -83,14 +103,18 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
+    "residency": "last-prepared-scene-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
-      "submit": "upload retained geometry and enqueue without readback",
-      "publication_frame": "upload retained geometry, submit and read back RGBA8"
+      "upload_submit": "switch prepared identities, upload, and enqueue",
+      "submit": "enqueue resident prepared geometry without upload/readback",
+      "publication_frame": "submit resident geometry and read back RGBA8"
     },
     "preparation": summary(preparationTimes),
+    "upload_submit": summary(uploadSubmitTimes),
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
+    "mesh_uploads": backend.wgpuDiagnostics.meshUploads,
     "guard": consumed
   }
   echo $report
