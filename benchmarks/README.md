@@ -69,6 +69,13 @@ They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other
 libraries.
 
+The transformed/reversed-axis change was checked on the same 2026-08-15
+100,000-point reference workload: default linear construction averaged
+21.42 ms and continuous-colour construction 31.39 ms over 10 iterations,
+against 21.45 ms and 31.45 ms immediately before the change. The differences
+are within run-to-run noise; this records absence of a detected regression, not
+a performance improvement.
+
 These stages align user intent, not internal work. Matplotlib may defer work to
 `savefig`, while UniPlot performs layout in `compileScene`; timings must not be
 interpreted as identical instruction sets. Results are evidence for regression

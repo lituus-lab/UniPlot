@@ -64,7 +64,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.
 - [x] Continuous colour maps, discrete palettes and colour bars.
-- [ ] Date/time, duration, transformed, reversed and polar coordinates.
+- [x] Logarithmic transformed and reversed Cartesian axes.
+- [ ] Date/time, duration, additional transforms and polar coordinates.
 - [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.
 - [ ] Statistical transforms: binning variants, smoothing, aggregation,
   quantiles and confidence intervals.

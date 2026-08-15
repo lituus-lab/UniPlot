@@ -17,6 +17,7 @@ custom guides, adapters and inspection.
 nbCode:
   import std/math
   import UniPlot
+  import UniGlyph
 
   let linear = continuousScale(0.0, 100.0, 70'f32, 670'f32)
   let logarithmic = continuousScale(1.0, 1000.0, 0'f32, 1'f32, skLog10)
@@ -34,6 +35,30 @@ ordinary interpolation; `skLog10` requires a positive domain and positive
 mapped values. `trainContinuous` ignores non-finite samples and pads a constant
 domain. `ticks` requires at least two ticks; `tickLabel` selects compact or
 scientific notation.
+
+## Plot-level transformed and reversed axes
+"""
+
+nbCode:
+  var transformed = linePlot([1.0, 10.0, 100.0, 1000.0],
+    [1.0, 4.0, 16.0, 64.0], color = "#7a3db8")
+  transformed.geomPoint(aes("x", "y"), color = "#d65f2d", radius = 5)
+  transformed.scaleX(skLog10, reversed = true)
+  transformed.scaleY(skLog10)
+  transformed.labels(title = "Logarithmic x, reversed",
+    x = "frequency", y = "power")
+  let transformedSvg = transformed.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(transformedSvg,
+  "A real scene using a logarithmic, reversed x coordinate and logarithmic y.")
+
+nbText: """
+`scaleX` and `scaleY` select `skLinear` or `skLog10` and independently reverse
+the output direction. Logarithmic coordinates reject non-positive mapped
+values. Categorical x coordinates remain linear; bars and areas reject a
+logarithmic y coordinate because their current semantic baseline is zero.
 
 ## Categorical band scales
 """
@@ -74,4 +99,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html")
+validatePage("scales_stats.html", minSvg = 1)
