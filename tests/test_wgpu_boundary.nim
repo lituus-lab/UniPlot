@@ -105,7 +105,7 @@ suite "WGPU boundary":
       var styledSpec = plot(styledFrame)
       styledSpec.geomLine(aes("x", "y"), color = "#3366cc", width = 2,
         lineStyle = DotDashLine)
-      styledSpec.geomPoint(aes("x", "y"), color = "#cc3344", radius = 3,
+      styledSpec.geomPoint(aes("x", "y", color = "x"), radius = 3,
         shape = DiamondMarker)
       let styledSize = Size(width: 320, height: 240)
       let styledPrepared = styledSpec.compileScene(styledSize).prepareWgpuScene(
