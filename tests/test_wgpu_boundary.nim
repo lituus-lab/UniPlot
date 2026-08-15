@@ -34,7 +34,10 @@ suite "WGPU boundary":
       check backend.state == wbsReady
       check wgpuCapabilities(backend).available
       check wgpuCapabilities(backend).storageBuffers
-      backend.clearWgpuTarget(Size(width: 17, height: 9),
+      let pixels = backend.readWgpuClearTarget(Size(width: 17, height: 9),
         parseColor("#204060").get)
+      check pixels.len == 17 * 9 * 4
+      for offset in countup(0, pixels.high, 4):
+        check pixels[offset .. offset + 3] == @[32'u8, 64, 96, 255]
       backend.close()
       check backend.state == wbsUnavailable

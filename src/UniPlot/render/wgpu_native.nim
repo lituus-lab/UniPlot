@@ -41,6 +41,29 @@ type
     colorAttachments: ptr WgpuRenderPassColorAttachment
     depthStencilAttachment, occlusionQuerySet, timestampWrites: pointer
 
+  WgpuBufferDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+    usage, size: uint64
+    mappedAtCreation: uint32
+
+  WgpuOrigin3D {.bycopy.} = object
+    x, y, z: uint32
+
+  WgpuTexelCopyBufferLayout {.bycopy.} = object
+    offset: uint64
+    bytesPerRow, rowsPerImage: uint32
+
+  WgpuTexelCopyBufferInfo {.bycopy.} = object
+    layout: WgpuTexelCopyBufferLayout
+    buffer: pointer
+
+  WgpuTexelCopyTextureInfo {.bycopy.} = object
+    texture: pointer
+    mipLevel: uint32
+    origin: WgpuOrigin3D
+    aspect: uint32
+
   WgpuRequestDeviceCallback = proc(status: uint32; device: pointer;
       message: WgpuStringView; userdata1, userdata2: pointer) {.cdecl.}
 
@@ -48,6 +71,15 @@ type
     nextInChain: pointer
     mode: uint32
     callback: WgpuRequestDeviceCallback
+    userdata1, userdata2: pointer
+
+  WgpuBufferMapCallback = proc(status: uint32; message: WgpuStringView;
+      userdata1, userdata2: pointer) {.cdecl.}
+
+  WgpuBufferMapCallbackInfo {.bycopy.} = object
+    nextInChain: pointer
+    mode: uint32
+    callback: WgpuBufferMapCallback
     userdata1, userdata2: pointer
 
   CreateInstanceProc = proc(descriptor: pointer): pointer {.cdecl.}
@@ -72,10 +104,24 @@ type
       descriptor: pointer): pointer {.cdecl.}
   SubmitProc = proc(queue: pointer; count: csize_t;
       commands: ptr pointer) {.cdecl.}
+  CreateBufferProc = proc(device: pointer;
+      descriptor: ptr WgpuBufferDescriptor): pointer {.cdecl.}
+  CopyTextureToBufferProc = proc(encoder: pointer;
+      source: ptr WgpuTexelCopyTextureInfo;
+      destination: ptr WgpuTexelCopyBufferInfo;
+      copySize: ptr WgpuExtent3D) {.cdecl.}
+  MapBufferProc = proc(buffer: pointer; mode: uint64; offset, size: csize_t;
+      callbackInfo: WgpuBufferMapCallbackInfo): WgpuFuture {.cdecl.}
+  GetMappedRangeProc = proc(buffer: pointer; offset,
+      size: csize_t): pointer {.cdecl.}
+  UnmapBufferProc = proc(buffer: pointer) {.cdecl.}
 
   DeviceRequest = object
     status: Atomic[uint32]
     device: pointer
+
+  MapRequest = object
+    status: Atomic[uint32]
 
   NativeWgpuRuntime* = ref object
     library: LibHandle
@@ -94,6 +140,11 @@ const
   TextureFormatRgba8Unorm = 0x16'u32
   LoadOpClear = 2'u32
   StoreOpStore = 1'u32
+  BufferUsageMapRead = 0x1'u64
+  BufferUsageCopyDst = 0x8'u64
+  MapModeRead = 0x1'u64
+  MapSuccess = 1'u32
+  TextureAspectAll = 1'u32
 
 proc loadSymbol[T](library: LibHandle; name: string): T =
   let address = library.symAddr(name)
@@ -108,6 +159,12 @@ proc receiveDevice(status: uint32; device: pointer; message: WgpuStringView;
   let request = cast[ptr DeviceRequest](userdata1)
   request.device = device
   request.status.store(status, moRelease)
+
+proc receiveMap(status: uint32; message: WgpuStringView;
+                userdata1, userdata2: pointer) {.cdecl.} =
+  discard message
+  discard userdata2
+  cast[ptr MapRequest](userdata1).status.store(status, moRelease)
 
 proc close*(runtime: NativeWgpuRuntime) =
   if runtime.isNil: return
@@ -203,9 +260,9 @@ proc supportsTimestampQueries*(runtime: NativeWgpuRuntime): bool =
   not runtime.isNil and runtime.adapter != nil and runtime.hasFeature != nil and
     runtime.hasFeature(runtime.adapter, FeatureTimestampQuery) != 0
 
-proc submitClear*(runtime: NativeWgpuRuntime; width, height: uint32;
-                  red, green, blue, alpha: float64) =
-  ## Submit an actual offscreen render pass to the native queue.
+proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
+                        red, green, blue, alpha: float64): seq[byte] =
+  ## Render, read back, and remove WebGPU's per-row copy padding.
   if runtime.isNil or runtime.device == nil or runtime.queue == nil:
     raise newException(LibraryError, "wgpu-native runtime is not ready")
   if width == 0 or height == 0:
@@ -234,6 +291,20 @@ proc submitClear*(runtime: NativeWgpuRuntime; width, height: uint32;
         "wgpuRenderPassEncoderRelease")
     releaseCommand = loadSymbol[ReleaseProc](runtime.library,
         "wgpuCommandBufferRelease")
+    createBuffer = loadSymbol[CreateBufferProc](runtime.library,
+        "wgpuDeviceCreateBuffer")
+    copyTextureToBuffer = loadSymbol[CopyTextureToBufferProc](runtime.library,
+        "wgpuCommandEncoderCopyTextureToBuffer")
+    mapBuffer = loadSymbol[MapBufferProc](runtime.library,
+        "wgpuBufferMapAsync")
+    getMappedRange = loadSymbol[GetMappedRangeProc](runtime.library,
+        "wgpuBufferGetConstMappedRange")
+    unmapBuffer = loadSymbol[UnmapBufferProc](runtime.library,
+        "wgpuBufferUnmap")
+    processEvents = loadSymbol[ProcessEventsProc](runtime.library,
+        "wgpuInstanceProcessEvents")
+    releaseBuffer = loadSymbol[ReleaseProc](runtime.library,
+        "wgpuBufferRelease")
   let emptyLabel = WgpuStringView(data: "".cstring, length: 0)
   var textureDescriptor = WgpuTextureDescriptor(
     label: emptyLabel,
@@ -271,9 +342,56 @@ proc submitClear*(runtime: NativeWgpuRuntime; width, height: uint32;
     raise newException(LibraryError, "wgpu-native did not create a render pass")
   endPass(renderPass)
   releasePass(renderPass)
+  let unpaddedRow = uint64(width) * 4'u64
+  let paddedRow = (unpaddedRow + 255'u64) and not 255'u64
+  if paddedRow > uint64(high(uint32)) or
+      paddedRow > uint64(high(int)) div uint64(height):
+    raise newException(LibraryError, "WGPU readback size exceeds host limits")
+  let bufferSize = paddedRow * uint64(height)
+  var bufferDescriptor = WgpuBufferDescriptor(label: emptyLabel,
+    usage: BufferUsageMapRead or BufferUsageCopyDst, size: bufferSize)
+  let readback = createBuffer(runtime.device, addr bufferDescriptor)
+  if readback == nil:
+    raise newException(LibraryError, "wgpu-native did not create a readback buffer")
+  defer: releaseBuffer(readback)
+  var source = WgpuTexelCopyTextureInfo(texture: texture,
+    aspect: TextureAspectAll)
+  var destination = WgpuTexelCopyBufferInfo(
+    layout: WgpuTexelCopyBufferLayout(bytesPerRow: uint32(paddedRow),
+      rowsPerImage: height), buffer: readback)
+  var copySize = WgpuExtent3D(width: width, height: height,
+    depthOrArrayLayers: 1)
+  copyTextureToBuffer(encoder, addr source, addr destination, addr copySize)
   let command = finishEncoder(encoder, nil)
   if command == nil:
     raise newException(LibraryError, "wgpu-native did not create a command buffer")
   defer: releaseCommand(command)
   var submittedCommand = command
   submit(runtime.queue, 1, addr submittedCommand)
+  let request = cast[ptr MapRequest](allocShared0(sizeof(MapRequest)))
+  if request == nil:
+    raise newException(LibraryError, "cannot allocate WGPU map state")
+  discard mapBuffer(readback, MapModeRead, 0, csize_t(bufferSize),
+    WgpuBufferMapCallbackInfo(mode: CallbackAllowProcessEvents,
+      callback: receiveMap, userdata1: request))
+  var attempts = 0
+  while request.status.load(moAcquire) == 0'u32 and attempts < 10_000:
+    processEvents(runtime.instance)
+    inc attempts
+    sleep(1)
+  let mapStatus = request.status.load(moAcquire)
+  deallocShared(request)
+  if mapStatus == 0'u32:
+    raise newException(LibraryError, "wgpu-native buffer mapping timed out")
+  if mapStatus != MapSuccess:
+    raise newException(LibraryError, "wgpu-native buffer mapping failed")
+  let mapped = getMappedRange(readback, 0, csize_t(bufferSize))
+  if mapped == nil:
+    raise newException(LibraryError, "wgpu-native returned no mapped data")
+  defer: unmapBuffer(readback)
+  let outputSize = int(unpaddedRow * uint64(height))
+  result = newSeq[byte](outputSize)
+  let sourceBytes = cast[ptr UncheckedArray[byte]](mapped)
+  for row in 0 ..< int(height):
+    copyMem(addr result[row * int(unpaddedRow)],
+      unsafeAddr sourceBytes[row * int(paddedRow)], int(unpaddedRow))

@@ -83,9 +83,9 @@ proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
     result.storageBuffers = true
     result.timestampQueries = backend.runtime.supportsTimestampQueries()
 
-proc clearWgpuTarget*(backend: WgpuBackend; size: Size;
-    color: Color) {.contractual.} =
-  ## Submit a real offscreen render pass that clears an RGBA8 texture.
+proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
+    color: Color): seq[byte] {.contractual.} =
+  ## Clear an offscreen RGBA8 texture and read its unpadded pixels back.
   require:
     not backend.isNil and backend.state == wbsReady
     size.width > 0 and size.height > 0
@@ -103,7 +103,12 @@ proc clearWgpuTarget*(backend: WgpuBackend; size: Size;
       raise newException(WgpuError, "cannot convert WGPU clear color to sRGB")
     let rgba = converted.get
     try:
-      backend.runtime.submitClear(uint32(size.width), uint32(size.height),
+      result = backend.runtime.renderClearPixels(uint32(size.width),
+        uint32(size.height),
         rgba.comp(0), rgba.comp(1), rgba.comp(2), rgba.alpha)
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
+
+proc clearWgpuTarget*(backend: WgpuBackend; size: Size; color: Color) =
+  ## Submit a real offscreen render pass, discarding its validation readback.
+  discard backend.readWgpuClearTarget(size, color)
