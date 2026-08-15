@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2026 lituus-lab */
 #include "UniPlot.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,9 +13,10 @@ static int write_bytes(const char *path, const uint8_t *data, size_t length) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 10) {
+  if (argc != 12) {
     fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg "
-                    "BOX.png HEAT.svg HEAT.png HIST.svg HIST.png\n");
+                    "BOX.png HEAT.svg HEAT.png HIST.svg HIST.png "
+                    "GROUPED.svg GROUPED.png\n");
     return EXIT_FAILURE;
   }
   const double x[] = {0, 1, 2, 3, 4, 5};
@@ -30,6 +32,8 @@ int main(int argc, char **argv) {
   uint8_t *heat_png = NULL;
   uint8_t *histogram_svg = NULL;
   uint8_t *histogram_png = NULL;
+  uint8_t *grouped_svg = NULL;
+  uint8_t *grouped_png = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
   size_t json_length = 0;
@@ -39,8 +43,11 @@ int main(int argc, char **argv) {
   size_t heat_png_length = 0;
   size_t histogram_svg_length = 0;
   size_t histogram_png_length = 0;
+  size_t grouped_svg_length = 0;
+  size_t grouped_png_length = 0;
   uplot_plot *heatmap = NULL;
   uplot_plot *histogram = NULL;
+  uplot_plot *grouped = NULL;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -125,6 +132,22 @@ int main(int argc, char **argv) {
       !write_bytes(argv[8], histogram_svg, histogram_svg_length) ||
       !write_bytes(argv[9], histogram_png, histogram_png_length))
     goto cleanup;
+  const char *aggregate_groups[] = {"beta", "alpha", "beta", "empty",
+                                    "alpha"};
+  const double aggregate_values[] = {1.0, 4.0, 3.0, NAN, 8.0};
+  grouped = uplot_plot_new(760, 440);
+  if (grouped == NULL ||
+      uplot_add_grouped_aggregate(grouped, aggregate_groups,
+                                  aggregate_values, 5, UPLOT_AGG_MEAN,
+                                  "#9b4d96") != UPLOT_OK ||
+      uplot_set_title(grouped, "C grouped mean") != UPLOT_OK ||
+      uplot_render_svg(grouped, argv[1], &grouped_svg,
+                       &grouped_svg_length) != UPLOT_OK ||
+      uplot_render_png(grouped, argv[1], &grouped_png,
+                       &grouped_png_length) != UPLOT_OK ||
+      !write_bytes(argv[10], grouped_svg, grouped_svg_length) ||
+      !write_bytes(argv[11], grouped_png, grouped_png_length))
+    goto cleanup;
   result = EXIT_SUCCESS;
 
 cleanup:
@@ -137,8 +160,11 @@ cleanup:
   uplot_buffer_free(heat_png, heat_png_length);
   uplot_buffer_free(histogram_svg, histogram_svg_length);
   uplot_buffer_free(histogram_png, histogram_png_length);
+  uplot_buffer_free(grouped_svg, grouped_svg_length);
+  uplot_buffer_free(grouped_png, grouped_png_length);
   uplot_plot_free(heatmap);
   uplot_plot_free(histogram);
+  uplot_plot_free(grouped);
   uplot_plot_free(plot);
   return result;
 }

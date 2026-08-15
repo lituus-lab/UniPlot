@@ -7,13 +7,13 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 10:
+    if len(sys.argv) != 12:
         raise SystemExit(
             "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
-            "HEAT.svg HEAT.png HIST.svg HIST.png")
+            "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png")
     (font, svg_path, png_path, box_svg_path, box_png_path,
      heat_svg_path, heat_png_path, histogram_svg_path,
-     histogram_png_path) = map(
+     histogram_png_path, grouped_svg_path, grouped_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -63,6 +63,14 @@ def main() -> int:
                  .title("Python explicit histogram breaks"))
     histogram_svg_path.write_bytes(histogram.svg(font))
     histogram_png_path.write_bytes(histogram.png(font))
+    grouped = (uniplot.Plot(760, 440)
+               .aggregate(
+                   ["beta", "alpha", "beta", "empty", "alpha"],
+                   [1.0, 4.0, 3.0, float("nan"), 8.0],
+                   aggregation=uniplot.AGG_MEAN, color="#9b4d96")
+               .title("Python grouped mean"))
+    grouped_svg_path.write_bytes(grouped.svg(font))
+    grouped_png_path.write_bytes(grouped.png(font))
     return 0
 
 

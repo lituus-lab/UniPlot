@@ -124,6 +124,9 @@ int main(void) {
   boundaries into a categorical histogram on an empty handle. Values outside
   the supplied domain are excluded and the final boundary is included. Bars
   have equal screen width even when numeric intervals differ.
+- `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
+  first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
+  observations are excluded and the builder requires an empty handle.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
@@ -152,6 +155,8 @@ let
   cHeatPng = pngDataUri(readFile("../assets/generated/c_heatmap.png"))
   cHistogramSvg = readFile("../assets/generated/c_histogram.svg")
   cHistogramPng = pngDataUri(readFile("../assets/generated/c_histogram.png"))
+  cGroupedSvg = readFile("../assets/generated/c_grouped.svg")
+  cGroupedPng = pngDataUri(readFile("../assets/generated/c_grouped.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
@@ -165,8 +170,12 @@ nbRawHtml gallery([
   svgFigure(cHistogramSvg,
     "An explicit-break histogram built through the C ABI."),
   pngFigure(cHistogramPng, "The same C histogram as an embedded PNG.",
-    "An explicit-break histogram rendered through the UniPlot C ABI")
+    "An explicit-break histogram rendered through the UniPlot C ABI"),
+  svgFigure(cGroupedSvg,
+    "First-seen grouped means built through `uplot_add_grouped_aggregate`."),
+  pngFigure(cGroupedPng, "The same grouped aggregate as an embedded PNG.",
+    "Grouped means rendered through the UniPlot C ABI")
 ])
 
 nbSave
-validatePage("c_binding.html", minSvg = 4, requirePng = true)
+validatePage("c_binding.html", minSvg = 5, requirePng = true)

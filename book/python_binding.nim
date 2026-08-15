@@ -87,6 +87,9 @@ copying it.
 - `histogram(values, breaks, color="#3366cc")` builds explicit lower-inclusive
   bins on an empty `Plot`; the last supplied boundary is included. Interval
   labels retain the boundaries while categorical bars use equal screen widths.
+- `aggregate(groups, values, aggregation=AGG_MEAN, color="#3366cc")`
+  computes a first-seen categorical count, sum, mean, minimum or maximum on an
+  empty `Plot`. Non-finite observations do not contribute.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
@@ -137,6 +140,9 @@ let
   pythonHistogramSvg = readFile("../assets/generated/python_histogram.svg")
   pythonHistogramPng = pngDataUri(
     readFile("../assets/generated/python_histogram.png"))
+  pythonGroupedSvg = readFile("../assets/generated/python_grouped.svg")
+  pythonGroupedPng = pngDataUri(
+    readFile("../assets/generated/python_grouped.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
@@ -151,8 +157,13 @@ nbRawHtml gallery([
     "An explicit-break histogram built through `Plot.histogram`."),
   pngFigure(pythonHistogramPng,
     "The same Python histogram as an embedded PNG.",
-    "An explicit-break histogram rendered through the Python binding")
+    "An explicit-break histogram rendered through the Python binding"),
+  svgFigure(pythonGroupedSvg,
+    "First-seen grouped means built through `Plot.aggregate`."),
+  pngFigure(pythonGroupedPng,
+    "The same Python grouped aggregate as an embedded PNG.",
+    "Grouped means rendered through the Python binding")
 ])
 
 nbSave
-validatePage("python_binding.html", minSvg = 4, requirePng = true)
+validatePage("python_binding.html", minSvg = 5, requirePng = true)
