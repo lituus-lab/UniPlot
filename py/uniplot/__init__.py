@@ -18,6 +18,8 @@ from ._core import (
     MISSING_REJECT,
     Plot,
     abi_version,
+    grid_png,
+    grid_svg,
     version,
 )
 
@@ -27,5 +29,5 @@ __all__ = [
     "LINE_SOLID", "MARKER_CIRCLE", "MARKER_CROSS", "MARKER_DIAMOND",
     "MARKER_PLUS", "MARKER_SQUARE", "MARKER_TRIANGLE", "Plot",
     "MISSING_BREAK", "MISSING_DROP", "MISSING_REJECT",
-    "abi_version", "version", "__version__",
+    "abi_version", "grid_png", "grid_svg", "version", "__version__",
 ]

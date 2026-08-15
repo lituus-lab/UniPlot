@@ -30,6 +30,10 @@ cdef extern from "UniPlot.h":
     int uplot_set_title(uplot_plot *, const char *)
     int uplot_render_png(uplot_plot *, const char *, uint8_t **, size_t *)
     int uplot_render_svg(uplot_plot *, const char *, uint8_t **, size_t *)
+    int uplot_render_grid_svg(uplot_plot **, size_t, int, int, int, int,
+                               const char *, uint8_t **, size_t *)
+    int uplot_render_grid_png(uplot_plot **, size_t, int, int, int, int,
+                               const char *, uint8_t **, size_t *)
     void uplot_buffer_free(void *, size_t)
     void uplot_plot_free(uplot_plot *)
 
@@ -148,6 +152,50 @@ cdef class Plot:
 
     def svg(self, font): return self._render(font, True)
     def png(self, font): return self._render(font, False)
+
+cdef bytes _render_grid(plots, font, int columns, int width, int height,
+                        int gap, bint svg):
+    cdef Py_ssize_t count = len(plots)
+    cdef uplot_plot **handles
+    cdef Py_ssize_t index
+    cdef bytes encoded = str(font).encode("utf-8")
+    cdef uint8_t *output = NULL
+    cdef size_t length = 0
+    cdef int status
+    if count == 0:
+        raise ValueError("plot grid requires at least one plot")
+    handles = <uplot_plot **>malloc(count * sizeof(uplot_plot *))
+    if handles == NULL:
+        raise MemoryError()
+    try:
+        for index in range(count):
+            if not isinstance(plots[index], Plot):
+                raise TypeError("plot grid entries must be Plot instances")
+            handles[index] = (<Plot>plots[index])._handle
+        if svg:
+            status = uplot_render_grid_svg(handles, count, columns, width,
+                                            height, gap, encoded, &output,
+                                            &length)
+        else:
+            status = uplot_render_grid_png(handles, count, columns, width,
+                                            height, gap, encoded, &output,
+                                            &length)
+        if status == 1:
+            raise ValueError("invalid plot grid arguments")
+        if status != 0:
+            raise RuntimeError("plot grid render failed")
+        return PyBytes_FromStringAndSize(<char *>output, length)
+    finally:
+        free(handles)
+        uplot_buffer_free(output, length)
+
+def grid_svg(plots, font, int columns, int width=1200, int height=800,
+             int gap=16):
+    return _render_grid(plots, font, columns, width, height, gap, True)
+
+def grid_png(plots, font, int columns, int width=1200, int height=800,
+             int gap=16):
+    return _render_grid(plots, font, columns, width, height, gap, False)
 
 def version(): return uplot_version().decode("ascii")
 def abi_version(): return uplot_abi_version()

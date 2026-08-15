@@ -16,6 +16,22 @@ def test_plot_renders_svg_and_png():
     assert plot.svg(FONT).startswith(b"<svg")
     assert plot.png(FONT).startswith(b"\x89PNG")
 
+def test_plot_grid_renders_svg_and_png():
+    first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
+    second = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3]).title("second")
+    assert uniplot.grid_svg(
+        [first, second], FONT, columns=2, width=656,
+        height=240).startswith(b"<svg")
+    assert uniplot.grid_png(
+        [first, second], FONT, columns=2, width=656,
+        height=240).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        uniplot.grid_svg([], FONT, columns=1)
+    with pytest.raises(ValueError):
+        uniplot.grid_svg([first], FONT, columns=0)
+    with pytest.raises(TypeError):
+        uniplot.grid_svg([first, object()], FONT, columns=2)
+
 def test_series_shape_is_checked():
     with pytest.raises(ValueError):
         uniplot.Plot().line([1], [1, 2])
