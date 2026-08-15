@@ -225,22 +225,25 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if legendRows > 0 and float32(legendRows * 24) > area.height:
     raise newException(PlotError, "legend does not fit the drawing height")
   let xKind = spec.data.columns[spec.layers[0].mapping.x].kind
-  var allX, allY: seq[float64]
-  var allCategories: seq[string]
+  var xDomain = initContinuousDomain()
+  var xBandDomain = initBandDomain()
+  var yDomain = initContinuousDomain()
   var includeZero = false
   for layer in spec.layers:
     if spec.data.columns[layer.mapping.x].kind != xKind:
       raise newException(PlotError, "all x mappings must use the same column kind")
-    if xKind == ckNumeric: allX.add spec.data.numeric(layer.mapping.x)
-    else: allCategories.add spec.data.categorical(layer.mapping.x)
-    allY.add spec.data.numeric(layer.mapping.y)
+    if xKind == ckNumeric:
+      xDomain.addValues(spec.data.numeric(layer.mapping.x))
+    else:
+      xBandDomain.addValues(spec.data.categorical(layer.mapping.x))
+    yDomain.addValues(spec.data.numeric(layer.mapping.y))
     includeZero = includeZero or layer.mark in {mkBar, mkArea}
-  if includeZero: allY.add 0.0
+  if includeZero: yDomain.addValues([0.0])
   var xScale: ContinuousScale
   var xBand: BandScale
-  if xKind == ckNumeric: xScale = trainContinuous(allX, area.xMin, area.xMax)
-  else: xBand = trainBand(allCategories, area.xMin, area.xMax)
-  let yScale = trainContinuous(allY, area.yMax, area.yMin)
+  if xKind == ckNumeric: xScale = xDomain.train(area.xMin, area.xMax)
+  else: xBand = xBandDomain.train(area.xMin, area.xMax)
+  let yScale = yDomain.train(area.yMax, area.yMin)
   var nodeId = 1'u64
   if xKind == ckNumeric:
     for value in xScale.ticks():
