@@ -100,8 +100,8 @@ suite "WGPU boundary":
         @[255'u8, 0, 0, 255]
       check scenePixels.anyIt(it != 255'u8)
       var styledFrame = initDataFrame()
-      styledFrame.addColumn("x", [0.0, 1.0, 2.0])
-      styledFrame.addColumn("y", [1.0, 2.0, 1.0])
+      styledFrame.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
+      styledFrame.addColumn("y", [1.0, 2.0, NaN, 2.0, 1.0])
       var styledSpec = plot(styledFrame)
       styledSpec.geomLine(aes("x", "y"), color = "#3366cc", width = 2,
         lineStyle = DotDashLine)
