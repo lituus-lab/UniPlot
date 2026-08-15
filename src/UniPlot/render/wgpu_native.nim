@@ -246,6 +246,10 @@ type
     library: LibHandle
     instance, adapter, device, queue: pointer
     meshShader, meshPipeline: pointer
+    targetTexture, targetView: pointer
+    vertexBuffer, indexBuffer, readbackBuffer: pointer
+    targetWidth, targetHeight: uint32
+    vertexCapacity, indexCapacity, readbackCapacity: uint64
     events: ptr DeviceEvents
     getVersion: GetVersionProc
     hasFeature: HasFeatureProc
@@ -254,6 +258,7 @@ type
     destroyDevice: ReleaseProc
     releaseInstance, releaseAdapter, releaseDevice, releaseQueue: ReleaseProc
     releaseShader, releasePipeline: ReleaseProc
+    releaseTexture, releaseView, releaseBuffer: ReleaseProc
 
 const
   CallbackAllowProcessEvents = 2'u32
@@ -292,6 +297,12 @@ proc loadSymbol[T](library: LibHandle; name: string): T =
     raise newException(LibraryError, "wgpu-native symbol missing: " & name)
   cast[T](address)
 
+proc grownCapacity(current, required: uint64): uint64 =
+  result = max(current, 256'u64)
+  while result < required:
+    if result > high(uint64) div 2: return required
+    result *= 2
+
 proc receiveDevice(status: uint32; device: pointer; message: WgpuStringView;
                    userdata1, userdata2: pointer) {.cdecl.} =
   discard message
@@ -323,6 +334,21 @@ proc receiveUncapturedError(device: pointer; errorType: uint32;
 
 proc close*(runtime: NativeWgpuRuntime) =
   if runtime.isNil: return
+  if runtime.readbackBuffer != nil and runtime.releaseBuffer != nil:
+    runtime.releaseBuffer(runtime.readbackBuffer)
+    runtime.readbackBuffer = nil
+  if runtime.indexBuffer != nil and runtime.releaseBuffer != nil:
+    runtime.releaseBuffer(runtime.indexBuffer)
+    runtime.indexBuffer = nil
+  if runtime.vertexBuffer != nil and runtime.releaseBuffer != nil:
+    runtime.releaseBuffer(runtime.vertexBuffer)
+    runtime.vertexBuffer = nil
+  if runtime.targetView != nil and runtime.releaseView != nil:
+    runtime.releaseView(runtime.targetView)
+    runtime.targetView = nil
+  if runtime.targetTexture != nil and runtime.releaseTexture != nil:
+    runtime.releaseTexture(runtime.targetTexture)
+    runtime.targetTexture = nil
   if runtime.meshPipeline != nil and runtime.releasePipeline != nil:
     runtime.releasePipeline(runtime.meshPipeline)
     runtime.meshPipeline = nil
@@ -520,29 +546,44 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     drawIndexed = loadSymbol[DrawIndexedProc](runtime.library,
         "wgpuRenderPassEncoderDrawIndexed")
   let emptyLabel = WgpuStringView(data: "".cstring, length: 0)
-  var textureDescriptor = WgpuTextureDescriptor(
-    label: emptyLabel,
-    usage: TextureUsageCopySrc or TextureUsageRenderAttachment,
-    dimension: TextureDimension2D,
-    size: WgpuExtent3D(width: width, height: height,
-      depthOrArrayLayers: 1),
-    format: TextureFormatRgba8Unorm,
-    mipLevelCount: 1,
-    sampleCount: 1)
-  let texture = createTexture(runtime.device, addr textureDescriptor)
-  if texture == nil:
-    raise newException(LibraryError, "wgpu-native did not create a texture")
-  defer: releaseTexture(texture)
-  let view = createView(texture, nil)
-  if view == nil:
-    raise newException(LibraryError, "wgpu-native did not create a texture view")
-  defer: releaseView(view)
+  runtime.releaseTexture = releaseTexture
+  runtime.releaseView = releaseView
+  runtime.releaseBuffer = releaseBuffer
+  if runtime.targetTexture == nil or runtime.targetWidth != width or
+      runtime.targetHeight != height:
+    if runtime.targetView != nil:
+      releaseView(runtime.targetView)
+      runtime.targetView = nil
+    if runtime.targetTexture != nil:
+      releaseTexture(runtime.targetTexture)
+      runtime.targetTexture = nil
+    var textureDescriptor = WgpuTextureDescriptor(
+      label: emptyLabel,
+      usage: TextureUsageCopySrc or TextureUsageRenderAttachment,
+      dimension: TextureDimension2D,
+      size: WgpuExtent3D(width: width, height: height,
+        depthOrArrayLayers: 1),
+      format: TextureFormatRgba8Unorm,
+      mipLevelCount: 1,
+      sampleCount: 1)
+    runtime.targetTexture = createTexture(runtime.device,
+      addr textureDescriptor)
+    if runtime.targetTexture == nil:
+      raise newException(LibraryError, "wgpu-native did not create a texture")
+    runtime.targetView = createView(runtime.targetTexture, nil)
+    if runtime.targetView == nil:
+      releaseTexture(runtime.targetTexture)
+      runtime.targetTexture = nil
+      raise newException(LibraryError,
+        "wgpu-native did not create a texture view")
+    runtime.targetWidth = width
+    runtime.targetHeight = height
   let encoder = createEncoder(runtime.device, nil)
   if encoder == nil:
     raise newException(LibraryError, "wgpu-native did not create an encoder")
   defer: releaseEncoder(encoder)
   var attachment = WgpuRenderPassColorAttachment(
-    view: view,
+    view: runtime.targetView,
     depthSlice: high(uint32),
     loadOp: LoadOpClear,
     storeOp: StoreOpStore,
@@ -628,25 +669,40 @@ struct VertexOut {
     let
       vertexSize = uint64(meshVertices.len * sizeof(float32))
       indexSize = uint64(meshIndices.len * sizeof(uint32))
-    var vertexDescriptor = WgpuBufferDescriptor(label: emptyLabel,
-      usage: BufferUsageCopyDst or BufferUsageVertex, size: vertexSize)
-    var indexDescriptor = WgpuBufferDescriptor(label: emptyLabel,
-      usage: BufferUsageCopyDst or BufferUsageIndex, size: indexSize)
-    let vertexBuffer = createBuffer(runtime.device, addr vertexDescriptor)
-    if vertexBuffer == nil:
-      raise newException(LibraryError, "wgpu-native did not create a vertex buffer")
-    defer: releaseBuffer(vertexBuffer)
-    let indexBuffer = createBuffer(runtime.device, addr indexDescriptor)
-    if indexBuffer == nil:
-      raise newException(LibraryError, "wgpu-native did not create an index buffer")
-    defer: releaseBuffer(indexBuffer)
-    writeBuffer(runtime.queue, vertexBuffer, 0,
+    if runtime.vertexCapacity < vertexSize:
+      if runtime.vertexBuffer != nil:
+        releaseBuffer(runtime.vertexBuffer)
+        runtime.vertexBuffer = nil
+      runtime.vertexCapacity = grownCapacity(runtime.vertexCapacity, vertexSize)
+      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+        usage: BufferUsageCopyDst or BufferUsageVertex,
+        size: runtime.vertexCapacity)
+      runtime.vertexBuffer = createBuffer(runtime.device, addr descriptor)
+      if runtime.vertexBuffer == nil:
+        runtime.vertexCapacity = 0
+        raise newException(LibraryError,
+          "wgpu-native did not create a vertex buffer")
+    if runtime.indexCapacity < indexSize:
+      if runtime.indexBuffer != nil:
+        releaseBuffer(runtime.indexBuffer)
+        runtime.indexBuffer = nil
+      runtime.indexCapacity = grownCapacity(runtime.indexCapacity, indexSize)
+      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+        usage: BufferUsageCopyDst or BufferUsageIndex,
+        size: runtime.indexCapacity)
+      runtime.indexBuffer = createBuffer(runtime.device, addr descriptor)
+      if runtime.indexBuffer == nil:
+        runtime.indexCapacity = 0
+        raise newException(LibraryError,
+          "wgpu-native did not create an index buffer")
+    writeBuffer(runtime.queue, runtime.vertexBuffer, 0,
       unsafeAddr meshVertices[0], csize_t(vertexSize))
-    writeBuffer(runtime.queue, indexBuffer, 0,
+    writeBuffer(runtime.queue, runtime.indexBuffer, 0,
       unsafeAddr meshIndices[0], csize_t(indexSize))
     setPipeline(renderPass, runtime.meshPipeline)
-    setVertexBuffer(renderPass, 0, vertexBuffer, 0, vertexSize)
-    setIndexBuffer(renderPass, indexBuffer, IndexFormatUint32, 0, indexSize)
+    setVertexBuffer(renderPass, 0, runtime.vertexBuffer, 0, vertexSize)
+    setIndexBuffer(renderPass, runtime.indexBuffer, IndexFormatUint32, 0,
+      indexSize)
     drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
   endPass(renderPass)
   releasePass(renderPass)
@@ -656,17 +712,24 @@ struct VertexOut {
       paddedRow > uint64(high(int)) div uint64(height):
     raise newException(LibraryError, "WGPU readback size exceeds host limits")
   let bufferSize = paddedRow * uint64(height)
-  var bufferDescriptor = WgpuBufferDescriptor(label: emptyLabel,
-    usage: BufferUsageMapRead or BufferUsageCopyDst, size: bufferSize)
-  let readback = createBuffer(runtime.device, addr bufferDescriptor)
-  if readback == nil:
-    raise newException(LibraryError, "wgpu-native did not create a readback buffer")
-  defer: releaseBuffer(readback)
-  var source = WgpuTexelCopyTextureInfo(texture: texture,
+  if runtime.readbackCapacity < bufferSize:
+    if runtime.readbackBuffer != nil:
+      releaseBuffer(runtime.readbackBuffer)
+      runtime.readbackBuffer = nil
+    runtime.readbackCapacity = grownCapacity(runtime.readbackCapacity, bufferSize)
+    var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+      usage: BufferUsageMapRead or BufferUsageCopyDst,
+      size: runtime.readbackCapacity)
+    runtime.readbackBuffer = createBuffer(runtime.device, addr descriptor)
+    if runtime.readbackBuffer == nil:
+      runtime.readbackCapacity = 0
+      raise newException(LibraryError,
+        "wgpu-native did not create a readback buffer")
+  var source = WgpuTexelCopyTextureInfo(texture: runtime.targetTexture,
     aspect: TextureAspectAll)
   var destination = WgpuTexelCopyBufferInfo(
     layout: WgpuTexelCopyBufferLayout(bytesPerRow: uint32(paddedRow),
-      rowsPerImage: height), buffer: readback)
+      rowsPerImage: height), buffer: runtime.readbackBuffer)
   var copySize = WgpuExtent3D(width: width, height: height,
     depthOrArrayLayers: 1)
   copyTextureToBuffer(encoder, addr source, addr destination, addr copySize)
@@ -679,7 +742,7 @@ struct VertexOut {
   let request = cast[ptr MapRequest](allocShared0(sizeof(MapRequest)))
   if request == nil:
     raise newException(LibraryError, "cannot allocate WGPU map state")
-  discard mapBuffer(readback, MapModeRead, 0, csize_t(bufferSize),
+  discard mapBuffer(runtime.readbackBuffer, MapModeRead, 0, csize_t(bufferSize),
     WgpuBufferMapCallbackInfo(mode: CallbackAllowProcessEvents,
       callback: receiveMap, userdata1: request))
   var attempts = 0
@@ -693,10 +756,10 @@ struct VertexOut {
     raise newException(LibraryError, "wgpu-native buffer mapping timed out")
   if mapStatus != MapSuccess:
     raise newException(LibraryError, "wgpu-native buffer mapping failed")
-  let mapped = getMappedRange(readback, 0, csize_t(bufferSize))
+  let mapped = getMappedRange(runtime.readbackBuffer, 0, csize_t(bufferSize))
   if mapped == nil:
     raise newException(LibraryError, "wgpu-native returned no mapped data")
-  defer: unmapBuffer(readback)
+  defer: unmapBuffer(runtime.readbackBuffer)
   let outputSize = int(unpaddedRow * uint64(height))
   result = newSeq[byte](outputSize)
   let sourceBytes = cast[ptr UncheckedArray[byte]](mapped)

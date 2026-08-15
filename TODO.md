@@ -36,7 +36,7 @@ scene without weakening its deterministic CPU semantics.
 - [x] UniGlyph text and ordered retained scenes rendered through the same
   UniVector tessellation path.
 - [x] Shader and render pipeline retained across frames.
-- [ ] Cache or pool vertex, index, texture and readback buffers by capacity.
+- [x] Cache or pool vertex, index, texture and readback buffers by capacity.
 - [ ] Separate submission from optional readback so interactive frames do not
   pay a synchronous CPU transfer.
 - [ ] Handle uncaptured validation errors and asynchronous device loss.
