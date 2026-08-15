@@ -144,6 +144,7 @@ nimble benchmarkDeps
 nimble benchmark
 nimble benchmarkScales
 nimble benchmarkThermals
+nimble benchmarkMemory
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
 
@@ -176,6 +177,17 @@ The stages align user intent, not implementation internals: Matplotlib can
 defer layout to `savefig`, whereas UniPlot performs it in `compileScene`.
 Numbers are suitable for regression tracking on the same machine, not for a
 universal “fastest library” claim.
+
+The separate `benchmarkMemory` task runs construction, CPU preparation, SVG
+serialization and PNG serialization in fresh release-mode ORC processes. It
+records process RSS and Nim heap high-water marks in
+`benchmarks/results/memory.json`; it does not pretend that retained heap growth
+equals cumulative allocated bytes. At 100,000 points on the 2026-08-16 Darwin
+arm64 reference machine, construction/compilation peaked at 140.30 MB RSS,
+prepared-scene creation at 202.70 MB, and real 51.06 MB SVG serialization at
+325.52 MB. PNG serialization did not exceed the 202.70 MB high-water mark of
+its prepared-scene setup. These single-run values are regression observations,
+not cross-library memory rankings.
 
 UniPlot additionally reports an `uncertainty_construct_compile` diagnostic:
 one line, one contiguous ribbon and one capped error bar per row. A 100,000-row

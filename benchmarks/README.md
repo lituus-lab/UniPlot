@@ -12,6 +12,7 @@ nimble benchmarkDeps         # explicit, isolated optional dependency setup
 nimble benchmark             # 20 iterations, 1,000 points
 nimble benchmarkScales       # 10^3, 10^5 and 10^6 points, all providers
 nimble benchmarkThermals     # cold process wall time + warmed stages
+nimble benchmarkMemory       # isolated UniPlot RSS and heap high-water marks
 nimble benchmark -- 50 5000  # direct runner arguments when supported
 python3 benchmarks/run_benchmarks.py 50 5000
 ```
@@ -35,6 +36,28 @@ before its provider subprocess and compilation is therefore excluded. The
 warm report is a separate process with three loop warmups and 20 measured
 iterations. Cold wall time and warm stage time have different boundaries and
 are never divided into a synthetic speedup ratio.
+
+`benchmarkMemory` writes `benchmarks/results/memory.json`. Each measured phase
+runs once in a fresh release-mode ORC process so prior phases cannot inflate
+its high-water marks. It reports the absolute process peak RSS, peak Nim heap
+and live heap, plus growth beyond phase-specific setup. Linux `ru_maxrss` is
+normalized from KiB to bytes; Darwin already reports bytes. Other platforms
+report `-1` rather than assuming an undocumented unit or fabricating a value.
+
+On the 2026-08-16 Darwin arm64 reference run at 100,000 points, constructing
+and compiling the line-plus-point scene reached 140.30 MB process RSS and grew
+the RSS high-water mark by 136.68 MB. Preparing the already compiled scene
+reached 202.70 MB and added 62.41 MB beyond its setup. Serializing that
+prepared scene to a real 51,057,593-byte SVG reached 325.52 MB and added
+122.81 MB. PNG serialization reached 202.70 MB and did not exceed the
+prepared-scene setup high-water mark; its live Nim heap grew by 1.61 MB while
+holding the 26,844-byte encoded output. Decimal MB are used here.
+
+These are single-run diagnostic observations, not statistical estimates or
+cross-library rankings. Nim's public allocator counters expose live and peak
+bytes, but not cumulative requested bytes. The harness therefore does not
+rename allocation counts or heap growth as “bytes allocated per frame”; that
+separate measurement remains open.
 
 `benchmarkDeps` creates `build/benchmark-python` for Matplotlib, Plotly and
 Kaleido; `build/benchmark-r-library` for ggplot2 when R is installed; and uses
