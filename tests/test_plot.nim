@@ -59,3 +59,21 @@ suite "plot compilation":
     expect PlotError: discard scatterPlot([1.0], [1.0, 2.0])
     expect PlotError: discard barPlot(["a"], [1.0, 2.0])
     expect PlotError: discard histogramPlot([1.0], 0)
+
+  test "named layers produce a deterministic optional legend":
+    var spec = sample()
+    spec.layers[0].legendLabel = "Trend"
+    spec.layers[1].legendLabel = "Samples"
+    spec.legend(title = "Series")
+    let scene = spec.compileScene(Size(width: 640, height: 400))
+    var labels: seq[string]
+    for node in scene.nodes:
+      if node.kind == snText and node.text in ["Series", "Trend", "Samples"]:
+        labels.add node.text
+    check labels == @["Series", "Trend", "Samples"]
+
+    spec.legend(position = lpNone)
+    let hidden = spec.compileScene(Size(width: 640, height: 400))
+    for node in hidden.nodes:
+      if node.kind == snText:
+        check node.text notin ["Series", "Trend", "Samples"]

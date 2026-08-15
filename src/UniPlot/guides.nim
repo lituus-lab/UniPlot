@@ -40,12 +40,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     raise newException(PlotError,
       "theme point size and line width must be finite and positive")
   result = initScene(size, spec.theme.background)
-  let area = Bounds(xMin: spec.theme.margins.left,
+  var legendLayers: seq[Layer]
+  if spec.legendSpec.visible:
+    for layer in spec.layers:
+      if layer.legendLabel.len > 0: legendLayers.add layer
+  var area = Bounds(xMin: spec.theme.margins.left,
     yMin: spec.theme.margins.top, xMax: float32(size.width) -
         spec.theme.margins.right,
     yMax: float32(size.height) - spec.theme.margins.bottom)
+  const legendWidth = 150'f32
+  if legendLayers.len > 0:
+    if spec.legendSpec.position != lpRight:
+      raise newException(PlotError, "unsupported legend position")
+    area.xMax -= legendWidth
   if area.width <= 0 or area.height <= 0:
     raise newException(PlotError, "plot margins leave no drawing area")
+  let legendRows = legendLayers.len + ord(spec.legendSpec.title.len > 0)
+  if legendRows > 0 and float32(legendRows * 24) > area.height:
+    raise newException(PlotError, "legend does not fit the drawing height")
   for layer in spec.layers:
     if layer.mapping.x notin spec.data.columns or
         layer.mapping.y notin spec.data.columns:
@@ -155,3 +167,30 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         result.addText(labels[row], points[i], if layer.size >
             0: layer.size else: 12,
           layer.color, nodeId); inc nodeId
+  if legendLayers.len > 0:
+    let legendX = area.xMax + 24
+    var legendY = area.yMin + 14
+    if spec.legendSpec.title.len > 0:
+      result.addText(spec.legendSpec.title, Point(x: legendX, y: legendY), 13,
+        spec.theme.foreground)
+      legendY += 24
+    for layer in legendLayers:
+      let center = Point(x: legendX + 10, y: legendY - 4)
+      case layer.mark
+      of mkLine:
+        let width = if layer.size > 0: layer.size else: spec.theme.lineWidth
+        result.addPath(segmentPath(Point(x: legendX, y: center.y),
+          Point(x: legendX + 20, y: center.y), width), layer.color)
+      of mkPoint:
+        let radius = if layer.size > 0: layer.size else: spec.theme.pointSize
+        result.addPath(circle(center, min(radius, 7'f32)), layer.color)
+      of mkBar, mkArea:
+        var swatch = newPath()
+        swatch.rect(legendX + 2, center.y - 6, 16, 12)
+        result.addPath(swatch, layer.color)
+      of mkText:
+        result.addText("T", Point(x: legendX + 4, y: legendY), 13,
+          layer.color)
+      result.addText(layer.legendLabel, Point(x: legendX + 30, y: legendY),
+        12, spec.theme.foreground)
+      legendY += 24
