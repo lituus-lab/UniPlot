@@ -184,6 +184,50 @@ suite "plot composition":
     else:
       expect PreConditionDefect: discard spec.facetSpecs("")
 
+  test "two-dimensional facets preserve empty Cartesian cells":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 3.0])
+    frame.addColumn("row", ["north", "north", "south"])
+    frame.addColumn("column", ["left", "right", "right"])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y"))
+    spec.labels(title = "Matrix")
+    let cells = spec.facetCells("row", "column")
+    check cells.len == 4
+    check cells[0].rowValue == "north"
+    check cells[0].columnValue == "left"
+    check cells[0].rows == @[0]
+    check cells[1].rows == @[1]
+    check cells[2].rowValue == "south"
+    check cells[2].columnValue == "left"
+    check cells[2].rows.len == 0
+    check cells[3].rows == @[2]
+    let scene = spec.compileFacetMatrix("row", "column",
+      Size(width: 816, height: 400), gap = 16, sharedX = true,
+      sharedY = true)
+    var foundEmptyTitle = false
+    for node in scene.nodes:
+      if node.kind == snText and node.text ==
+          "Matrix — row = south — column = left":
+        check node.position == Point(x: 70, y: 233)
+        foundEmptyTitle = true
+    check foundEmptyTitle
+
+  test "two-dimensional facets reject invalid dimensions":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0])
+    frame.addColumn("y", [1.0])
+    frame.addColumn("group", ["a"])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y"))
+    expect PlotError: discard spec.facetCells("missing", "group")
+    expect PlotError: discard spec.facetCells("x", "group")
+    when defined(release):
+      expect PlotError: discard spec.facetCells("group", "group")
+    else:
+      expect PreConditionDefect: discard spec.facetCells("group", "group")
+
   test "reject invalid grid dimensions in every build mode":
     let spec = sampleSpec("#3366cc")
     when not defined(release):
