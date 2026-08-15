@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[algorithm, math]
+import std/[algorithm, math, tables]
 import contracts
 import UniAccurate
 import UniPlot/common
@@ -16,6 +16,19 @@ type DescriptiveSummary* = object
   mean*: float64
   outliers*: seq[float64]
 
+type
+  AggregationKind* = enum
+    agCount
+    agSum
+    agMean
+    agMinimum
+    agMaximum
+
+  AggregatedCell* = object
+    x*, y*: string
+    value*: float64
+    count*: int
+
 proc finiteSorted(values: openArray[float64]): seq[float64] =
   result = newSeqOfCap[float64](values.len)
   for value in values:
@@ -30,6 +43,15 @@ func quantileSorted(values: openArray[float64]; probability: float64): float64 =
     upper = int(ceil(position))
     fraction = position - float64(lower)
   values[lower] * (1.0 - fraction) + values[upper] * fraction
+
+func stableMean(values: openArray[float64]; minimum,
+    maximum: float64): float64 =
+  let magnitude = max(abs(minimum), abs(maximum))
+  if magnitude == 0: return 0
+  var normalized = newSeqOfCap[float64](values.len)
+  for value in values: normalized.add value / magnitude
+  neumaierSum(normalized, assumeFinite = true) / float64(values.len) *
+    magnitude
 
 proc quantile*(values: openArray[float64]; probability: float64): float64 {.
     contractual.} =
@@ -71,14 +93,7 @@ proc summarize*(values: openArray[float64]; whiskerLength = 1.5):
     result.median = quantileSorted(finite, 0.5)
     result.thirdQuartile = quantileSorted(finite, 0.75)
     result.maximum = finite[^1]
-    let magnitude = max(abs(result.minimum), abs(result.maximum))
-    if magnitude == 0:
-      result.mean = 0
-    else:
-      var normalized = newSeqOfCap[float64](finite.len)
-      for value in finite: normalized.add value / magnitude
-      result.mean = neumaierSum(normalized, assumeFinite = true) /
-        float64(finite.len) * magnitude
+    result.mean = stableMean(finite, result.minimum, result.maximum)
     let
       spread = result.thirdQuartile - result.firstQuartile
       lowerFence = result.firstQuartile - whiskerLength * spread
@@ -96,6 +111,66 @@ proc summarize*(values: openArray[float64]; whiskerLength = 1.5):
     for value in finite:
       if value < result.lowerWhisker or value > result.upperWhisker:
         result.outliers.add value
+
+proc aggregate2D*(xs, ys: openArray[string]; values: openArray[float64];
+    kind = agMean): seq[AggregatedCell] {.contractual.} =
+  ## Aggregate finite values over a complete first-seen x-by-y matrix.
+  require:
+    xs.len == ys.len and ys.len == values.len
+    xs.len > 0
+  ensure:
+    result.len > 0
+  body:
+    if xs.len != ys.len or ys.len != values.len or xs.len == 0:
+      raise newException(PlotError, "2D aggregation columns must align")
+    var
+      xOrder, yOrder: seq[string]
+      xSeen, ySeen = initTable[string, bool]()
+      observed = initTable[(string, string), bool]()
+      samples = initTable[(string, string), seq[float64]]()
+    for index in 0 ..< xs.len:
+      if xs[index].len == 0 or ys[index].len == 0:
+        raise newException(PlotError,
+          "2D aggregation categories cannot be empty")
+      if xs[index] notin xSeen:
+        xSeen[xs[index]] = true
+        xOrder.add xs[index]
+      if ys[index] notin ySeen:
+        ySeen[ys[index]] = true
+        yOrder.add ys[index]
+      let key = (xs[index], ys[index])
+      observed[key] = true
+      if values[index].isFinite: samples.mgetOrPut(key, @[]).add values[index]
+    result = newSeqOfCap[AggregatedCell](xOrder.len * yOrder.len)
+    for y in yOrder:
+      for x in xOrder:
+        let key = (x, y)
+        var cell = AggregatedCell(x: x, y: y, value: NaN)
+        if key in observed:
+          let finite = samples.getOrDefault(key)
+          cell.count = finite.len
+          case kind
+          of agCount:
+            cell.value = float64(finite.len)
+          of agSum:
+            if finite.len > 0: cell.value = neumaierSum(finite)
+          of agMean:
+            if finite.len > 0:
+              var minimum = finite[0]
+              var maximum = finite[0]
+              for value in finite:
+                minimum = min(minimum, value)
+                maximum = max(maximum, value)
+              cell.value = stableMean(finite, minimum, maximum)
+          of agMinimum:
+            if finite.len > 0:
+              cell.value = finite[0]
+              for value in finite: cell.value = min(cell.value, value)
+          of agMaximum:
+            if finite.len > 0:
+              cell.value = finite[0]
+              for value in finite: cell.value = max(cell.value, value)
+        result.add cell
 
 proc histogram*(values: openArray[float64]; binCount = 30): seq[HistogramBin] {.
     contractual.} =

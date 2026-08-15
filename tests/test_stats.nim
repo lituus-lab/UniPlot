@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/unittest
+import std/[math, unittest]
 import contracts
 import UniPlot
 
@@ -67,3 +67,27 @@ suite "statistics":
     else:
       expect PreConditionDefect: discard boxPlot(["a"], [1.0, 2.0])
     expect PlotError: discard boxPlot(["empty"], [NaN])
+
+  test "2D aggregation preserves a complete first-seen category matrix":
+    let cells = aggregate2D(
+      ["left", "right", "left", "left"],
+      ["north", "north", "south", "north"],
+      [1.0, 4.0, NaN, 3.0])
+    check cells.len == 4
+    check cells[0] == AggregatedCell(x: "left", y: "north", value: 2.0,
+      count: 2)
+    check cells[1] == AggregatedCell(x: "right", y: "north", value: 4.0,
+      count: 1)
+    check cells[2].x == "left" and cells[2].y == "south"
+    check classify(cells[2].value) == fcNan and cells[2].count == 0
+    check cells[3].x == "right" and cells[3].y == "south"
+    check classify(cells[3].value) == fcNan and cells[3].count == 0
+    let counts = aggregate2D(["x", "x"], ["y", "y"], [NaN, 2.0], agCount)
+    check counts[0].value == 1.0
+    check aggregate2D(["x", "x"], ["y", "y"], [1e308, 1e308],
+      agMean)[0].value == 1e308
+    when defined(release):
+      expect PlotError: discard aggregate2D(["x"], ["y", "z"], [1.0])
+    else:
+      expect PreConditionDefect:
+        discard aggregate2D(["x"], ["y", "z"], [1.0])
