@@ -124,6 +124,13 @@ against 21.45 ms and 31.45 ms immediately before the change. The differences
 are within run-to-run noise; this records absence of a detected regression, not
 a performance improvement.
 
+Horizontal text anchoring was checked on the 100,000-point workload over three
+iterations after one warmup. Immediately before/after means were 21.55/21.50
+ms for construction, 31.95/32.11 ms for four-panel construction,
+678.14/678.83 ms for SVG and 1176.85/1182.83 ms for PNG. The largest observed
+change was +0.51% for PNG in this short run; it is retained as regression
+evidence, not interpreted as a measured slowdown or speedup.
+
 These stages align user intent, not internal work. Matplotlib may defer work to
 `savefig`, while UniPlot performs layout in `compileScene`; timings must not be
 interpreted as identical instruction sets. Results are evidence for regression
