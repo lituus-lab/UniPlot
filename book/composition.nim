@@ -89,12 +89,45 @@ unchanged. All participating axes must use the same transform and direction;
 existing explicit limits must already satisfy their own plot before they join
 the union.
 
-Shared categorical x domains, automatic data faceting, guide deduplication and
-secondary axes are not implemented and are not claimed. Requesting a shared
-categorical x axis raises `PlotError`.
+Shared categorical x domains, guide deduplication and secondary axes are not
+implemented and are not claimed. Requesting a shared categorical x axis raises
+`PlotError`.
+
+## Data-driven categorical facets
+"""
+
+nbCode:
+  var observations = initDataFrame()
+  observations.addColumn("time", [0.0, 1.0, 2.0, 0.0, 1.0, 2.0])
+  observations.addColumn("value", [1.0, 2.0, 1.5, 4.0, 3.0, 5.0])
+  observations.addColumn("site",
+    ["north", "north", "north", "south", "south", "south"])
+  var measured = plot(observations)
+  measured.geomLine(aes("time", "value"), color = "#267a5e")
+  measured.geomPoint(aes("time", "value"), color = "#d65f2d", radius = 4)
+  measured.labels(title = "Measurements", x = "time", y = "value")
+  let faceted = compileFacetGrid(measured, "site", columns = 2,
+    size = Size(width: 900, height: 360), gap = 18,
+    sharedX = true, sharedY = true)
+  let facetedSvg = faceted.toSvg(font)
+
+nbRawHtml svgFigure(facetedSvg,
+  "One complete plot specification partitioned by the site column.")
+
+nbText: """
+`facetSpecs(spec, column)` exposes the intermediate panel specifications when
+custom composition is needed. It accepts an existing categorical column,
+preserves all columns and row order inside each category, and orders panels by
+first appearance. `compileFacetGrid` performs the split and ordinary grid
+compilation in one call; its sharing flags have the same numeric-only contract
+as `compileGrid`.
+
+Empty, missing or numeric facet columns are rejected. Two-dimensional facets,
+shared categorical x domains, guide deduplication and secondary axes remain
+future work.
 
 Next: [Versioned JSON](serialization.html).
 """
 
 nbSave
-validatePage("composition.html", minSvg = 2, requirePng = true)
+validatePage("composition.html", minSvg = 3, requirePng = true)
