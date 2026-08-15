@@ -44,6 +44,19 @@ type
     kind*: ScaleKind
     reversed*: bool
 
+  ReferenceKind* = enum
+    rkXLine
+    rkYLine
+    rkXBand
+    rkYBand
+
+  Reference* = object
+    kind*: ReferenceKind
+    minimum*, maximum*: float64
+    color*: Color
+    width*: float32
+    label*: string
+
   Aes* = object
     x*, y*: string
     label*: string
@@ -79,6 +92,7 @@ type
     continuousColors*: Palette
     mappedSizeRange*, mappedAlphaRange*: AestheticRange
     xScaleSpec*, yScaleSpec*: AxisScaleSpec
+    references*: seq[Reference]
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -197,6 +211,53 @@ proc scaleX*(spec: var PlotSpec; kind = skLinear; reversed = false) =
 proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric y transform and coordinate direction.
   spec.yScaleSpec = AxisScaleSpec(kind: kind, reversed: reversed)
+
+proc addReference(spec: var PlotSpec; kind: ReferenceKind; minimum,
+    maximum: float64; color: string; width: float32; label: string) =
+  if not minimum.isFinite or not maximum.isFinite or minimum > maximum or
+      (kind in {rkXBand, rkYBand} and minimum == maximum):
+    raise newException(PlotError,
+      "reference bounds must be finite and bands must have positive extent")
+  if width <= 0 or not width.isFinite:
+    raise newException(PlotError, "reference width must be finite and positive")
+  spec.references.add Reference(kind: kind, minimum: minimum, maximum: maximum,
+    color: cssColor(color), width: width, label: label)
+
+proc referenceX*(spec: var PlotSpec; value: float64; color = "#7a3db8";
+    width = 1'f32; label = "") {.contractual.} =
+  ## Add a vertical reference line in data coordinates.
+  require:
+    value.isFinite
+    width > 0 and width.isFinite
+  body:
+    spec.addReference(rkXLine, value, value, color, width, label)
+
+proc referenceY*(spec: var PlotSpec; value: float64; color = "#7a3db8";
+    width = 1'f32; label = "") {.contractual.} =
+  ## Add a horizontal reference line in data coordinates.
+  require:
+    value.isFinite
+    width > 0 and width.isFinite
+  body:
+    spec.addReference(rkYLine, value, value, color, width, label)
+
+proc referenceXBand*(spec: var PlotSpec; minimum, maximum: float64;
+    color = "#d9e2f380"; label = "") {.contractual.} =
+  ## Add a vertical filled band in data coordinates.
+  require:
+    minimum.isFinite and maximum.isFinite
+    minimum < maximum
+  body:
+    spec.addReference(rkXBand, minimum, maximum, color, 1, label)
+
+proc referenceYBand*(spec: var PlotSpec; minimum, maximum: float64;
+    color = "#d9e2f380"; label = "") {.contractual.} =
+  ## Add a horizontal filled band in data coordinates.
+  require:
+    minimum.isFinite and maximum.isFinite
+    minimum < maximum
+  body:
+    spec.addReference(rkYBand, minimum, maximum, color, 1, label)
 
 proc linePlot*(x, y: openArray[float64]; color = "#3366cc";
     legend = ""): PlotSpec =

@@ -61,6 +61,41 @@ suite "plot compilation":
     logBars.scaleY(skLog10)
     expect PlotError: discard logBars.compileScene()
 
+  test "reference lines and bands compile through numeric scales":
+    var spec = sample()
+    spec.referenceX(1.0, label = "event")
+    spec.referenceY(2.0, width = 2)
+    spec.referenceXBand(0.25, 0.75)
+    spec.referenceYBand(1.5, 2.5, label = "target")
+    check spec.references.len == 4
+    spec.referenceX(10.0)
+    let scene = spec.compileScene()
+    var referenceLabels = 0
+    for node in scene.nodes:
+      if node.kind == snText and node.text in ["event", "target"]:
+        inc referenceLabels
+    check referenceLabels == 2
+
+  test "references reject invalid values and categorical x coordinates":
+    var spec = sample()
+    when defined(release):
+      expect PlotError: spec.referenceX(NaN)
+      expect PlotError: spec.referenceY(1.0, width = 0)
+      expect PlotError: spec.referenceXBand(2.0, 1.0)
+      expect PlotError: spec.referenceYBand(1.0, 1.0)
+    else:
+      expect PreConditionDefect: spec.referenceX(NaN)
+      expect PreConditionDefect: spec.referenceY(1.0, width = 0)
+      expect PreConditionDefect: spec.referenceXBand(2.0, 1.0)
+      expect PreConditionDefect: spec.referenceYBand(1.0, 1.0)
+    var categorical = barPlot(["a", "b"], [1.0, 2.0])
+    categorical.referenceX(1.0)
+    expect PlotError: discard categorical.compileScene()
+    var direct = sample()
+    direct.references.add Reference(kind: rkYBand, minimum: 2, maximum: 1,
+      color: parseColor("#ffffff").get, width: 1)
+    expect PlotError: discard direct.compileScene()
+
   test "invalid margins and missing mappings are typed errors":
     var spec = sample()
     spec.theme.margins.left = 1000

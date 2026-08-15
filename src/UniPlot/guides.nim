@@ -260,6 +260,27 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   var xDomain = initContinuousDomain(spec.xScaleSpec.kind)
   var xBandDomain = initBandDomain()
   var yDomain = initContinuousDomain(spec.yScaleSpec.kind)
+  for reference in spec.references:
+    if not reference.minimum.isFinite or not reference.maximum.isFinite or
+        reference.minimum > reference.maximum or reference.width <= 0 or
+        not reference.width.isFinite or
+        (reference.kind in {rkXBand, rkYBand} and
+        reference.minimum == reference.maximum):
+      raise newException(PlotError, "invalid reference annotation")
+    case reference.kind
+    of rkXLine, rkXBand:
+      if xKind != ckNumeric:
+        raise newException(PlotError,
+          "x references require numeric x coordinates")
+      if spec.xScaleSpec.kind == skLog10 and reference.minimum <= 0:
+        raise newException(PlotError,
+          "logarithmic x references must be positive")
+      xDomain.addValues([reference.minimum, reference.maximum])
+    of rkYLine, rkYBand:
+      if spec.yScaleSpec.kind == skLog10 and reference.minimum <= 0:
+        raise newException(PlotError,
+          "logarithmic y references must be positive")
+      yDomain.addValues([reference.minimum, reference.maximum])
   var includeZero = false
   for layer in spec.layers:
     if spec.data.columns[layer.mapping.x].kind != xKind:
@@ -311,6 +332,48 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if spec.yLabel.len > 0:
     result.addText(spec.yLabel, Point(x: 5, y: area.yMin - 20), 13,
       spec.theme.foreground)
+  for reference in spec.references:
+    case reference.kind
+    of rkXLine:
+      let x = xScale.map(reference.minimum)
+      result.addPath(segmentPath(Point(x: x, y: area.yMin),
+        Point(x: x, y: area.yMax), reference.width), reference.color, nodeId)
+      inc nodeId
+      if reference.label.len > 0:
+        result.addText(reference.label, Point(x: x + 4, y: area.yMin + 14),
+          11, reference.color)
+    of rkYLine:
+      let y = yScale.map(reference.minimum)
+      result.addPath(segmentPath(Point(x: area.xMin, y: y),
+        Point(x: area.xMax, y: y), reference.width), reference.color, nodeId)
+      inc nodeId
+      if reference.label.len > 0:
+        result.addText(reference.label, Point(x: area.xMin + 4, y: y - 4),
+          11, reference.color)
+    of rkXBand:
+      let
+        first = xScale.map(reference.minimum)
+        second = xScale.map(reference.maximum)
+      var band = newPath()
+      band.rect(min(first, second), area.yMin, abs(second - first), area.height)
+      result.addPath(band, reference.color, nodeId)
+      inc nodeId
+      if reference.label.len > 0:
+        result.addText(reference.label,
+          Point(x: min(first, second) + 4, y: area.yMin + 14), 11,
+          reference.color)
+    of rkYBand:
+      let
+        first = yScale.map(reference.minimum)
+        second = yScale.map(reference.maximum)
+      var band = newPath()
+      band.rect(area.xMin, min(first, second), area.width, abs(second - first))
+      result.addPath(band, reference.color, nodeId)
+      inc nodeId
+      if reference.label.len > 0:
+        result.addText(reference.label,
+          Point(x: area.xMin + 4, y: min(first, second) + 14), 11,
+          reference.color)
   for layer in spec.layers:
     let
       ys = spec.data.numeric(layer.mapping.y)
