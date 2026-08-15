@@ -48,6 +48,16 @@ suite "WGPU boundary":
       let center = (5 * 10 + 5) * 4
       check meshPixels[center .. center + 3] == @[255'u8, 0, 0, 255]
       check meshPixels[0 .. 3] == @[255'u8, 255, 255, 255]
+      var parityScene = initScene(Size(width: 10, height: 10),
+        parseColor("#ffffff").get)
+      parityScene.addPath(parsePath("M 2 2 L 8 2 L 8 8 L 2 8 Z"),
+        parseColor("#ff0000").get)
+      let cpuPixels = parityScene.renderImage(
+        loadTtf("tests/DejaVuSans.ttf")).data
+      var differentChannels = 0
+      for index, value in meshPixels:
+        if value != cpuPixels[index]: inc differentChannels
+      check differentChannels == 0
       var scene = initScene(Size(width: 64, height: 32),
         parseColor("#ffffff").get)
       scene.addPath(parsePath("M 2 2 L 20 2 L 20 20 L 2 20 Z"),
