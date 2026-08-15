@@ -2,6 +2,7 @@
 # Copyright 2026 lituus-lab
 ## Optional WGPU backend. Importing it does not load wgpu-native; opening a
 ## backend dynamically loads the caller-selected native library.
+import std/atomics
 import contracts
 import UniColor
 import UniGlyph
@@ -42,6 +43,9 @@ type
     resources*: seq[WgpuResource]
     nodeCount*: int
 
+  WgpuDiagnostics* = object
+    meshUploads*: uint64
+
   WgpuBackend* = ref object
     state*: WgpuBackendState
     runtime: NativeWgpuRuntime
@@ -51,6 +55,19 @@ type
     clear: array[4, float32]
     vertices: seq[float32]
     indices: seq[uint32]
+    uploadToken: uint64
+
+var nextPreparedToken: Atomic[uint64]
+
+proc newPreparedToken(): uint64 =
+  var current = nextPreparedToken.load(moRelaxed)
+  while true:
+    if current == high(uint64):
+      raise newException(WgpuError, "WGPU prepared-scene token space exhausted")
+    let desired = current + 1'u64
+    if nextPreparedToken.compareExchange(current, desired, moRelaxed,
+        moRelaxed):
+      return desired
 
 func size*(prepared: WgpuPreparedScene): Size {.contractual.} =
   ## Return the immutable render target dimensions of a prepared scene.
@@ -113,6 +130,15 @@ proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
     result.deviceId = adapter.deviceId
     result.maxTextureDimension2D = adapter.maxTextureDimension2D
     result.maxBufferSize = adapter.maxBufferSize
+
+proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
+  ## Report backend counters without exposing native WGPU handles.
+  require:
+    not backend.isNil and backend.state == wbsReady
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    WgpuDiagnostics(meshUploads: backend.runtime.meshUploadCount())
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =
@@ -216,6 +242,7 @@ proc prepareWgpuScene*(scene: Scene;
       raise newException(WgpuError, "cannot convert WGPU background to sRGB")
     let clear = convertedBackground.get
     result = WgpuPreparedScene(size: scene.size,
+      uploadToken: newPreparedToken(),
       clear: [clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha])
     for node in scene.nodes:
       let path = case node.kind
@@ -267,10 +294,11 @@ proc renderWgpuPrepared*(backend: WgpuBackend;
     if prepared.isNil:
       raise newException(WgpuError, "prepared WGPU scene is nil")
     try:
-      result = backend.runtime.renderMeshPixels(uint32(prepared.size.width),
+      result = backend.runtime.renderPreparedMeshPixels(
+        uint32(prepared.size.width),
         uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
         prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices)
+        prepared.indices, prepared.uploadToken)
     except LibraryError as error:
       if backend.runtime.deviceLostReason() != 0'u32:
         backend.state = wbsDeviceLost
@@ -288,10 +316,10 @@ proc submitWgpuPrepared*(backend: WgpuBackend;
     if prepared.isNil:
       raise newException(WgpuError, "prepared WGPU scene is nil")
     try:
-      backend.runtime.submitMesh(uint32(prepared.size.width),
+      backend.runtime.submitPreparedMesh(uint32(prepared.size.width),
         uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
         prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices)
+        prepared.indices, prepared.uploadToken)
     except LibraryError as error:
       if backend.runtime.deviceLostReason() != 0'u32:
         backend.state = wbsDeviceLost

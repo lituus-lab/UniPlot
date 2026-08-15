@@ -92,13 +92,21 @@ suite "WGPU boundary":
       let font = loadTtf("tests/DejaVuSans.ttf")
       let prepared = scene.prepareWgpuScene(font)
       check prepared.size == scene.size
+      let uploadsBeforePrepared = backend.wgpuDiagnostics.meshUploads
       backend.submitWgpuPrepared(prepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 1
       backend.submitWgpuPrepared(prepared)
       let scenePixels = backend.renderWgpuPrepared(prepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 1
       check scenePixels.len == 64 * 32 * 4
       check scenePixels[(10 * 64 + 10) * 4 .. (10 * 64 + 10) * 4 + 3] ==
         @[255'u8, 0, 0, 255]
       check scenePixels.anyIt(it != 255'u8)
+      discard backend.readWgpuMeshTarget(Size(width: 10, height: 10),
+        parseColor("#ffffff").get, mesh, parseColor("#ff0000").get)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 2
+      backend.submitWgpuPrepared(prepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 3
       var styledFrame = initDataFrame()
       styledFrame.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
       styledFrame.addColumn("y", [1.0, 2.0, NaN, 2.0, 1.0])
@@ -111,6 +119,7 @@ suite "WGPU boundary":
       let styledPrepared = styledSpec.compileScene(styledSize).prepareWgpuScene(
         font)
       let styledPixels = backend.renderWgpuPrepared(styledPrepared)
+      check backend.wgpuDiagnostics.meshUploads == uploadsBeforePrepared + 4
       check styledPixels.len == styledSize.width * styledSize.height * 4
       check styledPixels.anyIt(it != 255'u8)
       backend.close()

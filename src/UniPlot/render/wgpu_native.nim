@@ -285,6 +285,7 @@ type
     vertexBuffer, indexBuffer, readbackBuffer: pointer
     targetWidth, targetHeight: uint32
     vertexCapacity, indexCapacity, readbackCapacity: uint64
+    uploadedToken, meshUploadCount: uint64
     events: ptr DeviceEvents
     getVersion: GetVersionProc
     hasFeature: HasFeatureProc
@@ -571,11 +572,15 @@ proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
   if runtime.isNil or runtime.events == nil: result = 0'u32
   else: result = runtime.events.errorType.exchange(0'u32, moAcquireRelease)
 
+proc meshUploadCount*(runtime: NativeWgpuRuntime): uint64 =
+  ## Return vertex/index upload pairs issued through the queue.
+  if runtime.isNil: 0'u64 else: runtime.meshUploadCount
+
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
                   meshVertices: openArray[float32];
                   meshIndices: openArray[uint32];
-                  readback: bool): seq[byte] =
+                  readback: bool; uploadToken: uint64): seq[byte] =
   ## Render, read back, and remove WebGPU's per-row copy padding.
   if runtime.isNil or runtime.device == nil or runtime.queue == nil:
     raise newException(LibraryError, "wgpu-native runtime is not ready")
@@ -765,6 +770,7 @@ struct VertexOut {
       if runtime.vertexBuffer != nil:
         releaseBuffer(runtime.vertexBuffer)
         runtime.vertexBuffer = nil
+      runtime.uploadedToken = 0
       runtime.vertexCapacity = grownCapacity(runtime.vertexCapacity, vertexSize)
       var descriptor = WgpuBufferDescriptor(label: emptyLabel,
         usage: BufferUsageCopyDst or BufferUsageVertex,
@@ -778,6 +784,7 @@ struct VertexOut {
       if runtime.indexBuffer != nil:
         releaseBuffer(runtime.indexBuffer)
         runtime.indexBuffer = nil
+      runtime.uploadedToken = 0
       runtime.indexCapacity = grownCapacity(runtime.indexCapacity, indexSize)
       var descriptor = WgpuBufferDescriptor(label: emptyLabel,
         usage: BufferUsageCopyDst or BufferUsageIndex,
@@ -787,10 +794,13 @@ struct VertexOut {
         runtime.indexCapacity = 0
         raise newException(LibraryError,
           "wgpu-native did not create an index buffer")
-    writeBuffer(runtime.queue, runtime.vertexBuffer, 0,
-      unsafeAddr meshVertices[0], csize_t(vertexSize))
-    writeBuffer(runtime.queue, runtime.indexBuffer, 0,
-      unsafeAddr meshIndices[0], csize_t(indexSize))
+    if uploadToken == 0 or runtime.uploadedToken != uploadToken:
+      writeBuffer(runtime.queue, runtime.vertexBuffer, 0,
+        unsafeAddr meshVertices[0], csize_t(vertexSize))
+      writeBuffer(runtime.queue, runtime.indexBuffer, 0,
+        unsafeAddr meshIndices[0], csize_t(indexSize))
+      runtime.uploadedToken = uploadToken
+      inc runtime.meshUploadCount
     setPipeline(renderPass, runtime.meshPipeline)
     setVertexBuffer(renderPass, 0, runtime.vertexBuffer, 0, vertexSize)
     setIndexBuffer(renderPass, runtime.indexBuffer, IndexFormatUint32, 0,
@@ -874,17 +884,37 @@ struct VertexOut {
 
 proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                         red, green, blue, alpha: float64): seq[byte] =
-  runtime.renderPixels(width, height, red, green, blue, alpha, [], [], true)
+  runtime.renderPixels(width, height, red, green, blue, alpha, [], [], true, 0)
 
 proc renderMeshPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                        red, green, blue, alpha: float64;
                        vertices: openArray[float32];
                        indices: openArray[uint32]): seq[byte] =
   runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, true)
+    vertices, indices, true, 0)
+
+proc renderPreparedMeshPixels*(runtime: NativeWgpuRuntime;
+                               width, height: uint32;
+                               red, green, blue, alpha: float64;
+                               vertices: openArray[float32];
+                               indices: openArray[uint32];
+                               uploadToken: uint64): seq[byte] =
+  if uploadToken == 0:
+    raise newException(LibraryError, "prepared WGPU upload token is zero")
+  runtime.renderPixels(width, height, red, green, blue, alpha,
+    vertices, indices, true, uploadToken)
 
 proc submitMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
                  red, green, blue, alpha: float64;
                  vertices: openArray[float32]; indices: openArray[uint32]) =
   discard runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, false)
+    vertices, indices, false, 0)
+
+proc submitPreparedMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
+                         red, green, blue, alpha: float64;
+                         vertices: openArray[float32];
+                         indices: openArray[uint32]; uploadToken: uint64) =
+  if uploadToken == 0:
+    raise newException(LibraryError, "prepared WGPU upload token is zero")
+  discard runtime.renderPixels(width, height, red, green, blue, alpha,
+    vertices, indices, false, uploadToken)
