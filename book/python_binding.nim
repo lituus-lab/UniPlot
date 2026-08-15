@@ -29,9 +29,11 @@ import uniplot
 font = Path("DejaVuSans.ttf")
 figure = (uniplot.Plot(800, 500)
           .line([0, 1, 2], [1, 3, 2],
-                color="#3366cc", width=2.0)
+                color="#3366cc", width=2.0,
+                style=uniplot.LINE_DOT_DASH)
           .scatter([0, 1, 2], [1, 3, 2],
-                   color="#cc3344", radius=4.0)
+                   color="#cc3344", radius=4.0,
+                   shape=uniplot.MARKER_DIAMOND)
           .title("Measurements"))
 
 Path("plot.svg").write_bytes(figure.svg(font))
@@ -45,8 +47,10 @@ copying it.
 ## API and validation
 
 - `Plot(width=800, height=500)` owns one native plot handle.
-- `line(xs, ys, color="#3366cc", width=2.0)` adds a line series.
-- `scatter(xs, ys, color="#3366cc", radius=4.0)` adds points.
+- `line(xs, ys, color="#3366cc", width=2.0, style=LINE_SOLID)` adds a line
+  series; five `LINE_*` constants select the UniVector stroke style.
+- `scatter(xs, ys, color="#3366cc", radius=4.0, shape=MARKER_CIRCLE)` adds
+  points; six `MARKER_*` constants select the UniVector marker path.
 - `title(text)` sets the plot title.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `version()`, `abi_version()` and `__version__` expose compatibility.
@@ -63,9 +67,9 @@ The sdist carries the Nim sources needed to rebuild it, but excludes prebuilt
 native binaries. Linux, macOS and Windows wheels use their platform loader and
 ABI conventions.
 
-The Python binding intentionally exposes the stable line/point subset. Use pure
-Nim for the complete layered grammar until the foreign API grows under an
-explicit ABI version.
+The Python binding intentionally exposes the stable styled line/point subset.
+Use pure Nim for data-frame aesthetics and the complete layered grammar until
+the foreign API grows additively or under an explicit ABI version.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """

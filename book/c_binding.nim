@@ -38,8 +38,10 @@ int main(void) {
   uplot_plot *plot = uplot_plot_new(800, 500);
   if (plot == NULL) return 1;
 
-  uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f);
-  uplot_add_points(plot, x, y, 3, "#cc3344", 4.0f);
+  uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
+                        UPLOT_LINE_DOT_DASH);
+  uplot_add_points_shaped(plot, x, y, 3, "#cc3344", 4.0f,
+                          UPLOT_MARKER_DIAMOND);
   uplot_set_title(plot, "Measurements");
 
   int status = uplot_render_svg(
@@ -64,6 +66,9 @@ int main(void) {
 - Status is `UPLOT_OK`, `UPLOT_ERR_ARGUMENT` or `UPLOT_ERR_RENDER`.
 - A null pointer, zero-sized series, length mismatch, invalid colour or invalid
   dimensions is an argument error rather than undefined behaviour.
+- `uplot_add_line_styled` accepts the five `UPLOT_LINE_*` values;
+  `uplot_add_points_shaped` accepts the six `UPLOT_MARKER_*` values. Invalid
+  enum integers are rejected before conversion to Nim enums.
 
 ## ABI compatibility
 
@@ -71,8 +76,10 @@ int main(void) {
 compatibility. `UNIPLOT_ABI_VERSION` is 1. Adding functions may preserve this
 version; changing an existing signature or ownership rule may not.
 
-The C surface deliberately remains narrower than the Nim grammar: lines,
-points, titles and SVG/PNG are the stable 1.0 primitives.
+The C surface deliberately remains narrower than the Nim grammar: line and
+point series, their UniVector styles, titles and SVG/PNG are the stable 1.0
+primitives. The original solid-line and circle-point functions remain ABI
+compatible convenience entry points.
 
 Next: [Python binding](python_binding.html).
 """
