@@ -82,6 +82,10 @@ int main(void) {
 - The additive `_shared` variants take `shared_x` and `shared_y` integer flags
   (`0` or `1`) and derive common numeric domains. The original entry points
   remain ABI-compatible aliases for two false flags.
+- `uplot_add_categorical_column` copies a complete string column into the
+  retained frame. `uplot_render_facet_grid_svg` and its PNG counterpart split
+  one handle by that column; their sharing flags follow the same numeric-domain
+  contract.
 - `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
   ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
   explicit output dimensions and returns null for malformed or unsupported
@@ -108,7 +112,7 @@ compatibility. `UNIPLOT_ABI_VERSION` is 1. Adding functions may preserve this
 version; changing an existing signature or ownership rule may not.
 
 The direct C builders deliberately remain narrower than the Nim grammar: line
-and point series, their UniVector styles and titles are the stable 1.0
+and point series, categorical facet columns, their UniVector styles and titles are the stable 1.0
 construction primitives. The versioned JSON bridge transports the complete
 valid Nim `PlotSpec`, including layers, mappings, references, scales, themes
 and palettes, without duplicating the grammar in C. The original solid-line
@@ -121,9 +125,9 @@ let
   cSvg = readFile("../assets/generated/c_binding.svg")
   cPng = pngDataUri(readFile("../assets/generated/c_binding.png"))
 nbRawHtml gallery([
-  svgFigure(cSvg, "Two-panel SVG produced through the C grid ABI."),
-  pngFigure(cPng, "The same C handles composed into a PNG grid.",
-    "Two plot panels rendered through the UniPlot C ABI")
+  svgFigure(cSvg, "Two facets produced through the C ABI."),
+  pngFigure(cPng, "The same categorical facets rendered as PNG.",
+    "Two categorical facets rendered through the UniPlot C ABI")
 ])
 
 nbSave

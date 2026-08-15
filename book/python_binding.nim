@@ -77,6 +77,10 @@ copying it.
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
   instances without transferring ownership. Shared flags derive common
   numeric domains and reject incompatible transforms or directions.
+- `categorical_column(name, values)` copies a string iterable into the retained
+  frame. `facet_svg(plot, column, font_path, columns, ...)` and `facet_png`
+  partition that plot in first-seen category order and accept the same shared
+  domain flags.
 - `to_json()` returns the complete schema-v1 specification as `str`;
   `Plot.from_json(payload, width, height)` accepts `str` or UTF-8 `bytes` and
   restores a full Nim grammar specification.
@@ -108,9 +112,9 @@ let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
 nbRawHtml gallery([
-  svgFigure(pythonSvg, "Two-panel SVG returned by Python `grid_svg`."),
-  pngFigure(pythonPng, "The same Python Plot instances composed as PNG.",
-    "Two plot panels rendered through the UniPlot Python binding")
+  svgFigure(pythonSvg, "Two facets returned by Python `facet_svg`."),
+  pngFigure(pythonPng, "The same Python facets rendered as PNG.",
+    "Two categorical facets rendered through the UniPlot Python binding")
 ])
 
 nbSave

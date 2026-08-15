@@ -21,17 +21,13 @@ def main() -> int:
         .title("UniPlot Python binding")
     )
     figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
-    second = (
-        uniplot.Plot(800, 500)
-        .scatter(x, list(reversed(y)), color="#7557b3", radius=6.0,
-                 shape=uniplot.MARKER_DIAMOND)
-        .title("Python scatter panel")
-    )
-    svg_path.write_bytes(uniplot.grid_svg(
-        [figure, second], font, columns=2, width=1000, height=420, gap=16,
+    figure.categorical_column(
+        "region", ["west", "west", "west", "east", "east", "east"])
+    svg_path.write_bytes(uniplot.facet_svg(
+        figure, "region", font, columns=2, width=1000, height=420, gap=16,
         shared_x=True, shared_y=True))
-    png_path.write_bytes(uniplot.grid_png(
-        [figure, second], font, columns=2, width=1000, height=420, gap=16,
+    png_path.write_bytes(uniplot.facet_png(
+        figure, "region", font, columns=2, width=1000, height=420, gap=16,
         shared_x=True, shared_y=True))
     return 0
 
