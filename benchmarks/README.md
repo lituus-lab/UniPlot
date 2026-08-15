@@ -116,6 +116,15 @@ ranking:
   same process. The measured 12.44 ms (36.25%) exposes the current ownership
   cost of materialising facet frames; it is recorded as optimisation work, not
   hidden as plotting overhead.
+- `facet_compact_matrix_workload_compile` and
+  `facet_matrix_construct_compile` use the same 100,000-row, five-column frame
+  containing three observed row/column combinations. The first compacts those
+  combinations into three panels; the second preserves the full 2×2 Cartesian
+  matrix with one labelled empty cell. On the 2026-08-15 Darwin arm64 run they
+  averaged 50.46 ms and 53.95 ms over five iterations after three warmups.
+  The matrix contract added 3.49 ms (6.91%) in this paired run, covering the
+  second categorical grouping scan, Cartesian bookkeeping and empty-panel
+  composition; rendering is not included.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

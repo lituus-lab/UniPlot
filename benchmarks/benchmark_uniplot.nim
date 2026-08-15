@@ -120,6 +120,21 @@ proc facetedSpec(count: int): PlotSpec =
   for index in 0 ..< count: groups.add "panel-" & $(index mod 4)
   result.data.addColumn("facet", groups)
 
+proc matrixFacetedSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  var rows, columns, pairs = newSeqOfCap[string](count)
+  for index in 0 ..< count:
+    case index mod 3
+    of 0:
+      rows.add "north"; columns.add "left"; pairs.add "north-left"
+    of 1:
+      rows.add "north"; columns.add "right"; pairs.add "north-right"
+    else:
+      rows.add "south"; columns.add "right"; pairs.add "south-right"
+  result.data.addColumn("facet_row", rows)
+  result.data.addColumn("facet_column", columns)
+  result.data.addColumn("facet_pair", pairs)
+
 proc categoricalSpec(offset, count: int): PlotSpec =
   var
     categories = newSeqOfCap[string](count)
@@ -143,6 +158,7 @@ when isMainModule:
   let gridSpecs = [sampleSpec(panelPointCount), sampleSpec(panelPointCount),
     sampleSpec(panelPointCount), sampleSpec(panelPointCount)]
   let facetSpec = facetedSpec(pointCount)
+  let matrixFacetSpec = matrixFacetedSpec(pointCount)
   let categoryCount = min(100, max(1, pointCount div 4))
   let categoricalGridSpecs = [categoricalSpec(0, categoryCount),
     categoricalSpec(categoryCount div 2, categoryCount)]
@@ -154,7 +170,9 @@ when isMainModule:
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
-      facetCompileTimes, prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
+      facetCompileTimes, compactMatrixFacetCompileTimes,
+        facetMatrixCompileTimes,
+      prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
       pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
@@ -183,6 +201,12 @@ when isMainModule:
       gap = 12, sharedX = true, sharedY = true))
     let facetResult = measureScene(compileFacetGrid(facetSpec, "facet", 2,
       size, gap = 12, sharedX = true, sharedY = true))
+    let compactMatrixFacetResult = measureScene(compileFacetGrid(
+      matrixFacetSpec, "facet_pair", 2, size, gap = 12, sharedX = true,
+      sharedY = true))
+    let facetMatrixResult = measureScene(compileFacetMatrix(matrixFacetSpec,
+      "facet_row", "facet_column", size, gap = 12, sharedX = true,
+      sharedY = true))
     let categoricalGridResult = measureScene(compileGrid(
       categoricalGridSpecs, 2, size, gap = 12))
     let categoricalSharedGridResult = measureScene(compileGrid(
@@ -218,7 +242,8 @@ when isMainModule:
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + gridResult.nodes +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
-      categoricalSharedGridResult.nodes +
+      categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
+      compactMatrixFacetResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
       preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
@@ -236,6 +261,8 @@ when isMainModule:
       categoricalGridCompileTimes.push categoricalGridResult.ms
       categoricalSharedGridCompileTimes.push categoricalSharedGridResult.ms
       facetCompileTimes.push facetResult.ms
+      compactMatrixFacetCompileTimes.push compactMatrixFacetResult.ms
+      facetMatrixCompileTimes.push facetMatrixResult.ms
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
       prepareSceneTimes.push prepareSceneMs
@@ -270,6 +297,9 @@ when isMainModule:
       "categorical_shared_grid_construct_compile": summary(
         categoricalSharedGridCompileTimes),
       "facet_construct_compile": summary(facetCompileTimes),
+      "facet_compact_matrix_workload_compile": summary(
+        compactMatrixFacetCompileTimes),
+      "facet_matrix_construct_compile": summary(facetMatrixCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
       "cpu_prepare_scene": summary(prepareSceneTimes),
