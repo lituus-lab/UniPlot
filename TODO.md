@@ -65,7 +65,9 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Shared numeric domains and categorical x order across explicit plot
   grids, including C and Python bindings.
 - [x] One-dimensional categorical facets in Nim, C and Python.
-- [ ] Two-dimensional facets and secondary axes.
+- [x] Two-dimensional categorical facet matrices preserving empty Cartesian
+  cells in Nim, C and Python.
+- [ ] Secondary axes.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.
