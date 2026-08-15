@@ -1,60 +1,35 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright 2026 lituus-lab -->
-# ADR-0004: UniTemplate conventions
+# ADR-0004: UniPlot repository conventions
 
 - Status: Accepted
-- Date: 2026-07-15
-- Scope: UniTemplate and the conventions every clone inherits
+- Date: 2026-08-15
+- Scope: UniPlot source and distributions
 
 ## Layout
 
+```text
+src/UniPlot/       data, scales, statistics, grammar, scene, guides, render
+src/UniPlot.nim    public umbrella module
+bin/uniplot_cli.nim
+include/UniPlot.h  hand-written C header using uplot_ symbols
+tests/             Nim and C conformance tests
+py/                Cython binding and pytest
+book/              executable examples
 ```
-UniTemplate.nimble          package + tasks
-config.nims                 arch-conditional build flags
-src/UniTemplate.nim         umbrella
-src/UniTemplate/fibonacci.nim  hello-world (NimContracts)
-src/UniTemplate/c_api.nim   C ABI
-include/UniTemplate.h       hand-written C header
-tests/ tests/c/             Nim + C ABI tests
-examples/                   Nim + C demos
-py/                         Cython binding + pytest
-book/                       nimib placeholder
-ADRs/                       0001–0004
-.github/workflows/ci.yml    3-OS Nim + C ABI + Python
-LICENSE NOTICE CONTRIBUTING.md SECURITY.md .gitignore README.md AGENTS.md CLAUDE.md
-```
-
-## Naming
-
-- Nim package/module: `UniFoo` (PascalCase).
-- C library: `libUniFoo`. C header: `UniFoo.h`.
-- C symbol prefix: the lib's short token (`ut_` here; `ua_`, `um_`, `ulin_`…).
 
 ## Conventions
 
-- Hello-world `fibonacci`, exercised in Nim + C ABI + Python.
-- NimContracts `{.contractual.}` + `require:`/`ensure:`/`body:`, compiled away
-  under `-d:release`. The C ABI never raises — it clamps out-of-range input.
-- A postcondition is cheaper than the body; it never re-derives the result.
-- English comments, terse, describe what is done. No "deprecated".
-- Internal `types/` never imports `algorithms/`; `io/` → `types/` only.
+- Public errors are typed; the C ABI translates them to status codes.
+- Public dimensions and coordinates reject non-finite values.
+- Ordered sequences define draw, layer and guide order.
+- Core types contain no backend or window-system handles.
+- English comments are terse and explain one relevant fact.
+- Every executable tutorial block is compiled and run.
+- C symbols use `uplot_`; the library is `libUniPlot`.
 
-## CI gates
+## Gates
 
-- `nimble testCi` + `testCiRelease` on ubuntu/macOS/Windows.
-- `nimble ctest` on linux/macOS.
-- `nimble pyTest` on linux.
-
-## Clone map
-
-| Template | Clone |
-|---|---|
-| `UniTemplate` | `UniFoo` |
-| `unitemplate` | `unifoo` |
-| `ut_` | `<short>_` |
-| `libUniTemplate` | `libUniFoo` |
-| `UniTemplate.h` | `UniFoo.h` |
-
-After the rename, replace `fibonacci.nim` with the domain module(s), update the
-umbrella exports, the C ABI + header + C test + Python `_core.pyx`, and run the
-gates.
+Debug and release Nim tests, DAG validation, C ABI consumers, Python consumers,
+distribution artefacts, executable documentation and renderer fixtures all run
+before a release.

@@ -2,15 +2,12 @@
 <!-- Copyright 2026 lituus-lab -->
 # Security Policy
 
-Report vulnerabilities privately (email the maintainer — see git history),
-not via a public issue. Include: description + impact, minimal reproducer,
-affected version (`unitemplate_version()`).
+Report vulnerabilities privately to the maintainer. Include the affected
+UniPlot version, input data or font, output backend and a minimal reproducer.
 
-Only the latest released line is supported. The `0.1.x` C ABI is not yet frozen.
+Only the latest released line is supported. The 1.x C ABI uses the `uplot_`
+prefix and never lets a Nim exception unwind into foreign code.
 
-## Surface
-
-- C ABI trusts its callers (C pointers, lengths) and never raises; out-of-range
-  input is clamped. Foreign callers validate untrusted input before calling.
-- Python binding adds the domain check and raises `ValueError`/`TypeError`.
-- Single-threaded, reentrant; no global mutable state.
+Plot dimensions, data lengths, colour strings and output pointers are validated
+at public boundaries. Font parsing is delegated to UniGlyph. UniPlot performs
+no network access, implicit file discovery or shader compilation in its core.

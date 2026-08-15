@@ -1,25 +1,31 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright 2026 lituus-lab -->
-# ADR-0001: Acyclic DAG + anti-cycle invariants
+# ADR-0001: UniPlot DAG and anti-cycle invariants
 
 - Status: Accepted
-- Date: 2026-07-15
-- Scope: every `Uni*` repo
+- Date: 2026-08-15
+- Scope: UniPlot and its adapters
 
 ## Decision
 
-Family dependencies form a strictly acyclic DAG (layers 0–7); a library
-depends only on lower layers. Topological order = build order. A back-edge is
-rejected in review and fails CI.
+UniPlot consumes only lower-level engines: UniMath, UniLinalg, UniColor,
+UniImage, UniVector and UniGlyph. It imports no domain engine. Adapters for
+UniGeom, UniGraph, UniMusic or application data live with those consumers.
+
+## Internal order
+
+```text
+common < data < scales < stats < grammar < scene < guides < render < c_api
+```
+
+A module may import its own layer or a lower layer. Backends live at `render`;
+they cannot train scales, run statistics or mutate plot specifications.
 
 ## Invariants
 
-1. Layer-0 primitives have no domain dependency (`UniColor`, `UniMIDI` → none).
-2. Type modules never import algorithm modules within a library
-   (`types/` ↛ `algorithms/`; `io/` → `types/` only).
-3. `UniLinalg` is a repo above `UniMath`; `UniGeom` consumes it, no redefined Vec.
-4. No library depends on an app. Apps may depend on anything below.
-5. Optional deps (`nimsimd`, `NimContracts`) stay optional — never a hard edge.
-
-Extraction into its own repo requires a consumer wanting the piece *without*
-the parent's main subject; else one repo with a documented internal DAG.
+1. No library depends on an application.
+2. No UniPlot core module imports a domain engine.
+3. UniGlyph owns font parsing, shaping and text layout.
+4. UniVector owns vector paths and CPU rasterisation.
+5. UniImage owns pixel storage and image encoding.
+6. WGPU is optional runtime infrastructure and never a core dependency.

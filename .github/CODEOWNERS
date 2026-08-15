@@ -5,4 +5,4 @@
 
 # The C ABI is a compatibility contract: header and implementation move together.
 /include/                  @lbartoletti
-/src/UniTemplate/c_api.nim @lbartoletti
+/src/UniPlot/c_api.nim @lbartoletti

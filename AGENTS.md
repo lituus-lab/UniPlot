@@ -1,42 +1,51 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright 2026 lituus-lab -->
-# AGENTS.md — UniTemplate
+# AGENTS.md — UniPlot
 
-## Build & gates
+## Purpose
 
-```bash
-nimble install -y
-nimble testAll    # Nim debug + release + C ABI
-nimble pyTest     # Cython + pytest (needs libUniTemplate.so)
-nimble example
-nimble coverage   # gcov + lcov -> coverage/ (needs lcov; linux/macOS)
-nimble docs       # nimib book + API reference -> pages/ (needs nimib)
+UniPlot is the renderer-neutral scientific visualisation engine of the Uni*
+family. CPU output is the reference. GPU support is an optional consumer of the
+same scene and must never enter the default import graph.
+
+## Required dependency direction
+
+```text
+common < data < scales < stats < grammar < scene < guides < render < c_api
 ```
 
-`nimble docs` needs a complete Nim distribution: `--project` builds `dochack`,
-which Homebrew's `nim` omits (no `tools/`). choosenim and the CI action ship it.
+Allowed engines are UniMath, UniLinalg, UniColor, UniImage, UniVector and
+UniGlyph. Domain engines are forbidden dependencies.
 
-CI: 3-OS Nim matrix + C ABI (linux/macOS) + Python.
+## Build and gates
 
-## Conventions
+```bash
+nimble lint
+nimble checkVGraph
+nimble test
+nimble testRelease
+nimble testAll
+nimble example
+nimble ctest
+nimble pyTest
+nimble coverage
+nimble book
+nimble docs
+```
 
-- English comments, terse, describe what is done. No "deprecated".
-- NimContracts `{.contractual.}` + `require:`/`ensure:`/`body:`, compiled away
-  under `-d:release`. C ABI never raises — it clamps out-of-range input.
-- A postcondition is cheaper than the body: never re-derives the result by
-  calling the function itself.
-- C ABI: hand-written `include/UniTemplate.h` kept in sync with
-  `src/UniTemplate/c_api.nim`; `tests/c` links the header against the lib.
-  Built `--app:staticlib`/`--app:lib --noMain --mm:arc -d:release`.
-- C symbols `unitemplate_*` (prefix `ut_`); lib `libUniTemplate`; header `UniTemplate.h`.
-- `book/index.nim` is nimib: its code blocks are compiled and run at docs build,
-  so prose that outlives its API breaks the build. `py/notebooks/quickstart.ipynb`
-  plays the same role for Python and renders natively on GitHub.
-- End covered sources with a blank line. Nim maps a trailing statement one line
-  past EOF; without that line lcov aborts on `range`/`unmapped`, and `nimble
-  coverage` deliberately suppresses no error so the failure stays visible.
+## Code conventions
 
-## Scope
+- Preserve deterministic layer and node order.
+- Reject non-finite public layout inputs.
+- Keep statistics in data space and rendering in resolved scene space.
+- Do not parse fonts or approximate text metrics; call UniGlyph.
+- Do not introduce backend handles into public plot or scene types.
+- Keep C header, C implementation and Cython declarations synchronised.
+- C entry points use `uplot_` and never let a Nim exception cross the ABI.
+- Use concise English comments and SPDX headers.
 
-Private reference repo, cloned by hand to start each `Uni*`. No public template
-registry. Apache-2.0, DCO.
+## Scope discipline
+
+UniPlot owns general plotting semantics. Domain adapters belong to their domain
+repositories. WGPU integration is optional and runtime-loaded; headless CPU
+builds and imports cannot depend on it.

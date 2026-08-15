@@ -20,5 +20,5 @@ without a compatible license/attribution, and can stand behind it.
 - [ ] Commits are atomic (one logical change each; several per PR is fine, but not one monolithic commit)
 - [ ] `nimble testAll` passes
 - [ ] `nimble lint` and `nimble checkVGraph` pass
-- [ ] C ABI touched → `include/UniTemplate.h` updated in the same commit
+- [ ] C ABI touched → `include/UniPlot.h` updated in the same commit
 - [ ] Public API touched → `book/index.nim` still builds and describes it

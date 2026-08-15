@@ -1,95 +1,106 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright 2026 lituus-lab -->
-# UniTemplate
+# UniPlot
 
-Reference scaffold cloned to start each `lituus-lab` `Uni*` library. Private
-repo (not a public GitHub template). Hello-world: `fibonacci`, in Nim, C ABI,
-and Python.
+UniPlot is the pure-Nim scientific visualisation engine of the Uni* family. It
+turns typed data and plotting specifications into a renderer-neutral scene,
+then exports that scene through deterministic CPU backends. UniGlyph owns text;
+UniVector and UniImage own vector and raster primitives.
 
-## Layout
+Version 1.0 covers publication-quality two-dimensional plots. Its public model
+supports both a concise procedural API and a composable grammar so applications
+can choose a Matplotlib-like or ggplot2-like workflow without maintaining two
+rendering engines.
 
+## What is inside
+
+- typed columns, rows and finite-value filtering;
+- linear, logarithmic and categorical scales;
+- CSS colour styling through UniColor;
+- line, point, bar, area and text layers, plus histogram recipes;
+- Cartesian axes, ticks, labels, titles and themes;
+- an inspectable retained scene shared by SVG and raster rendering;
+- deterministic SVG and PNG export;
+- value-oriented plot specifications and deterministic scene compilation;
+- a `uniplot` CLI, C ABI and Python binding;
+- an optional backend boundary for WGPU, with no GPU dependency in the core.
+
+## Architecture
+
+```text
+data -> mappings -> statistics -> scales -> guides -> scene -> backend
+                                                     |-> SVG
+                                                     |-> raster/PNG
+                                                     `-> optional WGPU
 ```
-src/UniTemplate.nim          umbrella module
-src/UniTemplate/fibonacci.nim  Nim core (NimContracts)
-src/UniTemplate/c_api.nim    C ABI
-include/UniTemplate.h        hand-written C header
-tests/test_fibonacci.nim     Nim tests
-tests/c/                     C ABI test (links the header against the lib)
-examples/                    Nim + C demos
-py/                          Cython binding + pytest
-ADRs/                        0001 DAG, 0002 license, 0003 engine&shell, 0004 conventions
-.github/workflows/ci.yml     3-OS Nim matrix + C ABI + Python
+
+The dependency direction is fixed:
+
+```text
+common < data < scales < stats < grammar < scene < guides < render < c_api
 ```
+
+Backends consume the scene. They never participate in scale training, layout or
+statistics. This keeps CPU and future GPU output semantically equivalent.
+
+## 1.0 contract
+
+The stable unit is a renderer-neutral plot specification plus its compiled
+scene. Equal specifications, dimensions and font inputs produce equal scene
+ordering and deterministic vector output. Errors are typed; invalid dimensions,
+non-finite layout parameters and incompatible mappings are rejected rather than
+silently repaired.
+
+UniPlot 1.0 does not promise a complete clone of any single plotting library,
+facets, statistical smoothing, date-aware ticks, 3D scenes, volume rendering,
+arbitrary shader injection, a GUI event loop, or a bundled WGPU runtime.
+Interactivity, picking, observables and streaming use explicit extension points
+and may grow without changing the CPU scene contract.
+
+## The Uni* family
+
+UniPlot depends only on lower-level engines: UniMath, UniLinalg, UniColor,
+UniImage, UniVector and UniGlyph. Domain libraries such as UniGeom and UniGraph
+may provide adapters that consume UniPlot; UniPlot never imports them. The
+[family overview](https://github.com/lituus-lab/.github) documents the shared
+architecture and contribution principles.
+
+## Provenance & development
+
+UniPlot translates established plotting concepts from Python, R and Julia into
+the typed, dependency-directed Uni* architecture. Its implementation was built
+with LLM-assisted review over the family design and existing hand-written Nim
+engines; the short linear history records that reconstruction, not the full
+history of the underlying design work.
+
+## Benchmarks
+
+UniPlot 1.0 has no benchmark suite: rendering performance is dominated by the
+lower UniGlyph, UniVector and UniImage engines, while this repository currently
+prioritises deterministic semantic output and cross-backend equivalence. Any
+future performance claim will be backed by a reproducible, machine-tagged run.
 
 ## Build
 
 ```bash
 nimble install -y
-nimble test           # Nim, debug (contracts active)
-nimble testRelease    # Nim, release (contracts compiled away)
-nimble testAll        # debug + release + C ABI
-nimble ctest          # C ABI: static lib + tests/c
-nimble cexample       # C demo
-nimble example        # Nim demo
-nimble pyTest         # Cython + pytest
-nimble coverage       # gcov + lcov -> coverage/
-nimble book           # nimib book -> book/index.html
-nimble docs           # book + API reference -> pages/
+nimble test
+nimble testRelease
+nimble testAll
+nimble example
+nimble ctest
+nimble pyTest
+nimble book
+nimble docs
 ```
 
-## CI
+## GPU boundary
 
-`test`, `cabi` and `python` on ubuntu/macOS/Windows. `consume-cabi` and
-`consume-wheel` rebuild against the published artifacts on a machine without Nim,
-so what ships is what was tested. `coverage` and `docs` run on ubuntu.
-
-`dco` blocks PRs missing a `Signed-off-by` trailer; `commitizen` blocks PRs whose
-commits or title are not [Conventional Commits](https://www.conventionalcommits.org/)
-(`CONTRIBUTING.md`).
-
-The same gates run locally with pre-commit: `pip install pre-commit && pre-commit install`
-(`CONTRIBUTING.md`).
-
-`docs` publishes to GitHub Pages only from a public repo — the template itself is
-private, so that deploy stays skipped here and turns itself on in the engines.
-
-## Clone map
-
-Clone, then rename tokens, then replace `fibonacci.nim` with the domain module(s).
-
-| Template | Clone | Example |
-|---|---|---|
-| `UniTemplate` | `UniFoo` | `UniAccurate`, `UniMath`, `UniGeom` |
-| `unitemplate` | `unifoo` | `uniaccurate`, `unimath`, `unigeom` |
-| `ut_` | `<short>_` | `ua_`, `um_`, `ulin_`, `ug_` |
-| `libUniTemplate` | `libUniFoo` | `libUniMusic` |
-| `UniTemplate.h` | `UniFoo.h` | `UniMusic.h` |
-
-Files to rename: `UniTemplate.nimble`, `src/UniTemplate.nim`, `src/UniTemplate/`,
-`include/UniTemplate.h`, `tests/c/test_unitemplate.c` (+ its Makefile target),
-`py/unitemplate/`. Then update `LICENSE`/`NOTICE` copyright and the ADR titles.
-
-## AI-assisted contributions
-
-Assistance from AI/LLM tools is welcome on the same terms as any other
-contribution.
-
-- **Accountability.** The human contributor is the author and remains fully
-  responsible for the change. The DCO sign-off (`Signed-off-by`) is the mechanism:
-  by signing you certify the content is yours or properly licensed — this covers
-  AI-assisted work, provided you can stand behind it.
-- **No third-party contamination.** Ensure AI output introduces no code from a
-  third party without a compatible license and attribution. If an LLM reproduced
-  protected material, do not submit it.
-- **Correctness is yours.** The gates (tests, `nimble lint`, conventional commits,
-  pre-commit) catch a lot, but you own the result — review and verify what you
-  commit.
-- **Atomic commits.** Each commit is one logical change. A PR may stack
-  several atomic commits (one per element, say) — one monolithic big-bang
-  commit is not.
-- **Disclosure.** State in the PR whether AI assistance was used (see the PR
-  template). It is not a hard requirement — the DCO remains the gate.
+The core contains renderer-neutral resource identifiers, meshes, paths, text
+runs and clip nodes. An optional WGPU backend may translate those resources to
+`wgpu-native`, but importing `UniPlot` never loads or links WGPU. CPU rendering
+is the reference semantics and remains available on every supported platform.
 
 ## License
 
-Apache-2.0 (`LICENSE`). DCO sign-off on every commit (`CONTRIBUTING.md`).
+Apache-2.0. Contributions require a DCO sign-off.

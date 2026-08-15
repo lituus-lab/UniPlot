@@ -29,7 +29,7 @@ Commit subjects and the PR title follow [Conventional Commits 1.0](https://www.c
 optional. A space separates the colon from the description.
 
 ```
-feat: add fibonacci C ABI
+feat(scales): add logarithmic tick generation
 fix(c_api): clamp negative index instead of raising
 docs: clarify clone map
 feat(core)!: drop the old accumulator API

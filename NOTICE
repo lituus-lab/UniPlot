@@ -1,4 +1,4 @@
-UniTemplate
+UniPlot
 Copyright 2026 lituus-lab
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,5 +15,5 @@ limitations under the License.
 
 ----------------------------------------------------------------------------
 
-Bundles a pinned dependency on NimContracts (github.com/lbartoletti/NimContracts,
-branch fix/generic-proc-support), MIT-licensed.
+Depends on NimContracts (main), UniMath, UniLinalg, UniColor, UniImage,
+UniVector and UniGlyph. Their notices and licenses apply to their distributions.
