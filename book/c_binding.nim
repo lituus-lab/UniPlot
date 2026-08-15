@@ -80,7 +80,8 @@ int main(void) {
   of non-null plot handles, an explicit row-major column count, canvas size
   and pixel gap. They do not take ownership of the handles.
 - The additive `_shared` variants take `shared_x` and `shared_y` integer flags
-  (`0` or `1`) and derive common numeric domains. The original entry points
+  (`0` or `1`) and derive common numeric domains or categorical x order. The
+  original entry points
   remain ABI-compatible aliases for two false flags.
 - `uplot_add_categorical_column` copies a complete string column into the
   retained frame. `uplot_render_facet_grid_svg` and its PNG counterpart split

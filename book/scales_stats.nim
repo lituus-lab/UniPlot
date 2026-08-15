@@ -66,6 +66,12 @@ limit that would silently draw outside the panel. Calling `scaleX` or `scaleY`
 does not erase an existing limit; `clearXLimits` and `clearYLimits` restore
 automatic training. The optional limits round-trip through schema-v1 JSON.
 
+`xCategories(["beta", "alpha", "gamma"])` fixes a categorical x order and
+may retain categories absent from a particular panel. It must contain every
+observed category and cannot contain duplicates. `clearXCategories` restores
+first-seen automatic ordering; the optional order also round-trips through
+schema-v1 JSON.
+
 ```nim
 var bounded = linePlot([1.0, 2.0, 3.0], [4.0, 6.0, 5.0])
 bounded.xLimits(0.0, 4.0)

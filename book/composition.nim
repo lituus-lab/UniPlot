@@ -63,7 +63,7 @@ positive dimensions are rejected in debug contracts and by release guards.
 Panel node IDs are deterministically namespaced. Recompiling the same grid
 therefore gives stable IDs without collisions between repeated specifications.
 
-## Shared numeric domains
+## Shared axis domains
 """
 
 nbCode:
@@ -89,9 +89,27 @@ unchanged. All participating axes must use the same transform and direction;
 existing explicit limits must already satisfy their own plot before they join
 the union.
 
-Shared categorical x domains, guide deduplication and secondary axes are not
-implemented and are not claimed. Requesting a shared categorical x axis raises
-`PlotError`.
+Categorical x domains are unioned in first-seen panel order. An explicit
+`xCategories` order is retained first and must contain its panel's observed
+values. Numeric and categorical x coordinates cannot be mixed in one shared
+grid.
+
+"""
+
+nbCode:
+  var firstBars = barPlot(["beta", "alpha"], [3.0, 2.0])
+  firstBars.labels(title = "First categories", x = "group", y = "count")
+  var secondBars = barPlot(["gamma", "beta"], [4.0, 1.0])
+  secondBars.labels(title = "Second categories", x = "group", y = "count")
+  let categoricalShared = compileGrid([firstBars, secondBars], columns = 2,
+    size = Size(width: 900, height: 360), gap = 18, sharedX = true)
+  let categoricalSharedSvg = categoricalShared.toSvg(font)
+
+nbRawHtml svgFigure(categoricalSharedSvg,
+  "Both bar panels use beta, alpha, gamma in deterministic union order.")
+
+nbText: """
+Guide deduplication and secondary axes are not implemented and are not claimed.
 
 ## Data-driven categorical facets
 """
@@ -119,15 +137,14 @@ nbText: """
 custom composition is needed. It accepts an existing categorical column,
 preserves all columns and row order inside each category, and orders panels by
 first appearance. `compileFacetGrid` performs the split and ordinary grid
-compilation in one call; its sharing flags have the same numeric-only contract
-as `compileGrid`.
+compilation in one call; its sharing flags have the same contract as
+`compileGrid`.
 
 Empty, missing or numeric facet columns are rejected. Two-dimensional facets,
-shared categorical x domains, guide deduplication and secondary axes remain
-future work.
+guide deduplication and secondary axes remain future work.
 
 Next: [Versioned JSON](serialization.html).
 """
 
 nbSave
-validatePage("composition.html", minSvg = 3, requirePng = true)
+validatePage("composition.html", minSvg = 4, requirePng = true)

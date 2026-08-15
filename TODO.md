@@ -12,8 +12,8 @@ scene without weakening its deterministic CPU semantics.
 - [x] Typed numeric and categorical columns with finite-row filtering.
 - [x] Layered, value-oriented plot specifications and stable scene node IDs.
 - [x] Linear, logarithmic and band scales with deterministic ticks.
-- [x] Strict explicit numeric domains with backward-compatible schema-v1
-  serialization.
+- [x] Strict explicit numeric and categorical x domains with
+  backward-compatible schema-v1 serialization.
 - [x] Line, point, bar, area and text marks; histogram recipe.
 - [x] Axes, grid, tick labels, titles, axis labels and themes.
 - [x] UniColor styling, UniGlyph text, UniVector paths and UniImage output.
@@ -62,10 +62,10 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Legends derived from named layers with explicit visibility and title
   control.
 - [x] Explicit subplot grids with independent axes and retained-scene output.
-- [x] Numeric shared domains across explicit plot grids, including C and
-  Python bindings.
+- [x] Shared numeric domains and categorical x order across explicit plot
+  grids, including C and Python bindings.
 - [x] One-dimensional categorical facets in Nim, C and Python.
-- [ ] Two-dimensional facets, shared categorical axes and secondary axes.
+- [ ] Two-dimensional facets and secondary axes.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.

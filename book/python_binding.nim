@@ -76,7 +76,8 @@ copying it.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
   instances without transferring ownership. Shared flags derive common
-  numeric domains and reject incompatible transforms or directions.
+  numeric domains or categorical x order and reject incompatible coordinate
+  kinds, transforms or directions.
 - `categorical_column(name, values)` copies a string iterable into the retained
   frame. `facet_svg(plot, column, font_path, columns, ...)` and `facet_png`
   partition that plot in first-seen category order and accept the same shared
