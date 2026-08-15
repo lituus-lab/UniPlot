@@ -147,6 +147,14 @@ ranking:
   averaged 7.55 ms over five iterations after three warmups (7.29–7.90 ms).
   Input copying, sorting and temporary normalized storage are included; this
   is not a pre-sorted or allocation-free claim.
+- `grouped_box_plot_construct_compile` constructs 100,000 deterministic
+  group labels and values, partitions them into eight first-seen groups,
+  computes each type-7/Tukey summary, materialises explicit summary and
+  outlier rows, and compiles their UniVector box/outlier scene. On the
+  2026-08-15 Darwin arm64 run it averaged 14.68 ms over five iterations after
+  three warmups (14.56–14.89 ms). String/value construction, grouping,
+  sorting, frame allocation and scene compilation are included; SVG/PNG/GPU
+  rendering is not.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

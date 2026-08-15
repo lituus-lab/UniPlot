@@ -125,6 +125,16 @@ proc retainedAnnotationSpec(count: int): PlotSpec =
   result.annotateArrow(domainMaximum * 0.6, 0.5,
     domainMaximum * 0.75, 1.0)
 
+proc groupedBoxPlotSpec(count: int): PlotSpec =
+  var
+    groups = newSeqOfCap[string](count)
+    values = newSeqOfCap[float64](count)
+  for index in 0 ..< count:
+    groups.add "group-" & $(index mod 8)
+    let base = sin(float64(index) * 0.017) + float64(index mod 8) * 0.2
+    values.add(if index > 0 and index mod 10_000 == 0: base + 8.0 else: base)
+  result = boxPlot(groups, values)
+
 proc facetedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   var groups = newSeqOfCap[string](count)
@@ -181,7 +191,7 @@ when isMainModule:
       styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
-      retainedAnnotationCompileTimes,
+      retainedAnnotationCompileTimes, groupedBoxPlotCompileTimes,
       jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
@@ -228,6 +238,8 @@ when isMainModule:
     let uncertaintyResult = measureScene(
       uncertaintySpec(pointCount).compileScene(size))
     let themedResult = measureScene(themedSpec(pointCount).compileScene(size))
+    let groupedBoxPlotResult = measureScene(
+      groupedBoxPlotSpec(pointCount).compileScene(size))
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
     let sharedGridResult = measureScene(compileGrid(gridSpecs, 2, size,
       gap = 12, sharedX = true, sharedY = true))
@@ -274,6 +286,7 @@ when isMainModule:
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + secondaryResult.nodes + gridResult.nodes +
       retainedAnnotationResult.nodes +
+      groupedBoxPlotResult.nodes +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
@@ -293,6 +306,7 @@ when isMainModule:
       themedCompileTimes.push themedResult.ms
       secondaryCompileTimes.push secondaryResult.ms
       retainedAnnotationCompileTimes.push retainedAnnotationResult.ms
+      groupedBoxPlotCompileTimes.push groupedBoxPlotResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
       categoricalGridCompileTimes.push categoricalGridResult.ms
@@ -331,6 +345,8 @@ when isMainModule:
       "secondary_axis_construct_compile": summary(secondaryCompileTimes),
       "retained_annotation_construct_compile": summary(
         retainedAnnotationCompileTimes),
+      "grouped_box_plot_construct_compile": summary(
+        groupedBoxPlotCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "categorical_grid_construct_compile": summary(
