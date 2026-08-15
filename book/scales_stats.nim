@@ -78,6 +78,33 @@ bounded.xLimits(0.0, 4.0)
 bounded.yLimits(0.0, 8.0)
 ```
 
+## Secondary y guide
+
+The secondary guide is a bijective affine view of primary y values:
+`secondary = primary × scale + offset`. It does not train an independent
+domain and cannot be used to align unrelated series visually.
+"""
+
+nbCode:
+  var temperature = linePlot([0.0, 1.0, 2.0, 3.0],
+    [0.0, 10.0, 20.0, 30.0], color = "#267a5e")
+  temperature.geomPoint(aes("x", "y"), color = "#d65f2d", radius = 5)
+  temperature.labels(title = "One quantity, two units",
+    x = "sample", y = "celsius")
+  temperature.secondaryY(scale = 1.8, offset = 32.0, label = "fahrenheit")
+  let secondarySvg = temperature.compileScene(
+    Size(width: 760, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(secondarySvg,
+  "Celsius positions with a right-side affine Fahrenheit guide.")
+
+nbText: """
+`scale` must be finite and non-zero; `offset` must be finite. A transformed
+tick that overflows is rejected. The guide reserves its own right-side width
+and coexists with a right legend without overlap. `clearSecondaryY` removes it.
+The optional transform round-trips through schema-v1 JSON.
+
 ## Categorical band scales
 """
 
@@ -117,4 +144,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 1)
+validatePage("scales_stats.html", minSvg = 2)
