@@ -72,6 +72,7 @@ type
     theme*: Theme
     legendSpec*: LegendSpec
     categoricalColors*: Palette
+    continuousColors*: Palette
     mappedSizeRange*, mappedAlphaRange*: AestheticRange
 
 proc cssColor(value: string): Color =
@@ -85,8 +86,12 @@ proc defaultTheme*(): Theme =
     right: 30, bottom: 60), pointSize: 4, lineWidth: 2)
 
 proc plot*(data: DataFrame): PlotSpec =
+  let continuous = viridis(5)
+  if continuous.isErr:
+    raise newException(PlotError, "cannot initialize the continuous palette")
   PlotSpec(data: data, theme: defaultTheme(),
     legendSpec: LegendSpec(position: lpRight), categoricalColors: okabeIto(),
+    continuousColors: continuous.get,
     mappedSizeRange: AestheticRange(minimum: 2, maximum: 10),
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
@@ -146,6 +151,13 @@ proc categoricalPalette*(spec: var PlotSpec; colors: Palette) =
       palCategorical}:
     raise newException(PlotError, "categorical mappings require a discrete palette")
   spec.categoricalColors = colors
+
+proc continuousPalette*(spec: var PlotSpec; colors: Palette) =
+  ## Select the ordered UniColor ramp used by numeric color mappings.
+  if colors.tag notin {palOrdered, palScientific, palContinuous}:
+    raise newException(PlotError,
+      "continuous mappings require an ordered palette")
+  spec.continuousColors = colors
 
 proc sizeRange*(spec: var PlotSpec; minimum, maximum: float32) {.contractual.} =
   ## Configure the output range of numeric size mappings.

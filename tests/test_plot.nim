@@ -183,6 +183,14 @@ suite "plot compilation":
     area.geomArea(aes("x", "y", color = "group"))
     expect PlotError: discard area.compileScene()
 
+  test "continuous palettes require ordered UniColor ramps":
+    var spec = sample()
+    let ramp = viridis(7)
+    check ramp.isOk
+    spec.continuousPalette(ramp.get)
+    check spec.continuousColors.len == 7
+    expect PlotError: spec.continuousPalette(okabeIto())
+
   test "numeric size and alpha mappings use explicit output ranges":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0])
