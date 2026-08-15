@@ -52,7 +52,7 @@ def main():
         started = time.perf_counter_ns()
         png_bytes = reference.to_image(format="png", width=800, height=500)
         png_ms = (time.perf_counter_ns() - started) / 1_000_000
-        guard ^= len(svg_bytes) ^ len(png_bytes) ^ len(figure.data)
+        guard += len(svg_bytes) + len(png_bytes) + len(figure.data)
 
         if iteration >= warmups:
             construct.append(construct_ms)

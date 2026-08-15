@@ -43,8 +43,7 @@ for (iteration in seq_len(iterations + warmups)) {
   print(reference)
   grDevices::dev.off()
   png_ms <- (proc.time()[["elapsed"]] - started) * 1000
-  guard <- bitwXor(guard, file.info(svg_path)$size)
-  guard <- bitwXor(guard, file.info(png_path)$size)
+  guard <- guard + file.info(svg_path)$size + file.info(png_path)$size
   unlink(c(svg_path, png_path))
 
   if (iteration > warmups) {

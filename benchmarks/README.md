@@ -64,6 +64,14 @@ ranking:
   into the interpolation space once. This is a measured 57.6% reduction for
   this internal stage, not a claim about complete render throughput or other
   machines; the sampler remains serial rather than SIMD or parallel.
+- `reference_construct_compile` compiles the common line-plus-point workload
+  with two reference lines, two reference bands and two labels. It exercises
+  scale-domain extension and UniVector annotation geometry without folding
+  that UniPlot-only work into the cross-provider ranking. On the 2026-08-15
+  100,000-point check it averaged 21.23 ms over five iterations versus
+  21.34 ms for the unannotated construction in the same process; the apparent
+  difference is noise, while the absence of material annotation overhead is
+  the relevant observation.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other

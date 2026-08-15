@@ -35,7 +35,7 @@ for iteration in 1:(iterations + warmups)
   svg_ms = @elapsed(savefig(reference, svg_path)) * 1000
   png_path = tempname() * ".png"
   png_ms = @elapsed(savefig(reference, png_path)) * 1000
-  guard = xor(xor(guard, filesize(svg_path)), filesize(png_path))
+  guard += filesize(svg_path) + filesize(png_path)
   rm(svg_path)
   rm(png_path)
   if iteration > warmups

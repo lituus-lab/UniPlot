@@ -54,6 +54,14 @@ proc continuousColorSpec(count: int): PlotSpec =
   result = plot(frame)
   result.geomPoint(aes("x", "y", color = "intensity"), radius = 2)
 
+proc annotatedSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  let domainMaximum = max(1.0, float64(count - 1) / 25.0)
+  result.referenceX(domainMaximum * 0.5, label = "midpoint")
+  result.referenceY(0.0, width = 2)
+  result.referenceXBand(domainMaximum * 0.2, domainMaximum * 0.3)
+  result.referenceYBand(-0.25, 0.25)
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -66,7 +74,8 @@ when isMainModule:
   let referenceX = referenceSpec.data.numeric("x")
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
-      continuousColorCompileTimes, svgTimes, pngTimes: RunningStat
+      continuousColorCompileTimes, referenceCompileTimes, svgTimes,
+      pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -94,15 +103,19 @@ when isMainModule:
     let continuousColorCompileMs = elapsedMs(started)
 
     started = getMonoTime()
+    let referenceScene = annotatedSpec(pointCount).compileScene(size)
+    let referenceCompileMs = elapsedMs(started)
+
+    started = getMonoTime()
     let svg = reference.toSvg(font)
     let svgMs = elapsedMs(started)
 
     started = getMonoTime()
     let png = reference.encodePng(font)
     let pngMs = elapsedMs(started)
-    consumed = consumed xor svg.len xor png.len xor scene.nodes.len xor
-      styledScene.nodes.len xor continuousColorScene.nodes.len xor
-      finiteCount xor int(trained.domainMax)
+    consumed += svg.len + png.len + scene.nodes.len + styledScene.nodes.len +
+      continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
+      int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
@@ -110,6 +123,7 @@ when isMainModule:
       compileTimes.push compileMs
       styledCompileTimes.push styledCompileMs
       continuousColorCompileTimes.push continuousColorCompileMs
+      referenceCompileTimes.push referenceCompileMs
       svgTimes.push svgMs
       pngTimes.push pngMs
 
@@ -128,6 +142,7 @@ when isMainModule:
       "styled_construct_compile": summary(styledCompileTimes),
       "continuous_color_construct_compile": summary(
         continuousColorCompileTimes),
+      "reference_construct_compile": summary(referenceCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
       "png_from_compiled_scene": summary(pngTimes)
     },

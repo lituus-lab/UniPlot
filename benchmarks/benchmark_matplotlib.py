@@ -52,13 +52,13 @@ def main():
         started = time.perf_counter_ns()
         reference.savefig(target, format="svg")
         svg_ms = (time.perf_counter_ns() - started) / 1_000_000
-        guard ^= len(target.getvalue())
+        guard += len(target.getvalue())
 
         target = io.BytesIO()
         started = time.perf_counter_ns()
         reference.savefig(target, format="png")
         png_ms = (time.perf_counter_ns() - started) / 1_000_000
-        guard ^= len(target.getvalue())
+        guard += len(target.getvalue())
 
         if iteration >= warmups:
             construct.append(construct_ms)
