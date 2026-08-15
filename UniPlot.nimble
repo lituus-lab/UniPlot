@@ -142,6 +142,14 @@ task benchmarkScales, "Run cross-library 10^3, 10^5, and 10^6-point workloads":
 task benchmarkThermals, "Compare cold processes with warmed provider stages":
   exec "python3 benchmarks/run_thermal_suite.py"
 
+task benchmarkMemory, "Measure isolated UniPlot heap and RSS high-water marks":
+  let memoryBinary = when defined(windows): "build/benchmark_memory.exe" else:
+    "build/benchmark_memory"
+  exec "nim c -d:release --mm:orc --path:src -o:" & memoryBinary &
+       " benchmarks/benchmark_memory.nim"
+  exec "nim c -r -d:release --mm:orc -o:build/run_memory_benchmarks" &
+       " benchmarks/run_memory_benchmarks.nim " & memoryBinary
+
 task benchmarkBindings, "Benchmark an already-built C/Python JSON bridge":
   exec "python3 benchmarks/benchmark_bindings.py"
 
