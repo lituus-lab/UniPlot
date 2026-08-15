@@ -213,6 +213,40 @@ Automatic Scott, Sturges and Freedman–Diaconis selection is intentionally not
 implemented locally: those rules need floating-point transcendental/root
 primitives that must first belong to UniMath.
 
+## Grouped aggregation
+"""
+
+nbCode:
+  let groupNames = ["beta", "alpha", "beta", "empty", "alpha"]
+  let groupValues = [1.0, 4.0, 3.0, NaN, 8.0]
+  for summary in aggregateGroups(groupNames, groupValues, agMean):
+    echo summary.group, ": value=", summary.value,
+      " finite count=", summary.count
+  var grouped = groupedAggregatePlot(groupNames, groupValues, agMean,
+    color = "#9b4d96")
+  grouped.labels(title = "Mean by first-seen group", x = "cohort",
+    y = "finite-sample mean")
+  let groupedSvg = grouped.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(groupedSvg,
+  "Compensated means in first-seen group order; the empty group is retained on the axis.")
+
+nbText: """
+`aggregateGroups(groups, values, aggregation)` supports `agCount`, `agSum`,
+`agMean`, `agMinimum` and `agMaximum`. Inputs must have equal non-zero lengths
+and group names cannot be empty. Groups retain first-seen order. Non-finite
+values do not contribute; `count` records the number of finite observations.
+An entirely non-finite group is still returned: its aggregate is `NaN`, except
+for `agCount`, whose value is zero. This preserves the categorical domain while
+the ordinary mark filtering omits a non-finite bar.
+
+Sums and means delegate their compensated arithmetic to UniAccurate.
+`groupedAggregatePlot` materialises the result as an ordinary categorical bar
+specification, so it uses the same retained scene, serialization and rendering
+pipeline as caller-built bars.
+
 ## Quantiles and descriptive summaries
 
 `quantile(values, probability)` filters non-finite observations and uses the
@@ -311,4 +345,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 6)
+validatePage("scales_stats.html", minSvg = 7)
