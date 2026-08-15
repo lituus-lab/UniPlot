@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import UniColor
+import contracts
 import UniPlot/[common, data, scales, stats]
 
 type
@@ -20,10 +21,15 @@ type
     title*: string
     position*: LegendPosition
 
+  AestheticRange* = object
+    minimum*, maximum*: float32
+
   Aes* = object
     x*, y*: string
     label*: string
     color*: string
+    size*: string
+    alpha*: string
 
   Layer* = object
     mark*: MarkKind
@@ -44,6 +50,7 @@ type
     theme*: Theme
     legendSpec*: LegendSpec
     categoricalColors*: Palette
+    mappedSizeRange*, mappedAlphaRange*: AestheticRange
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -57,10 +64,13 @@ proc defaultTheme*(): Theme =
 
 proc plot*(data: DataFrame): PlotSpec =
   PlotSpec(data: data, theme: defaultTheme(),
-    legendSpec: LegendSpec(position: lpRight), categoricalColors: okabeIto())
+    legendSpec: LegendSpec(position: lpRight), categoricalColors: okabeIto(),
+    mappedSizeRange: AestheticRange(minimum: 2, maximum: 10),
+    mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
-proc aes*(x, y: string; label = ""; color = ""): Aes =
-  Aes(x: x, y: y, label: label, color: color)
+proc aes*(x, y: string; label = ""; color = ""; size = "";
+    alpha = ""): Aes =
+  Aes(x: x, y: y, label: label, color: color, size: size, alpha: alpha)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "") =
@@ -103,6 +113,31 @@ proc categoricalPalette*(spec: var PlotSpec; colors: Palette) =
       palCategorical}:
     raise newException(PlotError, "categorical mappings require a discrete palette")
   spec.categoricalColors = colors
+
+proc sizeRange*(spec: var PlotSpec; minimum, maximum: float32) {.contractual.} =
+  ## Configure the output range of numeric size mappings.
+  require:
+    minimum > 0 and minimum.isFinite
+    maximum >= minimum and maximum.isFinite
+  body:
+    if minimum <= 0 or not minimum.isFinite or maximum < minimum or
+        not maximum.isFinite:
+      raise newException(PlotError,
+        "size range must be finite, positive and ordered")
+    spec.mappedSizeRange = AestheticRange(minimum: minimum, maximum: maximum)
+
+proc alphaRange*(spec: var PlotSpec; minimum,
+    maximum: float32) {.contractual.} =
+  ## Configure the output range of numeric alpha mappings.
+  require:
+    minimum >= 0 and minimum.isFinite
+    maximum >= minimum and maximum <= 1 and maximum.isFinite
+  body:
+    if minimum < 0 or not minimum.isFinite or maximum < minimum or
+        maximum > 1 or not maximum.isFinite:
+      raise newException(PlotError,
+        "alpha range must be finite, ordered and within [0, 1]")
+    spec.mappedAlphaRange = AestheticRange(minimum: minimum, maximum: maximum)
 
 proc linePlot*(x, y: openArray[float64]; color = "#3366cc";
     legend = ""): PlotSpec =
