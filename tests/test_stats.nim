@@ -20,6 +20,24 @@ suite "statistics":
     check explicit.data.rowCount == 2
     check explicit.data.numeric("value") == @[2.0, 2.0]
 
+  test "numeric histograms preserve interval width and optional density":
+    let counts = histogramPlot(
+      [0.0, 0.5, 1.0, 2.0, 3.0], [0.0, 1.0, 3.0])
+    check counts.layers[0].mark == mkRect
+    check counts.data.numeric("xMin") == @[0.0, 1.0]
+    check counts.data.numeric("xMax") == @[1.0, 3.0]
+    check counts.data.numeric("yMax") == @[2.0, 3.0]
+    discard counts.compileScene()
+
+    let density = histogramPlot(
+      [0.0, 0.5, 1.0, 2.0, 3.0], [0.0, 1.0, 3.0], density = true)
+    let heights = density.data.numeric("yMax")
+    check abs(heights[0] * 1.0 + heights[1] * 2.0 - 1.0) < 1e-12
+    check histogramPlot([], [0.0, 1.0], density = true).data.numeric(
+      "yMax") == @[0.0]
+    expect PlotError:
+      discard histogramPlot([0.0], [-1e308, 1e308])
+
   test "histograms reject invalid bin counts and ignore non-finite input":
     expect PlotError: discard histogram([1.0], 0)
     check histogram([NaN, Inf], 3).len == 0

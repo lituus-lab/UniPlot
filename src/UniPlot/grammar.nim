@@ -581,6 +581,37 @@ proc histogramBreaksPlot*(values, breaks: openArray[float64];
     counts.add float64(bin.count)
   result = barPlot(labels, counts, color, legend)
 
+proc histogramPlot*(values, breaks: openArray[float64]; density = false;
+    color = "#3366cc"; legend = ""): PlotSpec =
+  ## Build numeric variable-width count or probability-density rectangles.
+  let bins = histogramBreaks(values, breaks)
+  var
+    lower = newSeqOfCap[float64](bins.len)
+    upper = newSeqOfCap[float64](bins.len)
+    baseline = newSeq[float64](bins.len)
+    heights = newSeqOfCap[float64](bins.len)
+    finiteCount = 0
+  for bin in bins: finiteCount += bin.count
+  for bin in bins:
+    let width = bin.upper - bin.lower
+    if width <= 0 or not width.isFinite:
+      raise newException(PlotError,
+        "numeric histogram intervals must have finite positive widths")
+    lower.add bin.lower
+    upper.add bin.upper
+    heights.add(if density and finiteCount > 0:
+      float64(bin.count) / float64(finiteCount) / width
+    else:
+      float64(bin.count))
+  var frame = initDataFrame()
+  frame.addColumn("xMin", lower)
+  frame.addColumn("xMax", upper)
+  frame.addColumn("yMin", baseline)
+  frame.addColumn("yMax", heights)
+  result = plot(frame)
+  result.geomRect(aes("", "", xMin = "xMin", xMax = "xMax",
+    yMin = "yMin", yMax = "yMax"), color, legend)
+
 proc groupedAggregatePlot*(groups: openArray[string];
     values: openArray[float64]; aggregation = agMean; color = "#3366cc";
     legend = ""): PlotSpec =
