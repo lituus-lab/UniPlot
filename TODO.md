@@ -95,7 +95,10 @@ than introducing competing geometry or text implementations.
 
 ## Performance investigations
 
-- [ ] Remove repeated allocations in scale training and finite-row selection.
+- [x] Train continuous and band scale domains incrementally without retaining
+  or sorting concatenated samples.
+- [ ] Avoid materialising finite-row index sequences while preserving explicit
+  missing-value and line-break semantics.
 - [x] Expose reusable prepared scenes that retain shaped and tessellated paths.
 - [ ] Add bounded automatic prepared-scene caching by stable semantic key.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
