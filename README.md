@@ -18,6 +18,7 @@ rendering engines.
 - linear, logarithmic and categorical scales;
 - CSS colour styling through UniColor;
 - categorical colour mappings backed by immutable UniColor palettes;
+- numeric size and alpha mappings with explicit output ranges;
 - line, point, bar, area and text layers, plus histogram recipes;
 - Cartesian axes, ticks, labels, titles and themes;
 - explicit layer-derived legends with deterministic layout;

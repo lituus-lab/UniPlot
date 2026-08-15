@@ -141,6 +141,38 @@ Point, bar, text and line layers support categorical colours. A line segment
 uses the category of its ending row. An area is one polygon and therefore
 rejects per-row colour mappings instead of silently choosing one colour.
 
+## Numeric size and alpha mappings
+
+The `size` and `alpha` aesthetics map numeric columns through the existing
+continuous-scale implementation. `sizeRange` and `alphaRange` define explicit
+finite output ranges; alpha composes with the immutable UniColor value instead
+of mutating it.
+"""
+
+nbCode:
+  var weightedData = initDataFrame()
+  weightedData.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
+  weightedData.addColumn("y", [1.0, 3.0, 2.0, 4.5, 3.7])
+  weightedData.addColumn("weight", [1.0, 3.0, 2.0, 5.0, 4.0])
+  weightedData.addColumn("confidence", [0.2, 0.8, 0.4, 1.0, 0.7])
+  var weighted = plot(weightedData)
+  weighted.geomPoint(aes("x", "y", size = "weight", alpha = "confidence"),
+    color = "#7b2cbf")
+  weighted.sizeRange(3, 11)
+  weighted.alphaRange(0.25, 1)
+  weighted.labels(title = "Numeric aesthetics", x = "x", y = "y")
+  let weightedSvg = weighted.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(weightedSvg,
+  "Point radius and opacity are trained from independent numeric columns.")
+
+nbText: """
+Non-finite mapped values remove the corresponding row consistently with x and
+y filtering. Lines use the ending row's width and opacity; bars use mapped size
+as width; text uses it as font size. Areas reject per-row aesthetics because an
+area layer produces one polygon.
+
 ## Labels and themes
 
 `labels` sets the title and axis labels. `defaultTheme()` exposes background,
@@ -173,4 +205,4 @@ Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 8)
+validatePage("grammar.html", minSvg = 9)
