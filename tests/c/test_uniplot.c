@@ -2,6 +2,7 @@
 /* Copyright 2026 lituus-lab */
 #include "UniPlot.h"
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #ifndef TEST_FONT
@@ -35,6 +36,8 @@ int main(void) {
   assert(uplot_add_line(plot, x, y, 3, "invalid", 2.0f) ==
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
+  const double gap_y[] = {1.0, NAN, 2.0};
+  assert(uplot_add_line(plot, x, gap_y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
   assert(uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
                                UPLOT_LINE_DOT_DASH) == UPLOT_OK);
