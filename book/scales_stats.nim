@@ -15,7 +15,6 @@ custom guides, adapters and inspection.
 """
 
 nbCode:
-  import std/math
   import UniPlot
   import UniGlyph
 
@@ -59,6 +58,19 @@ nbText: """
 the output direction. Logarithmic coordinates reject non-positive mapped
 values. Categorical x coordinates remain linear; bars and areas reject a
 logarithmic y coordinate because their current semantic baseline is zero.
+
+`xLimits(minimum, maximum)` and `yLimits(minimum, maximum)` fix a numeric
+domain. Limits are finite and strictly increasing, and must contain all marks,
+uncertainty bounds, baselines and reference annotations. UniPlot rejects a
+limit that would silently draw outside the panel. Calling `scaleX` or `scaleY`
+does not erase an existing limit; `clearXLimits` and `clearYLimits` restore
+automatic training. The optional limits round-trip through schema-v1 JSON.
+
+```nim
+var bounded = linePlot([1.0, 2.0, 3.0], [4.0, 6.0, 5.0])
+bounded.xLimits(0.0, 4.0)
+bounded.yLimits(0.0, 8.0)
+```
 
 ## Categorical band scales
 """

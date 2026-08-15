@@ -63,12 +63,38 @@ positive dimensions are rejected in debug contracts and by release guards.
 Panel node IDs are deterministically namespaced. Recompiling the same grid
 therefore gives stable IDs without collisions between repeated specifications.
 
-This API is explicit subplot composition. Automatic data faceting, shared
-domains, shared axes and secondary axes are not part of it yet and are not
-claimed as implemented.
+## Shared numeric domains
+"""
+
+nbCode:
+  var local = linePlot([0.0, 1.0, 2.0], [10.0, 20.0, 15.0],
+    color = "#3366cc")
+  local.labels(title = "Local range", x = "time", y = "value")
+  var distant = linePlot([4.0, 6.0, 8.0], [-20.0, 0.0, 30.0],
+    color = "#cc6633")
+  distant.labels(title = "Distant range", x = "time", y = "value")
+  let shared = compileGrid([local, distant], columns = 2,
+    size = Size(width: 900, height: 360), gap = 18,
+    sharedX = true, sharedY = true)
+  let sharedSvg = shared.toSvg(font)
+
+nbRawHtml svgFigure(sharedSvg,
+  "Both panels use the union of their numeric x and y domains.")
+
+nbText: """
+`sharedX` and `sharedY` default to `false`. When enabled, UniPlot accumulates
+the same coordinates as ordinary scene compilation: marks, ribbon/error
+bounds, zero baselines and reference annotations. Source specifications remain
+unchanged. All participating axes must use the same transform and direction;
+existing explicit limits must already satisfy their own plot before they join
+the union.
+
+Shared categorical x domains, automatic data faceting, guide deduplication and
+secondary axes are not implemented and are not claimed. Requesting a shared
+categorical x axis raises `PlotError`.
 
 Next: [Versioned JSON](serialization.html).
 """
 
 nbSave
-validatePage("composition.html", minSvg = 1, requirePng = true)
+validatePage("composition.html", minSvg = 2, requirePng = true)
