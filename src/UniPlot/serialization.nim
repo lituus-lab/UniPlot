@@ -185,6 +185,9 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
   if spec.yScaleSpec.domain.configured:
     yScale["domain"] = %*{"minimum": spec.yScaleSpec.domain.minimum,
       "maximum": spec.yScaleSpec.domain.maximum}
+  if spec.secondaryYSpec.enabled:
+    yScale["secondary"] = %*{"scale": spec.secondaryYSpec.scale,
+      "offset": spec.secondaryYSpec.offset, "label": spec.secondaryYSpec.label}
   %*{
     "schema": "org.lituus-lab.uniplot.plot-spec",
     "version": PlotSpecSchemaVersion,
@@ -283,6 +286,12 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
     result.yScaleSpec.domain = AxisDomainSpec(configured: true,
       minimum: domain.finiteNumber("minimum"),
       maximum: domain.finiteNumber("maximum"))
+  if yScale.hasKey("secondary"):
+    let secondary = yScale.field("secondary", JObject)
+    result.secondaryYSpec = SecondaryAxisSpec(enabled: true,
+      scale: secondary.finiteNumber("scale"),
+      offset: secondary.finiteNumber("offset"),
+      label: secondary.field("label", JString).getStr)
   result.references.setLen(0)
   for node in root.field("references", JArray):
     result.references.add Reference(

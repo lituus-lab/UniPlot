@@ -58,6 +58,13 @@ suite "PlotSpec JSON schema":
     check encoded["xScale"]["categories"] == %*["c", "a", "b"]
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "secondary y transforms round trip as optional scale semantics":
+    var spec = completeSpec()
+    spec.secondaryY(scale = 1.8, offset = 32.0, label = "fahrenheit")
+    let encoded = spec.toJsonNode
+    check encoded["yScale"]["secondary"]["scale"].getFloat == 1.8
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])
