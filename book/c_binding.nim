@@ -106,6 +106,8 @@ int main(void) {
   accept `UPLOT_MISSING_DROP`, `UPLOT_MISSING_BREAK` or
   `UPLOT_MISSING_REJECT`. Existing line entry points break at non-finite values;
   existing point entry points drop them.
+- `uplot_set_secondary_y(scale, offset, label)` adds the same affine right-side
+  guide as Nim; `uplot_clear_secondary_y` removes it.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 

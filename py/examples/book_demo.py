@@ -18,7 +18,8 @@ def main() -> int:
               style=uniplot.LINE_DASHED)
         .scatter(x[1:-1], y[1:-1], color="#dc7c28", radius=5.0,
                  shape=uniplot.MARKER_CROSS)
-        .title("Python")
+        .title("Py")
+        .secondary_y(1.8, 32.0, "F")
     )
     figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
     figure.categorical_column(

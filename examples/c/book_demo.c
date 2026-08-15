@@ -35,7 +35,8 @@ int main(int argc, char **argv) {
                             UPLOT_LINE_DOT_DASH) != UPLOT_OK ||
       uplot_add_points_shaped(plot, x + 1, y + 1, 4, "#d64255", 5.0f,
                               UPLOT_MARKER_DIAMOND) != UPLOT_OK ||
-      uplot_set_title(plot, "C") != UPLOT_OK)
+      uplot_set_title(plot, "C") != UPLOT_OK ||
+      uplot_set_secondary_y(plot, 1.8, 32.0, "F") != UPLOT_OK)
     goto cleanup;
   if (uplot_plot_to_json(plot, &json, &json_length) != UPLOT_OK) goto cleanup;
   uplot_plot *restored = uplot_plot_from_json(json, json_length, 800, 500);

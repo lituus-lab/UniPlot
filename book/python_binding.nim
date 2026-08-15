@@ -72,6 +72,8 @@ copying it.
   infinite values explicitly; rejection is reported when rendering compiles
   the retained specification.
 - `title(text)` sets the plot title.
+- `secondary_y(scale=1.0, offset=0.0, label="")` adds an affine right-side
+  guide; `clear_secondary_y()` removes it.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16,
   shared_x=False, shared_y=False)` and `grid_png(...)` compose borrowed `Plot`
