@@ -15,6 +15,8 @@ type
     mkBar
     mkArea
     mkText
+    mkErrorBar
+    mkRibbon
 
   LineStyle* = enum
     SolidLine
@@ -59,6 +61,7 @@ type
 
   Aes* = object
     x*, y*: string
+    yMin*, yMax*: string
     label*: string
     color*: string
     fill*: string
@@ -76,6 +79,7 @@ type
     shape*: MarkerShape
     lineStyle*: LineStyle
     missingValues*: MissingValuePolicy
+    capWidth*: float32
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -115,16 +119,21 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
-    shape = ""; lineStyle = ""; fill = ""): Aes =
+    shape = ""; lineStyle = ""; fill = ""; yMin = ""; yMax = ""): Aes =
   Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
-    alpha: alpha, shape: shape, lineStyle: lineStyle)
+    alpha: alpha, shape: shape, lineStyle: lineStyle, yMin: yMin, yMax: yMax)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
     shape = CircleMarker; lineStyle = SolidLine;
     missingValues = DropMissing) =
-  if mapping.x.len == 0 or mapping.y.len == 0:
-    raise newException(PlotError, "x and y mappings are required")
+  if mapping.x.len == 0 or
+      (mark notin {mkErrorBar, mkRibbon} and mapping.y.len == 0):
+    raise newException(PlotError, "required position mappings are missing")
+  if mark in {mkErrorBar, mkRibbon} and
+      (mapping.yMin.len == 0 or mapping.yMax.len == 0):
+    raise newException(PlotError,
+      "error bars and ribbons require yMin and yMax mappings")
   if size < 0 or not size.isFinite:
     raise newException(PlotError, "mark size must be finite and non-negative")
   spec.layers.add Layer(mark: mark, mapping: mapping, color: cssColor(color),
@@ -152,6 +161,26 @@ proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
 proc geomText*(spec: var PlotSpec; mapping: Aes; color = "#202124";
     size = 12'f32; legend = ""; missingValues = DropMissing) =
   spec.addLayer(mkText, mapping, color, size, legend,
+    missingValues = missingValues)
+
+proc geomErrorBar*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
+    width = 1'f32; capWidth = 8'f32; legend = "";
+    missingValues = DropMissing) {.contractual.} =
+  ## Add independent vertical uncertainty intervals with horizontal caps.
+  require:
+    capWidth >= 0 and capWidth.isFinite
+  body:
+    if capWidth < 0 or not capWidth.isFinite:
+      raise newException(PlotError,
+        "error-bar cap width must be finite and non-negative")
+    spec.addLayer(mkErrorBar, mapping, color, width, legend,
+      missingValues = missingValues)
+    spec.layers[^1].capWidth = capWidth
+
+proc geomRibbon*(spec: var PlotSpec; mapping: Aes; color = "#6699dd80";
+    legend = ""; missingValues = BreakOnMissing) =
+  ## Add a filled uncertainty envelope between yMin and yMax.
+  spec.addLayer(mkRibbon, mapping, color, legend = legend,
     missingValues = missingValues)
 
 proc labels*(spec: var PlotSpec; title = ""; x = ""; y = "") =

@@ -96,6 +96,60 @@ suite "plot compilation":
       color: parseColor("#ffffff").get, width: 1)
     expect PlotError: discard direct.compileScene()
 
+  test "error bars and ribbons use explicit uncertainty bounds":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("lower", [0.5, 1.5, 1.0])
+    frame.addColumn("upper", [1.5, 3.0, 2.5])
+    var spec = plot(frame)
+    let uncertainty = aes("x", "", yMin = "lower", yMax = "upper")
+    spec.geomRibbon(uncertainty)
+    spec.geomErrorBar(uncertainty, capWidth = 10)
+    let scene = spec.compileScene()
+    var markNodes = 0
+    for node in scene.nodes:
+      if node.id != 0:
+        inc markNodes
+    check markNodes == 4
+
+  test "ribbons preserve gaps and reject inverted bounds":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0])
+    frame.addColumn("lower", [0.0, 0.5, NaN, 1.0, 1.5])
+    frame.addColumn("upper", [1.0, 1.5, NaN, 2.0, 2.5])
+    var ribbon = plot(frame)
+    ribbon.geomRibbon(aes("x", "", yMin = "lower", yMax = "upper"))
+    let scene = ribbon.compileScene()
+    var ribbonNodes = 0
+    for node in scene.nodes:
+      if node.id != 0:
+        inc ribbonNodes
+    check ribbonNodes == 2
+
+    var invertedFrame = initDataFrame()
+    invertedFrame.addColumn("x", [0.0])
+    invertedFrame.addColumn("lower", [2.0])
+    invertedFrame.addColumn("upper", [1.0])
+    var inverted = plot(invertedFrame)
+    inverted.geomErrorBar(aes("x", "", yMin = "lower", yMax = "upper"))
+    expect PlotError: discard inverted.compileScene()
+
+  test "uncertainty constructors enforce their contracts":
+    var spec = sample()
+    expect PlotError: spec.geomRibbon(aes("x", ""))
+    when defined(release):
+      expect PlotError:
+        spec.geomErrorBar(aes("x", "", yMin = "y", yMax = "y"),
+          capWidth = -1)
+    else:
+      expect PreConditionDefect:
+        spec.geomErrorBar(aes("x", "", yMin = "y", yMax = "y"),
+          capWidth = -1)
+    var direct = sample()
+    direct.geomErrorBar(aes("x", "", yMin = "y", yMax = "y"))
+    direct.layers[^1].capWidth = NaN.float32
+    expect PlotError: discard direct.compileScene()
+
   test "invalid margins and missing mappings are typed errors":
     var spec = sample()
     spec.theme.margins.left = 1000

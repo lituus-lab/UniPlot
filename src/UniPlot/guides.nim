@@ -75,6 +75,18 @@ proc linePath(points: openArray[Point]; width: float32;
   result = result.preparePath().strokeToPath(
     lineStrokeStyle(width, lineStyle))
 
+proc errorBarPath(lower, upper: Point; capWidth, width: float32): Path =
+  result = newPath()
+  result.moveTo(lower.x, lower.y)
+  result.lineTo(upper.x, upper.y)
+  if capWidth > 0:
+    let halfCap = capWidth * 0.5
+    result.moveTo(lower.x - halfCap, lower.y)
+    result.lineTo(lower.x + halfCap, lower.y)
+    result.moveTo(upper.x - halfCap, upper.y)
+    result.lineTo(upper.x + halfCap, upper.y)
+  result = result.preparePath().strokeToPath(defaultStrokeStyle(width))
+
 proc categoricalEntries(spec: PlotSpec; layer: Layer;
                         mapping: string): seq[LegendEntry] =
   if mapping.len == 0: return
@@ -151,10 +163,25 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       "theme point size and line width must be finite and positive")
   var usesContinuousColors = false
   for layer in spec.layers:
-    if layer.mapping.x notin spec.data.columns or
-        layer.mapping.y notin spec.data.columns:
+    let bounded = layer.mark in {mkErrorBar, mkRibbon}
+    if layer.size < 0 or not layer.size.isFinite:
+      raise newException(PlotError,
+        "mark size must be finite and non-negative")
+    if layer.mark == mkErrorBar and
+        (layer.capWidth < 0 or not layer.capWidth.isFinite):
+      raise newException(PlotError,
+        "error-bar cap width must be finite and non-negative")
+    if layer.mapping.x notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
-    if spec.data.columns[layer.mapping.y].kind != ckNumeric:
+    if bounded:
+      for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
+        if mapping notin spec.data.columns or
+            spec.data.columns[mapping].kind != ckNumeric:
+          raise newException(PlotError,
+            "uncertainty bounds must reference numeric columns")
+    elif layer.mapping.y notin spec.data.columns:
+      raise newException(PlotError, "layer mapping references a missing column")
+    elif spec.data.columns[layer.mapping.y].kind != ckNumeric:
       raise newException(PlotError, "y mappings must reference numeric columns")
     if layer.mapping.color.len > 0 and
         layer.mapping.color notin spec.data.columns:
@@ -189,12 +216,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           spec.data.columns[mapping].kind != ckNumeric):
         raise newException(PlotError,
           "size and alpha mappings must reference numeric columns")
-    if layer.mark == mkArea and (layer.mapping.color.len > 0 or
+    if layer.mark in {mkArea, mkRibbon} and (layer.mapping.color.len > 0 or
         layer.mapping.fill.len > 0 or
         layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
         layer.mapping.shape.len > 0 or layer.mapping.lineStyle.len > 0):
       raise newException(PlotError,
-        "area layers do not support per-row aesthetic mappings")
+        "area and ribbon layers do not support per-row aesthetic mappings")
     if layer.mark == mkText and (layer.mapping.label.len == 0 or
         layer.mapping.label notin spec.data.columns or
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
@@ -289,7 +316,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       xDomain.addValues(spec.data.numeric(layer.mapping.x))
     else:
       xBandDomain.addValues(spec.data.categorical(layer.mapping.x))
-    yDomain.addValues(spec.data.numeric(layer.mapping.y))
+    if layer.mark in {mkErrorBar, mkRibbon}:
+      yDomain.addValues(spec.data.numeric(layer.mapping.yMin))
+      yDomain.addValues(spec.data.numeric(layer.mapping.yMax))
+    else:
+      yDomain.addValues(spec.data.numeric(layer.mapping.y))
     includeZero = includeZero or layer.mark in {mkBar, mkArea}
   if includeZero: yDomain.addValues([0.0])
   if includeZero and spec.yScaleSpec.kind == skLog10:
@@ -376,7 +407,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           reference.color)
   for layer in spec.layers:
     let
-      ys = spec.data.numeric(layer.mapping.y)
+      bounded = layer.mark in {mkErrorBar, mkRibbon}
+      ys = if bounded: @[] else: spec.data.numeric(layer.mapping.y)
+      lowerValues = if bounded: spec.data.numeric(layer.mapping.yMin) else: @[]
+      upperValues = if bounded: spec.data.numeric(layer.mapping.yMax) else: @[]
       numericXs = if xKind == ckNumeric:
         spec.data.numeric(layer.mapping.x)
       else:
@@ -385,7 +419,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.categorical(layer.mapping.x)
       else:
         @[]
-    var finiteColumns = @[layer.mapping.x, layer.mapping.y]
+    var finiteColumns = @[layer.mapping.x]
+    if bounded:
+      finiteColumns.add layer.mapping.yMin
+      finiteColumns.add layer.mapping.yMax
+    else:
+      finiteColumns.add layer.mapping.y
     if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
     if layer.mapping.alpha.len > 0: finiteColumns.add layer.mapping.alpha
     let paintMapping = if layer.mapping.fill.len > 0:
@@ -401,6 +440,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var lineStyles: seq[LineStyle]
     var labels: seq[string]
     var breakBefore: seq[bool]
+    var lowerPoints, upperPoints: seq[Point]
     var categoryColors = initTable[string, Color]()
     let categoricalPaintValues = if paintMapping.len > 0 and
         spec.data.columns[paintMapping].kind == ckCategorical:
@@ -437,9 +477,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     let fallbackSize = if layer.size > 0: layer.size else:
       case layer.mark
       of mkPoint: spec.theme.pointSize
-      of mkLine: spec.theme.lineWidth
+      of mkLine, mkErrorBar: spec.theme.lineWidth
       of mkText: 12'f32
-      of mkBar, mkArea: 0'f32
+      of mkBar, mkArea, mkRibbon: 0'f32
     var pendingBreak = false
     for row in 0 ..< spec.data.rowCount:
       if not rowFilter.rowIsFinite(row):
@@ -456,8 +496,20 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         xScale.map(numericXs[row])
       else:
         xBand.map(categoricalXs[row])
-      points.add Point(x: x, y: yScale.map(ys[row]))
-      if layer.mark in {mkLine, mkArea}: breakBefore.add pendingBreak
+      if bounded:
+        if lowerValues[row] > upperValues[row]:
+          raise newException(PlotError,
+            "uncertainty lower bound exceeds upper bound")
+        let
+          lower = Point(x: x, y: yScale.map(lowerValues[row]))
+          upper = Point(x: x, y: yScale.map(upperValues[row]))
+        lowerPoints.add lower
+        upperPoints.add upper
+        points.add Point(x: x, y: (lower.y + upper.y) * 0.5)
+      else:
+        points.add Point(x: x, y: yScale.map(ys[row]))
+      if layer.mark in {mkLine, mkArea, mkRibbon}:
+        breakBefore.add pendingBreak
       pendingBreak = false
       var paint = if categoricalPaintValues.len > 0:
         categoryColors[categoricalPaintValues[row]] else: layer.color
@@ -541,6 +593,25 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       for i, label in labels:
         result.addText(label, points[i], sizes[i],
           colors[i], nodeId); inc nodeId
+    of mkErrorBar:
+      for index in 0 ..< lowerPoints.len:
+        result.addPath(errorBarPath(lowerPoints[index], upperPoints[index],
+          layer.capWidth, sizes[index]), colors[index], nodeId)
+        inc nodeId
+    of mkRibbon:
+      if lowerPoints.len > 0:
+        var start = 0
+        for stop in 1 .. lowerPoints.len:
+          if stop == lowerPoints.len or breakBefore[stop]:
+            if stop - start > 1:
+              var ribbon = newSeqOfCap[Point]((stop - start) * 2)
+              for index in start ..< stop:
+                ribbon.add upperPoints[index]
+              for index in countdown(stop - 1, start):
+                ribbon.add lowerPoints[index]
+              result.addPath(polygon(ribbon), layer.color, nodeId)
+              inc nodeId
+            start = stop
   if legendEntries.len > 0 or continuousGuides.len > 0:
     let legendX = area.xMax + 24
     var legendY = area.yMin + 14
@@ -551,7 +622,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     for entry in legendEntries:
       let center = Point(x: legendX + 10, y: legendY - 4)
       case entry.mark
-      of mkLine:
+      of mkLine, mkErrorBar:
         let width = if entry.size > 0: entry.size else: spec.theme.lineWidth
         result.addPath(linePath([Point(x: legendX, y: center.y),
           Point(x: legendX + 20, y: center.y)], width, entry.lineStyle),
@@ -560,7 +631,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
         result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
-      of mkBar, mkArea:
+      of mkBar, mkArea, mkRibbon:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
         result.addPath(swatch, entry.color)
