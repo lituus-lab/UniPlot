@@ -59,7 +59,8 @@ silently claimed by the focused 1.0 publication contract.
 
 - [x] Legends derived from named layers with explicit visibility and title
   control.
-- [ ] Facets, subplot grids, shared axes and secondary axes.
+- [x] Explicit subplot grids with independent axes and retained-scene output.
+- [ ] Data-driven facets, shared axes and secondary axes.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.
