@@ -86,6 +86,13 @@ ranking:
   the 2026-08-15 Darwin arm64 run it averaged 21.47 ms for 100,000 points over
   five measured iterations, versus 21.37 ms for the default theme in the same
   process. The 0.10 ms difference is within run-to-run noise.
+- `secondary_axis_construct_compile` adds a five-tick affine right-side y guide
+  to the common workload and alternates measurement order against the default
+  plot. On the 2026-08-15 Darwin arm64 run, seven iterations after three
+  warmups averaged 21.65 ms with the guide and 21.47 ms without it. The
+  0.18 ms (0.85%) difference is smaller than the overlapping run variability;
+  it is retained as regression evidence, not claimed as a measurable universal
+  cost.
 - `grid_construct_compile` compiles four independent panels containing a
   combined point count equal to the common workload, then composes their paths,
   text and namespaced IDs. On the 2026-08-15 Darwin arm64 run at 100,000 total

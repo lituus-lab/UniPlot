@@ -114,6 +114,10 @@ proc themedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   result.applyTheme(darkTheme())
 
+proc secondaryAxisSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  result.secondaryY(scale = 1.8, offset = 32.0, label = "fahrenheit")
+
 proc facetedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   var groups = newSeqOfCap[string](count)
@@ -167,7 +171,8 @@ when isMainModule:
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
-      uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
+      uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
+      jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
       facetCompileTimes, compactMatrixFacetCompileTimes,
@@ -187,7 +192,15 @@ when isMainModule:
       if rowFilter.rowIsFinite(row): inc finiteCount
     let rowFilterMs = elapsedMs(started)
 
-    let sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
+    var sceneResult, secondaryResult: tuple[ms: float64; nodes: int]
+    if (iteration and 1) == 0:
+      sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
+      secondaryResult = measureScene(
+        secondaryAxisSpec(pointCount).compileScene(size))
+    else:
+      secondaryResult = measureScene(
+        secondaryAxisSpec(pointCount).compileScene(size))
+      sceneResult = measureScene(sampleSpec(pointCount).compileScene(size))
     let styledResult = measureScene(styledSpec(pointCount).compileScene(size))
     let continuousColorResult = measureScene(
       continuousColorSpec(pointCount).compileScene(size))
@@ -240,7 +253,7 @@ when isMainModule:
     consumed += svgResult.bytes + pngResult.bytes + sceneResult.nodes +
       styledResult.nodes + continuousColorResult.nodes +
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
-      themedResult.nodes + gridResult.nodes +
+      themedResult.nodes + secondaryResult.nodes + gridResult.nodes +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
@@ -256,6 +269,7 @@ when isMainModule:
       referenceCompileTimes.push referenceResult.ms
       uncertaintyCompileTimes.push uncertaintyResult.ms
       themedCompileTimes.push themedResult.ms
+      secondaryCompileTimes.push secondaryResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
       categoricalGridCompileTimes.push categoricalGridResult.ms
@@ -290,6 +304,7 @@ when isMainModule:
       "reference_construct_compile": summary(referenceCompileTimes),
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
       "themed_construct_compile": summary(themedCompileTimes),
+      "secondary_axis_construct_compile": summary(secondaryCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "categorical_grid_construct_compile": summary(
