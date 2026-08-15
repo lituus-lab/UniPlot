@@ -35,6 +35,8 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "invalid", 2.0f) ==
          UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_line(plot, x, y, 3, "#3366cc", -1.0f) ==
+         UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   const double gap_y[] = {1.0, NAN, 2.0};
   assert(uplot_add_line(plot, x, gap_y, 3, "#3366cc", 2.0f) == UPLOT_OK);

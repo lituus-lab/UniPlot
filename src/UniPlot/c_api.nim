@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/[locks, tables]
+import UniColor
 import UniGlyph
 import UniPlot
 
@@ -65,6 +66,8 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     return UPLOT_ERR_ARGUMENT
   if count > csize_t(high(int)):
     return UPLOT_ERR_ARGUMENT
+  if size < 0 or not size.isFinite or parseColor($color).isErr:
+    return UPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     let inputCount = int(count)
@@ -80,11 +83,11 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
       xv[i] = NaN; yv[i] = NaN
     let xName = "x" & $h.nextColumn
     let yName = "y" & $h.nextColumn
-    inc h.nextColumn
     h.spec.data.addColumn(xName, xv)
     h.spec.data.addColumn(yName, yv)
     h.spec.addLayer(mark, aes(xName, yName), $color, size,
       lineStyle = lineStyle, shape = shape, missingValues = missingValues)
+    inc h.nextColumn
     UPLOT_OK
   except CatchableError, Defect: UPLOT_ERR_ARGUMENT
 
