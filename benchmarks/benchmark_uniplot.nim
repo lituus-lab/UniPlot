@@ -150,6 +150,18 @@ proc categoricalHeatmapSpec(count: int): PlotSpec =
   let inputs = heatmapInputs(count)
   heatmapPlot(inputs.xs, inputs.ys, inputs.values)
 
+proc histogramBreakInputs(count: int): tuple[values, breaks: seq[float64]] =
+  result.values = newSeqOfCap[float64](count)
+  for index in 0 ..< count:
+    result.values.add float64(index mod 1_000) / 10.0
+  result.breaks = newSeqOfCap[float64](65)
+  for index in 0 .. 64:
+    result.breaks.add float64(index) * 100.0 / 64.0
+
+proc explicitHistogramSpec(count: int): PlotSpec =
+  let inputs = histogramBreakInputs(count)
+  histogramBreaksPlot(inputs.values, inputs.breaks)
+
 proc facetedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   var groups = newSeqOfCap[string](count)
@@ -202,6 +214,7 @@ when isMainModule:
   let referenceY = referenceSpec.data.numeric("y")
   let referenceJson = referenceSpec.toJson
   let heatmapReference = heatmapInputs(pointCount)
+  let histogramBreakReference = histogramBreakInputs(pointCount)
 
   var scaleTimes, rowFilterTimes, descriptiveSummaryTimes, compileTimes,
       styledCompileTimes,
@@ -209,6 +222,7 @@ when isMainModule:
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
       retainedAnnotationCompileTimes, groupedBoxPlotCompileTimes,
       aggregate2DTimes, categoricalHeatmapCompileTimes,
+      explicitHistogramTimes, explicitHistogramCompileTimes,
       jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
       categoricalGridCompileTimes, categoricalSharedGridCompileTimes,
@@ -238,6 +252,11 @@ when isMainModule:
       heatmapReference.values)
     let aggregate2DMs = elapsedMs(started)
 
+    started = getMonoTime()
+    let explicitBins = histogramBreaks(histogramBreakReference.values,
+      histogramBreakReference.breaks)
+    let explicitHistogramMs = elapsedMs(started)
+
     var sceneResult, secondaryResult, retainedAnnotationResult:
       tuple[ms: float64; nodes: int]
     if (iteration and 1) == 0:
@@ -264,6 +283,8 @@ when isMainModule:
       groupedBoxPlotSpec(pointCount).compileScene(size))
     let categoricalHeatmapResult = measureScene(
       categoricalHeatmapSpec(pointCount).compileScene(size))
+    let explicitHistogramResult = measureScene(
+      explicitHistogramSpec(pointCount).compileScene(size))
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
     let sharedGridResult = measureScene(compileGrid(gridSpecs, 2, size,
       gap = 12, sharedX = true, sharedY = true))
@@ -312,6 +333,7 @@ when isMainModule:
       retainedAnnotationResult.nodes +
       groupedBoxPlotResult.nodes +
       categoricalHeatmapResult.nodes + aggregated.len +
+      explicitHistogramResult.nodes + explicitBins.len +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
       compactMatrixFacetResult.nodes +
@@ -334,6 +356,8 @@ when isMainModule:
       groupedBoxPlotCompileTimes.push groupedBoxPlotResult.ms
       aggregate2DTimes.push aggregate2DMs
       categoricalHeatmapCompileTimes.push categoricalHeatmapResult.ms
+      explicitHistogramTimes.push explicitHistogramMs
+      explicitHistogramCompileTimes.push explicitHistogramResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
       categoricalGridCompileTimes.push categoricalGridResult.ms
@@ -377,6 +401,9 @@ when isMainModule:
       "aggregate_2d": summary(aggregate2DTimes),
       "categorical_heatmap_construct_compile": summary(
         categoricalHeatmapCompileTimes),
+      "explicit_histogram_breaks": summary(explicitHistogramTimes),
+      "explicit_histogram_construct_compile": summary(
+        explicitHistogramCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
       "categorical_grid_construct_compile": summary(

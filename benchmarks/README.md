@@ -166,6 +166,15 @@ UniPlot also reports internal diagnostics excluded from cross-library ranking:
   UniVector tiles. The same run averaged 14.42 ms (14.32–14.59 ms). SVG, PNG
   and WGPU rendering are excluded; this stage is not compared with competitor
   heatmaps whose aggregation and missing-cell contracts may differ.
+- `explicit_histogram_breaks` assigns 100,000 prepared finite samples to 64
+  unequal-capable caller-defined bins using binary search. On the 2026-08-15
+  Darwin arm64 run it averaged 1.11 ms over five iterations after three
+  warmups (1.05–1.15 ms). Boundary validation and result allocation are
+  included; input construction is excluded.
+- `explicit_histogram_construct_compile` constructs the 100,000 samples and 65
+  boundaries, bins them, materialises labels/counts and compiles the 64-bar
+  UniVector scene. The same run averaged 1.41 ms (1.38–1.46 ms). SVG, PNG and
+  WGPU rendering are excluded.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the

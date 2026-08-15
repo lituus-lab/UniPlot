@@ -199,6 +199,13 @@ averaged 14.42 ms (14.32–14.59 ms). Neither stage includes SVG, PNG or WGPU
 rendering, and neither is ranked against competitor heatmaps with different
 aggregation and missing-cell semantics.
 
+Explicit histogram boundaries are also isolated. Assigning 100,000 prepared
+samples to 64 caller-defined bins averaged 1.11 ms over five iterations after
+three warmups (1.05–1.15 ms), including boundary validation and result
+allocation. Constructing the samples and 65 boundaries, binning, materialising
+labels/counts and compiling the 64-bar UniVector scene averaged 1.41 ms
+(1.38–1.46 ms). Rendering is excluded from both stages.
+
 Versioned PlotSpec JSON is measured in two stages. For 100,000 rows on the
 same 2026-08-15 Darwin arm64 run, in-memory encoding averaged 8.04 ms and
 decoding averaged 17.80 ms over five measured iterations. The input JSON is
