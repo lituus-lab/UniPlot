@@ -11,6 +11,21 @@ extern "C" {
 #define UNIPLOT_VERSION "1.0.0"
 #define UNIPLOT_ABI_VERSION 1
 enum { UPLOT_OK = 0, UPLOT_ERR_ARGUMENT = 1, UPLOT_ERR_RENDER = 2 };
+typedef enum {
+  UPLOT_LINE_SOLID = 0,
+  UPLOT_LINE_DASHED = 1,
+  UPLOT_LINE_DOTTED = 2,
+  UPLOT_LINE_DOT_DASH = 3,
+  UPLOT_LINE_LONG_DASH = 4
+} uplot_line_style;
+typedef enum {
+  UPLOT_MARKER_CIRCLE = 0,
+  UPLOT_MARKER_SQUARE = 1,
+  UPLOT_MARKER_TRIANGLE = 2,
+  UPLOT_MARKER_DIAMOND = 3,
+  UPLOT_MARKER_PLUS = 4,
+  UPLOT_MARKER_CROSS = 5
+} uplot_marker_shape;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -21,6 +36,10 @@ int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                      const char *color, float radius);
+int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,
+                          const char *color, float width, int line_style);
+int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
+                            size_t, const char *color, float radius, int shape);
 int uplot_set_title(uplot_plot *, const char *title);
 int uplot_render_png(uplot_plot *, const char *font_path, uint8_t **, size_t *);
 int uplot_render_svg(uplot_plot *, const char *font_path, uint8_t **, size_t *);

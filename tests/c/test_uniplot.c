@@ -19,6 +19,8 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_points(NULL, x, y, 3, "#cc3333", 4.0f) ==
          UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_line_styled(NULL, x, y, 3, "#3366cc", 2.0f,
+                               UPLOT_LINE_DASHED) == UPLOT_ERR_ARGUMENT);
   assert(uplot_set_title(NULL, "title") == UPLOT_ERR_ARGUMENT);
   assert(uplot_render_svg(NULL, TEST_FONT, &svg, &svg_len) ==
          UPLOT_ERR_ARGUMENT);
@@ -32,6 +34,14 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
+  assert(uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
+                               UPLOT_LINE_DOT_DASH) == UPLOT_OK);
+  assert(uplot_add_points_shaped(plot, x, y, 3, "#cc3333", 4.0f,
+                                 UPLOT_MARKER_DIAMOND) == UPLOT_OK);
+  assert(uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f, 999) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_points_shaped(plot, x, y, 3, "#cc3333", 4.0f, 999) ==
+         UPLOT_ERR_ARGUMENT);
   assert(uplot_set_title(plot, "C plot") == UPLOT_OK);
   assert(uplot_render_svg(plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);

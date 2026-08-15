@@ -45,7 +45,8 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
 
 proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
-    mark: MarkKind; color: cstring; size: float32): cint =
+    mark: MarkKind; color: cstring; size: float32;
+    lineStyle = SolidLine; shape = CircleMarker): cint =
   if value.isNil or xs.isNil or ys.isNil or count == 0 or color.isNil:
     return UPLOT_ERR_ARGUMENT
   try:
@@ -61,7 +62,8 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     inc h.nextColumn
     h.spec.data.addColumn(xName, xv)
     h.spec.data.addColumn(yName, yv)
-    h.spec.addLayer(mark, aes(xName, yName), $color, size)
+    h.spec.addLayer(mark, aes(xName, yName), $color, size,
+      lineStyle = lineStyle, shape = shape)
     UPLOT_OK
   except CatchableError: UPLOT_ERR_ARGUMENT
 
@@ -72,6 +74,24 @@ proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
 proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
   addSeries(value, xs, ys, count, mkPoint, color, radius)
+
+proc uplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
+    count: csize_t; color: cstring; width: float32;
+    lineStyle: cint): cint {.exportc, dynlib, cdecl.} =
+  if lineStyle < cint(low(LineStyle).ord) or
+      lineStyle > cint(high(LineStyle).ord):
+    return UPLOT_ERR_ARGUMENT
+  addSeries(value, xs, ys, count, mkLine, color, width,
+    LineStyle(lineStyle))
+
+proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
+    count: csize_t; color: cstring; radius: float32;
+    shape: cint): cint {.exportc, dynlib, cdecl.} =
+  if shape < cint(low(MarkerShape).ord) or
+      shape > cint(high(MarkerShape).ord):
+    return UPLOT_ERR_ARGUMENT
+  addSeries(value, xs, ys, count, mkPoint, color, radius,
+    shape = MarkerShape(shape))
 
 proc uplot_set_title*(value: pointer; title: cstring): cint {.
     exportc, dynlib, cdecl.} =
