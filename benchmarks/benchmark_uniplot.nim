@@ -150,6 +150,19 @@ proc categoricalHeatmapSpec(count: int): PlotSpec =
   let inputs = heatmapInputs(count)
   heatmapPlot(inputs.xs, inputs.ys, inputs.values)
 
+proc groupedInputs(count: int): tuple[groups: seq[string];
+    values: seq[float64]] =
+  result.groups = newSeqOfCap[string](count)
+  result.values = newSeqOfCap[float64](count)
+  for index in 0 ..< count:
+    result.groups.add "group-" & $(index mod 32)
+    let value = sin(float64(index) * 0.013) + float64(index mod 17) * 0.1
+    result.values.add(if index > 0 and index mod 10_000 == 0: NaN else: value)
+
+proc groupedAggregateSpec(count: int): PlotSpec =
+  let inputs = groupedInputs(count)
+  groupedAggregatePlot(inputs.groups, inputs.values)
+
 proc histogramBreakInputs(count: int): tuple[values, breaks: seq[float64]] =
   result.values = newSeqOfCap[float64](count)
   for index in 0 ..< count:
@@ -214,6 +227,7 @@ when isMainModule:
   let referenceY = referenceSpec.data.numeric("y")
   let referenceJson = referenceSpec.toJson
   let heatmapReference = heatmapInputs(pointCount)
+  let groupedReference = groupedInputs(pointCount)
   let histogramBreakReference = histogramBreakInputs(pointCount)
 
   var scaleTimes, rowFilterTimes, descriptiveSummaryTimes, compileTimes,
@@ -221,7 +235,8 @@ when isMainModule:
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, secondaryCompileTimes,
       retainedAnnotationCompileTimes, groupedBoxPlotCompileTimes,
-      aggregate2DTimes, categoricalHeatmapCompileTimes,
+      aggregate2DTimes, categoricalHeatmapCompileTimes, aggregateGroupTimes,
+      groupedAggregateCompileTimes,
       explicitHistogramTimes, explicitHistogramCompileTimes,
       jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
@@ -251,6 +266,11 @@ when isMainModule:
     let aggregated = aggregate2D(heatmapReference.xs, heatmapReference.ys,
       heatmapReference.values)
     let aggregate2DMs = elapsedMs(started)
+
+    started = getMonoTime()
+    let groupAggregates = aggregateGroups(groupedReference.groups,
+      groupedReference.values)
+    let aggregateGroupMs = elapsedMs(started)
 
     started = getMonoTime()
     let explicitBins = histogramBreaks(histogramBreakReference.values,
@@ -283,6 +303,8 @@ when isMainModule:
       groupedBoxPlotSpec(pointCount).compileScene(size))
     let categoricalHeatmapResult = measureScene(
       categoricalHeatmapSpec(pointCount).compileScene(size))
+    let groupedAggregateResult = measureScene(
+      groupedAggregateSpec(pointCount).compileScene(size))
     let explicitHistogramResult = measureScene(
       explicitHistogramSpec(pointCount).compileScene(size))
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
@@ -332,7 +354,8 @@ when isMainModule:
       themedResult.nodes + secondaryResult.nodes + gridResult.nodes +
       retainedAnnotationResult.nodes +
       groupedBoxPlotResult.nodes +
-      categoricalHeatmapResult.nodes + aggregated.len +
+      categoricalHeatmapResult.nodes + groupedAggregateResult.nodes +
+      aggregated.len + groupAggregates.len +
       explicitHistogramResult.nodes + explicitBins.len +
       sharedGridResult.nodes + facetResult.nodes + categoricalGridResult.nodes +
       categoricalSharedGridResult.nodes + facetMatrixResult.nodes +
@@ -356,6 +379,8 @@ when isMainModule:
       groupedBoxPlotCompileTimes.push groupedBoxPlotResult.ms
       aggregate2DTimes.push aggregate2DMs
       categoricalHeatmapCompileTimes.push categoricalHeatmapResult.ms
+      aggregateGroupTimes.push aggregateGroupMs
+      groupedAggregateCompileTimes.push groupedAggregateResult.ms
       explicitHistogramTimes.push explicitHistogramMs
       explicitHistogramCompileTimes.push explicitHistogramResult.ms
       gridCompileTimes.push gridResult.ms
@@ -401,6 +426,9 @@ when isMainModule:
       "aggregate_2d": summary(aggregate2DTimes),
       "categorical_heatmap_construct_compile": summary(
         categoricalHeatmapCompileTimes),
+      "aggregate_groups": summary(aggregateGroupTimes),
+      "grouped_aggregate_construct_compile": summary(
+        groupedAggregateCompileTimes),
       "explicit_histogram_breaks": summary(explicitHistogramTimes),
       "explicit_histogram_construct_compile": summary(
         explicitHistogramCompileTimes),

@@ -166,6 +166,16 @@ UniPlot also reports internal diagnostics excluded from cross-library ranking:
   UniVector tiles. The same run averaged 14.42 ms (14.32–14.59 ms). SVG, PNG
   and WGPU rendering are excluded; this stage is not compared with competitor
   heatmaps whose aggregation and missing-cell contracts may differ.
+- `aggregate_groups` groups prepared categorical labels and values into 32
+  first-seen compensated means. On the 2026-08-15 Darwin arm64 reference run,
+  100,000 observations averaged 3.46 ms over five iterations after three
+  warmups (3.33–3.60 ms). Hashing, finite filtering, result allocation and
+  UniAccurate arithmetic are included; prepared input construction is not.
+- `grouped_aggregate_construct_compile` constructs the same labels and values,
+  aggregates them, materialises a retained categorical frame and compiles the
+  32-bar UniVector scene. The same run averaged 5.81 ms (5.75–5.95 ms). SVG,
+  PNG and WGPU rendering are excluded, and this is not a cross-provider grouped
+  transform comparison.
 - `explicit_histogram_breaks` assigns 100,000 prepared finite samples to 64
   unequal-capable caller-defined bins using binary search. On the 2026-08-15
   Darwin arm64 run it averaged 1.11 ms over five iterations after three

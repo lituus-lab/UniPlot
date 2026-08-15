@@ -199,6 +199,15 @@ averaged 14.42 ms (14.32–14.59 ms). Neither stage includes SVG, PNG or WGPU
 rendering, and neither is ranked against competitor heatmaps with different
 aggregation and missing-cell semantics.
 
+One-dimensional grouped aggregation is measured separately. Grouping 100,000
+prepared observations into 32 first-seen compensated means averaged 3.46 ms
+over five iterations after three warmups (3.33–3.60 ms). Constructing those
+labels and values, repeating the aggregation, materialising the retained frame
+and compiling its 32 UniVector bars averaged 5.81 ms (5.75–5.95 ms). SVG, PNG
+and WGPU rendering are excluded, as is prepared input construction from the
+first stage; these internal timings are not ranked against competitors with
+different grouping contracts.
+
 Explicit histogram boundaries are also isolated. Assigning 100,000 prepared
 samples to 64 caller-defined bins averaged 1.11 ms over five iterations after
 three warmups (1.05–1.15 ms), including boundary validation and result
