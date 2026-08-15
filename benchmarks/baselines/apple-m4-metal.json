@@ -1,0 +1,20 @@
+{
+  "adapter": "Apple M4",
+  "backend": "metal",
+  "points": 1000,
+  "canvas": "800x500",
+  "repeated_runs": 3,
+  "iterations_per_run": 50,
+  "preparation": {
+    "mean_ms": 3.13464418,
+    "max_ratio": 1.4
+  },
+  "submit": {
+    "mean_ms": 0.2813049,
+    "max_ratio": 4.5
+  },
+  "publication_frame": {
+    "mean_ms": 3.3271575,
+    "max_ratio": 1.25
+  }
+}

@@ -44,6 +44,10 @@ The real WGPU path has a separate pure-Nim benchmark:
 ```bash
 nimble wgpuDeps
 nimble wgpuBenchmark
+# Same-machine Apple M4 regression gate after the task builds the executable:
+UNIPLOT_WGPU_LIBRARY="$PWD/.deps/wgpu/29.0.1.1/macos-aarch64/lib/libwgpu_native.dylib" \
+  ./build/benchmark_wgpu 50 1000 build/wgpu-current.json \
+  benchmarks/baselines/apple-m4-metal.json
 ```
 
 It reports preparation, enqueue-only frames and publication frames separately.
@@ -51,3 +55,9 @@ Preparation shapes UniGlyph text and tessellates UniVector paths. Warm frames
 reuse that geometry; publication additionally reads the 800×500 RGBA8 texture
 back. Enqueue timing is CPU-side submission latency, not guaranteed GPU
 completion or a universal frame-rate claim.
+
+The optional fourth argument compares the current means with a baseline only
+after adapter, backend, workload and canvas identity match. Each phase carries
+its own ratio derived from repeated runs, because asynchronous submission is
+materially noisier than preparation or readback. Add a separate baseline for a
+different machine; never reuse these thresholds across hardware.

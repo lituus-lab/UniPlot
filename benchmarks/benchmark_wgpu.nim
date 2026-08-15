@@ -12,6 +12,22 @@ proc summary(samples: RunningStat): JsonNode =
   %*{"mean_ms": samples.mean, "stdev_ms": samples.standardDeviationS,
     "min_ms": samples.min, "max_ms": samples.max}
 
+proc checkBaseline(report: JsonNode; path: string) =
+  let baseline = parseFile(path)
+  for field in ["adapter", "backend", "points", "canvas"]:
+    if baseline[field] != report[field]:
+      quit("WGPU baseline does not match current " & field, 1)
+  for phase in ["preparation", "submit", "publication_frame"]:
+    let
+      expected = baseline[phase]["mean_ms"].getFloat
+      maxRatio = baseline[phase]["max_ratio"].getFloat
+      observed = report[phase]["mean_ms"].getFloat
+    if expected <= 0 or maxRatio < 1.0:
+      quit("invalid WGPU baseline threshold for " & phase, 1)
+    if observed > expected * maxRatio:
+      quit(phase & " regressed: " & $observed & " ms > " &
+        $(expected * maxRatio) & " ms", 1)
+
 proc sampleSpec(count: int): PlotSpec =
   var x = newSeq[float64](count)
   var y = newSeq[float64](count)
@@ -36,6 +52,7 @@ proc main() =
     scene = sampleSpec(pointCount).compileScene(size)
     backend = openWgpuBackend(libraryPath)
   defer: backend.close()
+  let capabilities = wgpuCapabilities(backend)
   var preparationTimes, submitTimes, frameTimes: RunningStat
   var prepared: WgpuPreparedScene
   for iteration in 0 ..< iterations + 3:
@@ -57,9 +74,11 @@ proc main() =
     let frameMs = elapsedMs(started)
     consumed = consumed xor pixels[(iteration * 4) mod pixels.len]
     if iteration >= 3: frameTimes.push(frameMs)
-  echo $(%*{
+  let report = %*{
     "provider": "UniPlot-WGPU",
     "wgpu_native": WgpuNativeTargetVersion,
+    "adapter": capabilities.adapterName,
+    "backend": capabilities.backend,
     "iterations": iterations,
     "warmup_iterations": 3,
     "points": pointCount,
@@ -73,7 +92,12 @@ proc main() =
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
     "guard": consumed
-  })
+  }
+  echo $report
+  if paramCount() >= 3:
+    writeFile(paramStr(3), pretty(report) & "\n")
+  if paramCount() >= 4:
+    checkBaseline(report, paramStr(4))
 
 when isMainModule:
   main()

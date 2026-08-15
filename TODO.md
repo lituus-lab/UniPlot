@@ -21,8 +21,9 @@ scene without weakening its deterministic CPU semantics.
 - [x] Rosetta examples and same-machine Matplotlib, Plotly, ggplot2 and
   Plots.jl benchmark harness.
 - [x] Debug contracts, release tests, import-layer validation and lint gates.
-- [ ] Add direct regression tests for every public constructor and rejection
-  path, including release-mode runtime guards where contracts compile away.
+- [x] Add direct regression tests for public constructors and rejection
+  families, including release-mode runtime guards where contracts compile
+  away and NULL/argument validation across the C ABI.
 - [x] Record a clean full-suite debug/release/C/Python/book result for the
   release candidate.
 
@@ -47,8 +48,8 @@ scene without weakening its deterministic CPU semantics.
   one-pixel cells intersected by the geometric edge.
 - [x] Add release benchmarks separating scene preparation, retained upload and
   submission, and readback publication throughput.
-- [ ] Establish regression thresholds from repeated same-machine runs; never
-  encode cross-machine marketing claims.
+- [x] Establish adapter-bound regression thresholds from repeated same-machine
+  runs; never encode cross-machine marketing claims.
 - [x] Exercise Linux Vulkan and Windows DX12 in CI in addition to Metal.
 
 ## Functional parity after 1.0
