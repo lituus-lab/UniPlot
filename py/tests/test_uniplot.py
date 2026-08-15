@@ -103,6 +103,25 @@ def test_categorical_heatmaps_render_and_validate_empty_plot_contract():
     with pytest.raises(RuntimeError):
         all_missing.svg(FONT)
 
+def test_numeric_heatmaps_render_and_validate_row_major_cells():
+    plot = uniplot.Plot().numeric_heatmap(
+        [0, 1, 3], [10, 20, 40], [1, 2, 3, float("nan")])
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.numeric_heatmap([0, 1], [0, 1], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().numeric_heatmap([0], [0, 1], [])
+    with pytest.raises(ValueError):
+        uniplot.Plot().numeric_heatmap([0, 1], [0, 1], [1, 2])
+    with pytest.raises(ValueError):
+        uniplot.Plot().numeric_heatmap(
+            [-1e308, 1e308], [0, 1], [1])
+    all_missing = uniplot.Plot().numeric_heatmap(
+        [0, 1], [0, 1], [float("nan")])
+    with pytest.raises(RuntimeError):
+        all_missing.svg(FONT)
+
 def test_explicit_break_histograms_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().histogram(
         [-1, 0, 0.5, 1, 2, 3, float("nan")], [0, 1, 2],

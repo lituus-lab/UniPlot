@@ -30,6 +30,9 @@ cdef extern from "UniPlot.h":
                                     const char *)
     int uplot_add_heatmap(uplot_plot *, const char **, const char **,
                           const double *, size_t, int)
+    int uplot_add_numeric_heatmap(uplot_plot *, const double *, size_t,
+                                  const double *, size_t, const double *,
+                                  size_t)
     int uplot_add_categorical_column(uplot_plot *, const char *,
                                       const char **, size_t)
     int uplot_add_line_styled(uplot_plot *, const double *, const double *,
@@ -237,6 +240,42 @@ cdef class Plot:
             free(x_items); free(y_items); free(number_items)
         if status != 0:
             raise ValueError("invalid heatmap or non-empty plot")
+        return self
+
+    def numeric_heatmap(self, x_breaks, y_breaks, values):
+        x_breaks = list(x_breaks)
+        y_breaks = list(y_breaks)
+        values = list(values)
+        if len(x_breaks) < 2 or len(y_breaks) < 2:
+            raise ValueError("numeric heatmap axes require two boundaries")
+        if len(values) != (len(x_breaks) - 1) * (len(y_breaks) - 1):
+            raise ValueError("values must match the row-major cell count")
+        cdef size_t x_count = len(x_breaks)
+        cdef size_t y_count = len(y_breaks)
+        cdef size_t value_count = len(values)
+        cdef double *x_items = <double *>malloc(x_count * sizeof(double))
+        cdef double *y_items = <double *>malloc(y_count * sizeof(double))
+        cdef double *value_items = <double *>malloc(
+            value_count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if x_items == NULL or y_items == NULL or value_items == NULL:
+            free(x_items); free(y_items); free(value_items)
+            raise MemoryError()
+        try:
+            for index in range(x_count):
+                x_items[index] = float(x_breaks[index])
+            for index in range(y_count):
+                y_items[index] = float(y_breaks[index])
+            for index in range(value_count):
+                value_items[index] = float(values[index])
+            status = uplot_add_numeric_heatmap(
+                self._handle, x_items, x_count, y_items, y_count,
+                value_items, value_count)
+        finally:
+            free(x_items); free(y_items); free(value_items)
+        if status != 0:
+            raise ValueError("invalid numeric heatmap or non-empty plot")
         return self
 
     def histogram(self, values, breaks, color="#3366cc", bint density=False):
