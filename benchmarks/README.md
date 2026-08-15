@@ -33,7 +33,8 @@ UniPlot also reports three internal diagnostics excluded from cross-library
 ranking:
 
 - `continuous_scale_train` measures one-pass numeric-domain training;
-- `finite_row_select` measures numeric-column validation and row selection;
+- `row_filter_scan` measures allocation-light numeric-column validation and
+  row filtering;
 - `styled_construct_compile` uses a real UniVector dot-dash stroke and
   categorical marker shapes.
 

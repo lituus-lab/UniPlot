@@ -48,7 +48,7 @@ when isMainModule:
   let reference = referenceSpec.compileScene(size)
   let referenceX = referenceSpec.data.numeric("x")
 
-  var scaleTimes, finiteRowTimes, compileTimes, styledCompileTimes, svgTimes,
+  var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes, svgTimes,
       pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + 3:
@@ -57,8 +57,11 @@ when isMainModule:
     let scaleMs = elapsedMs(started)
 
     started = getMonoTime()
-    let finiteRows = referenceSpec.data.finiteRows(["x", "y"])
-    let finiteRowMs = elapsedMs(started)
+    let rowFilter = referenceSpec.data.initRowFilter(["x", "y"])
+    var finiteCount = 0
+    for row in 0 ..< referenceSpec.data.rowCount:
+      if rowFilter.rowIsFinite(row): inc finiteCount
+    let rowFilterMs = elapsedMs(started)
 
     started = getMonoTime()
     let scene = sampleSpec(pointCount).compileScene(size)
@@ -76,11 +79,11 @@ when isMainModule:
     let png = reference.encodePng(font)
     let pngMs = elapsedMs(started)
     consumed = consumed xor svg.len xor png.len xor scene.nodes.len xor
-      styledScene.nodes.len xor finiteRows.len xor int(trained.domainMax)
+      styledScene.nodes.len xor finiteCount xor int(trained.domainMax)
 
     if iteration >= 3:
       scaleTimes.push scaleMs
-      finiteRowTimes.push finiteRowMs
+      rowFilterTimes.push rowFilterMs
       compileTimes.push compileMs
       styledCompileTimes.push styledCompileMs
       svgTimes.push svgMs
@@ -96,7 +99,7 @@ when isMainModule:
     "warmup_iterations": 3,
     "stages": {
       "continuous_scale_train": summary(scaleTimes),
-      "finite_row_select": summary(finiteRowTimes),
+      "row_filter_scan": summary(rowFilterTimes),
       "construct_compile": summary(compileTimes),
       "styled_construct_compile": summary(styledCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
