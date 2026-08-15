@@ -66,7 +66,9 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Continuous colour maps, discrete palettes and colour bars.
 - [x] Logarithmic transformed and reversed Cartesian axes.
 - [ ] Date/time, duration, additional transforms and polar coordinates.
-- [ ] Error bars, ribbons, box/violin plots, density, contours and heatmaps.
+- [x] Error bars and ribbons with explicit numeric bounds and missing-value
+      policies.
+- [ ] Box/violin plots, density, contours and heatmaps.
 - [ ] Statistical transforms: binning variants, smoothing, aggregation,
   quantiles and confidence intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.

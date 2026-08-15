@@ -58,7 +58,7 @@ nbText: """
 Recipes are not a separate rendering path. Their result can be labelled,
 themed or extended with additional layers.
 
-## The five geometries
+## Core geometries
 
 `aes(x, y, label)` maps columns. `geomLine`, `geomPoint`, `geomBar`, `geomArea`
 and `geomText` append typed layers. Multiple layers share trained scales,
@@ -119,6 +119,44 @@ finite coordinates. Bands require positive extent. X references require a
 numeric x coordinate, and logarithmic-axis references must be positive. The
 compiler revalidates public `Reference` values even when callers construct
 them directly instead of using these contractual helpers.
+
+## Error bars and ribbons
+
+Uncertainty layers map an x coordinate plus explicit `yMin` and `yMax`
+columns. They do not require a synthetic centre column: a ribbon fills the
+envelope, while error bars draw one vertical interval and two optional caps
+per finite row.
+"""
+
+nbCode:
+  var uncertaintyData = initDataFrame()
+  uncertaintyData.addColumn("x", [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+  uncertaintyData.addColumn("estimate", [1.5, 2.1, 2.7, 3.0, 3.7, 4.2])
+  uncertaintyData.addColumn("lower", [0.9, 1.5, 2.0, 2.2, 2.8, 3.3])
+  uncertaintyData.addColumn("upper", [2.1, 2.8, 3.5, 3.9, 4.5, 5.0])
+
+  var uncertainty = plot(uncertaintyData)
+  let interval = aes("x", "", yMin = "lower", yMax = "upper")
+  uncertainty.geomRibbon(interval, color = "#4f7bd955")
+  uncertainty.geomErrorBar(interval, color = "#234a99", width = 1.5,
+    capWidth = 10)
+  uncertainty.geomLine(aes("x", "estimate"), color = "#c23b4a", width = 3)
+  uncertainty.geomPoint(aes("x", "estimate"), color = "#c23b4a", radius = 4)
+  uncertainty.labels(title = "Estimate and uncertainty", x = "sample",
+    y = "value")
+  let uncertaintySvg = uncertainty.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(uncertaintySvg,
+  "The ribbon, capped intervals, centre line and samples share trained scales.")
+
+nbText: """
+Bounds must be numeric and finite after applying the layer's missing-value
+policy, and each lower value must not exceed its upper value. Ribbons default
+to `BreakOnMissing`, preserving gaps as separate polygons. Error bars default
+to `DropMissing`; `capWidth = 0` retains only the vertical stem. Invalid cap
+widths are rejected by a contract in debug builds and by `PlotError` in
+release builds.
 
 ## Legends
 
@@ -339,4 +377,4 @@ Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 10)
+validatePage("grammar.html", minSvg = 11)
