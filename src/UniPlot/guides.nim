@@ -149,6 +149,76 @@ proc withOpacity(value: Color; opacity: float32): Color =
     raise newException(PlotError, "cannot apply mapped alpha to color")
   adjusted.get
 
+type AxisDomains* = object
+  xKind*: ColumnKind
+  xContinuous*: ContinuousDomain
+  xBand*: BandDomain
+  yContinuous*: ContinuousDomain
+
+proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
+  ## Accumulate every coordinate that must be representable by plot axes.
+  if spec.layers.len == 0:
+    raise newException(PlotError, "plot has no layers")
+  let firstX = spec.layers[0].mapping.x
+  if firstX notin spec.data.columns:
+    raise newException(PlotError, "layer mapping references a missing column")
+  result.xKind = spec.data.columns[firstX].kind
+  if result.xKind == ckCategorical and spec.xScaleSpec.kind != skLinear:
+    raise newException(PlotError,
+      "categorical x coordinates only support a linear scale")
+  result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
+  result.xBand = initBandDomain()
+  result.yContinuous = initContinuousDomain(spec.yScaleSpec.kind)
+  for reference in spec.references:
+    if not reference.minimum.isFinite or not reference.maximum.isFinite or
+        reference.minimum > reference.maximum or reference.width <= 0 or
+        not reference.width.isFinite or
+        (reference.kind in {rkXBand, rkYBand} and
+        reference.minimum == reference.maximum):
+      raise newException(PlotError, "invalid reference annotation")
+    case reference.kind
+    of rkXLine, rkXBand:
+      if result.xKind != ckNumeric:
+        raise newException(PlotError,
+          "x references require numeric x coordinates")
+      if spec.xScaleSpec.kind == skLog10 and reference.minimum <= 0:
+        raise newException(PlotError,
+          "logarithmic x references must be positive")
+      result.xContinuous.addValues([reference.minimum, reference.maximum])
+    of rkYLine, rkYBand:
+      if spec.yScaleSpec.kind == skLog10 and reference.minimum <= 0:
+        raise newException(PlotError,
+          "logarithmic y references must be positive")
+      result.yContinuous.addValues([reference.minimum, reference.maximum])
+  var includeZero = false
+  for layer in spec.layers:
+    if layer.mapping.x notin spec.data.columns:
+      raise newException(PlotError, "layer mapping references a missing column")
+    if spec.data.columns[layer.mapping.x].kind != result.xKind:
+      raise newException(PlotError, "all x mappings must use the same column kind")
+    if result.xKind == ckNumeric:
+      result.xContinuous.addValues(spec.data.numeric(layer.mapping.x))
+    else:
+      result.xBand.addValues(spec.data.categorical(layer.mapping.x))
+    if layer.mark in {mkErrorBar, mkRibbon}:
+      for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
+        if mapping notin spec.data.columns or
+            spec.data.columns[mapping].kind != ckNumeric:
+          raise newException(PlotError,
+            "uncertainty bounds must reference numeric columns")
+        result.yContinuous.addValues(spec.data.numeric(mapping))
+    else:
+      if layer.mapping.y notin spec.data.columns or
+          spec.data.columns[layer.mapping.y].kind != ckNumeric:
+        raise newException(PlotError, "y mappings must reference numeric columns")
+      result.yContinuous.addValues(spec.data.numeric(layer.mapping.y))
+    includeZero = includeZero or layer.mark in {mkBar, mkArea}
+  if includeZero:
+    result.yContinuous.addValues([0.0])
+  if includeZero and spec.yScaleSpec.kind == skLog10:
+    raise newException(PlotError,
+      "bar and area layers require a linear y scale with a zero baseline")
+
 proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     height: 500)): Scene =
   size.validate()
@@ -293,52 +363,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     continuousGuides.len * 168 + ord(spec.legendSpec.title.len > 0) * 24)
   if legendHeight > area.height:
     raise newException(PlotError, "legend does not fit the drawing height")
-  let xKind = spec.data.columns[spec.layers[0].mapping.x].kind
-  if xKind == ckCategorical and spec.xScaleSpec.kind != skLinear:
-    raise newException(PlotError,
-      "categorical x coordinates only support a linear scale")
-  var xDomain = initContinuousDomain(spec.xScaleSpec.kind)
-  var xBandDomain = initBandDomain()
-  var yDomain = initContinuousDomain(spec.yScaleSpec.kind)
-  for reference in spec.references:
-    if not reference.minimum.isFinite or not reference.maximum.isFinite or
-        reference.minimum > reference.maximum or reference.width <= 0 or
-        not reference.width.isFinite or
-        (reference.kind in {rkXBand, rkYBand} and
-        reference.minimum == reference.maximum):
-      raise newException(PlotError, "invalid reference annotation")
-    case reference.kind
-    of rkXLine, rkXBand:
-      if xKind != ckNumeric:
-        raise newException(PlotError,
-          "x references require numeric x coordinates")
-      if spec.xScaleSpec.kind == skLog10 and reference.minimum <= 0:
-        raise newException(PlotError,
-          "logarithmic x references must be positive")
-      xDomain.addValues([reference.minimum, reference.maximum])
-    of rkYLine, rkYBand:
-      if spec.yScaleSpec.kind == skLog10 and reference.minimum <= 0:
-        raise newException(PlotError,
-          "logarithmic y references must be positive")
-      yDomain.addValues([reference.minimum, reference.maximum])
-  var includeZero = false
-  for layer in spec.layers:
-    if spec.data.columns[layer.mapping.x].kind != xKind:
-      raise newException(PlotError, "all x mappings must use the same column kind")
-    if xKind == ckNumeric:
-      xDomain.addValues(spec.data.numeric(layer.mapping.x))
-    else:
-      xBandDomain.addValues(spec.data.categorical(layer.mapping.x))
-    if layer.mark in {mkErrorBar, mkRibbon}:
-      yDomain.addValues(spec.data.numeric(layer.mapping.yMin))
-      yDomain.addValues(spec.data.numeric(layer.mapping.yMax))
-    else:
-      yDomain.addValues(spec.data.numeric(layer.mapping.y))
-    includeZero = includeZero or layer.mark in {mkBar, mkArea}
-  if includeZero: yDomain.addValues([0.0])
-  if includeZero and spec.yScaleSpec.kind == skLog10:
-    raise newException(PlotError,
-      "bar and area layers require a linear y scale with a zero baseline")
+  let domains = collectAxisDomains(spec)
+  let xKind = domains.xKind
   var xScale: ContinuousScale
   var xBand: BandScale
   let
@@ -350,17 +376,18 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     raise newException(PlotError,
       "numeric x limits cannot be applied to categorical coordinates")
   if xKind == ckNumeric and spec.xScaleSpec.domain.configured:
-    xScale = xDomain.train(xRangeMin, xRangeMax,
+    xScale = domains.xContinuous.train(xRangeMin, xRangeMax,
       spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
   elif xKind == ckNumeric:
-    xScale = xDomain.train(xRangeMin, xRangeMax)
+    xScale = domains.xContinuous.train(xRangeMin, xRangeMax)
   else:
-    xBand = xBandDomain.train(xRangeMin, xRangeMax)
+    xBand = domains.xBand.train(xRangeMin, xRangeMax)
   let yScale = if spec.yScaleSpec.domain.configured:
-    yDomain.train(yRangeMin, yRangeMax, spec.yScaleSpec.domain.minimum,
+    domains.yContinuous.train(yRangeMin, yRangeMax,
+        spec.yScaleSpec.domain.minimum,
       spec.yScaleSpec.domain.maximum)
   else:
-    yDomain.train(yRangeMin, yRangeMax)
+    domains.yContinuous.train(yRangeMin, yRangeMax)
   var nodeId = 1'u64
   if xKind == ckNumeric:
     for value in xScale.ticks():

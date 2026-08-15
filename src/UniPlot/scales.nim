@@ -52,6 +52,13 @@ proc addValues*(domain: var ContinuousDomain; values: openArray[float64]) =
         domain.minimum = min(domain.minimum, value)
         domain.maximum = max(domain.maximum, value)
 
+proc merge*(domain: var ContinuousDomain; other: ContinuousDomain) =
+  ## Merge an accumulated domain with another domain of the same scale kind.
+  if domain.kind != other.kind:
+    raise newException(PlotError, "cannot merge different scale kinds")
+  if other.hasValues:
+    domain.addValues([other.minimum, other.maximum])
+
 proc train*(domain: ContinuousDomain; rangeMin,
     rangeMax: float32): ContinuousScale =
   if not domain.hasValues:
@@ -64,6 +71,11 @@ proc train*(domain: ContinuousDomain; rangeMin,
     hi += pad
     if domain.kind == skLog10: lo = max(lo, domain.minimum * 0.5)
   continuousScale(lo, hi, rangeMin, rangeMax, domain.kind)
+
+proc fittedBounds*(domain: ContinuousDomain): tuple[minimum, maximum: float64] =
+  ## Return the finite, non-degenerate bounds produced by automatic training.
+  let scale = domain.train(0, 1)
+  (scale.domainMin, scale.domainMax)
 
 proc train*(domain: ContinuousDomain; rangeMin, rangeMax: float32;
     domainMin, domainMax: float64): ContinuousScale =
