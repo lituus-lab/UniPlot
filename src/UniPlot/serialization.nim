@@ -108,21 +108,28 @@ proc decodeInsets(node: JsonNode): Insets =
     bottom: float32(node.finiteNumber("bottom")))
 
 proc aesNode(value: Aes): JsonNode =
-  %*{"x": value.x, "y": value.y, "yMin": value.yMin, "yMax": value.yMax,
+  result = %*{"x": value.x, "y": value.y, "yMin": value.yMin,
+    "yMax": value.yMax,
     "label": value.label, "color": value.color, "fill": value.fill,
     "size": value.size, "alpha": value.alpha, "shape": value.shape,
     "lineStyle": value.lineStyle}
+  if value.yQ1.len > 0 or value.yQ3.len > 0:
+    result["yQ1"] = %value.yQ1
+    result["yQ3"] = %value.yQ3
 
 proc decodeAes(node: JsonNode): Aes =
   for name in ["x", "y", "yMin", "yMax", "label", "color", "fill",
       "size", "alpha", "shape", "lineStyle"]:
     discard node.field(name, JString)
-  Aes(x: node["x"].getStr, y: node["y"].getStr,
+  result = Aes(x: node["x"].getStr, y: node["y"].getStr,
     yMin: node["yMin"].getStr, yMax: node["yMax"].getStr,
     label: node["label"].getStr, color: node["color"].getStr,
     fill: node["fill"].getStr, size: node["size"].getStr,
     alpha: node["alpha"].getStr, shape: node["shape"].getStr,
     lineStyle: node["lineStyle"].getStr)
+  if node.hasKey("yQ1") or node.hasKey("yQ3"):
+    result.yQ1 = node.field("yQ1", JString).getStr
+    result.yQ3 = node.field("yQ3", JString).getStr
 
 proc dataNode(frame: DataFrame): JsonNode =
   var columns = newJArray()
@@ -162,11 +169,13 @@ proc decodeData(node: JsonNode): DataFrame =
 proc toJsonNode*(spec: PlotSpec): JsonNode =
   var layers = newJArray()
   for layer in spec.layers:
-    layers.add %*{"mark": $layer.mark, "mapping": layer.mapping.aesNode,
+    let encoded = %*{"mark": $layer.mark, "mapping": layer.mapping.aesNode,
       "color": layer.color.colorNode, "size": layer.size,
       "legendLabel": layer.legendLabel, "shape": $layer.shape,
       "lineStyle": $layer.lineStyle, "missingValues": $layer.missingValues,
       "capWidth": layer.capWidth}
+    if layer.mark == mkBoxPlot: encoded["boxWidth"] = %layer.boxWidth
+    layers.add encoded
   var references = newJArray()
   for reference in spec.references:
     references.add %*{"kind": $reference.kind,
@@ -239,7 +248,8 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
   result = plot(root.field("data", JObject).decodeData)
   result.layers.setLen(0)
   for node in root.field("layers", JArray):
-    result.layers.add Layer(mark: enumValue[MarkKind](node, "mark"),
+    let mark = enumValue[MarkKind](node, "mark")
+    result.layers.add Layer(mark: mark,
       mapping: node.field("mapping", JObject).decodeAes,
       color: node.field("color", JObject).decodeColor,
       size: float32(node.finiteNumber("size")),
@@ -248,6 +258,8 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
       lineStyle: enumValue[LineStyle](node, "lineStyle"),
       missingValues: enumValue[MissingValuePolicy](node, "missingValues"),
       capWidth: float32(node.finiteNumber("capWidth")))
+    if mark == mkBoxPlot:
+      result.layers[^1].boxWidth = float32(node.finiteNumber("boxWidth"))
   let labels = root.field("labels", JObject)
   result.title = labels.field("title", JString).getStr
   result.xLabel = labels.field("x", JString).getStr
