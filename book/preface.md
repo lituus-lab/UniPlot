@@ -19,6 +19,7 @@ current UniPlot API. SVG is inserted inline and PNG is encoded as a Base64
 - axes, ticks, labels, titles and themes;
 - an inspectable retained scene shared by every backend;
 - deterministic SVG and PNG rendering;
+- deterministic, versioned JSON plot specifications;
 - a CLI, stable C ABI and Python binding;
 - an optional WGPU resource boundary with no GPU dependency in the core.
 

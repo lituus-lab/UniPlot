@@ -77,7 +77,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Missing-value policies and intentional line breaks.
 - [x] Theme inheritance, reusable style values and publication presets.
 - [ ] Deterministic PDF output through a lower-level Uni* backend.
-- [ ] Declarative JSON serialization with a versioned schema.
+- [x] Declarative JSON serialization with a versioned schema and deterministic
+      round trips.
 
 Dash arrays and marker placement now come from UniVector and are shared by the
 CPU, SVG and WGPU paths. Advanced shaping, fallback and glyph atlas policy

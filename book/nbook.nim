@@ -16,6 +16,7 @@ book.toc = initToc:
   entry("Recipes and layered grammar", "grammar.nim")
   entry("Scales and statistics", "scales_stats.nim")
   entry("Scenes and rendering", "scene_rendering.nim")
+  entry("Versioned JSON", "serialization.nim")
   entry("WGPU and validation", "wgpu_errors.nim")
   entry("Command-line interface", "cli.nim")
   entry("C binding", "c_binding.nim")

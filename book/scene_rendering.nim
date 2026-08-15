@@ -98,7 +98,7 @@ UniGlyph converts text to paths, UniVector owns vector geometry and UniImage
 owns raster encoding. An explicit font keeps output independent of host font
 discovery.
 
-Next: [WGPU and validation](wgpu_errors.html).
+Next: [Versioned JSON](serialization.html).
 """
 
 nbSave

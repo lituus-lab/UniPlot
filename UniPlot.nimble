@@ -65,8 +65,8 @@ task docs, "API reference + book into pages/ — what CI publishes":
   # Generate each public module explicitly. `--project` forces a JS search
   # index and fails on Nim distributions (notably Homebrew) that omit the
   # compiler's optional tools/dochack source.
-  for module in ["common", "data", "scales", "stats", "grammar", "scene",
-      "guides", "render", "render/wgpu"]:
+  for module in ["common", "data", "scales", "stats", "grammar",
+      "serialization", "scene", "guides", "render", "render/wgpu"]:
     exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot/" &
          module & ".nim"
   exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"
