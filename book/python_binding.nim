@@ -48,17 +48,24 @@ copying it.
 
 - `Plot(width=800, height=500)` owns one native plot handle.
 - `line(xs, ys, color="#3366cc", width=2.0, style=LINE_SOLID)` adds a line
-  series; five `LINE_*` constants select the UniVector stroke style.
+  series; five `LINE_*` constants select the UniVector stroke style. Its
+  `missing` argument defaults to `MISSING_BREAK`.
 - `scatter(xs, ys, color="#3366cc", radius=4.0, shape=MARKER_CIRCLE)` adds
-  points; six `MARKER_*` constants select the UniVector marker path.
+  points; six `MARKER_*` constants select the UniVector marker path. Its
+  `missing` argument defaults to `MISSING_DROP`.
+- `MISSING_DROP`, `MISSING_BREAK` and `MISSING_REJECT` control `NaN` and
+  infinite values explicitly; rejection is reported when rendering compiles
+  the retained specification.
 - `title(text)` sets the plot title.
 - `svg(font_path)` and `png(font_path)` render bytes.
 - `version()`, `abi_version()` and `__version__` expose compatibility.
 
 Inputs accept Python iterables and are converted to contiguous double arrays.
-Length mismatches raise `ValueError` before the native call. Native argument or
-render failures become Python exceptions. An explicit TrueType font path is
-required for deterministic output.
+An x/y length mismatch within one call raises `ValueError` before the native
+call. Different series lengths are supported and resolved through their
+missing-value policies. Native argument or render failures become Python
+exceptions. An explicit TrueType font path is required for deterministic
+output.
 
 ## Packaging contract
 

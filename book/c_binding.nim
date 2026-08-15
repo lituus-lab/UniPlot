@@ -69,6 +69,12 @@ int main(void) {
 - `uplot_add_line_styled` accepts the five `UPLOT_LINE_*` values;
   `uplot_add_points_shaped` accepts the six `UPLOT_MARKER_*` values. Invalid
   enum integers are rejected before conversion to Nim enums.
+- `uplot_add_line_configured` and `uplot_add_points_configured` additionally
+  accept `UPLOT_MISSING_DROP`, `UPLOT_MISSING_BREAK` or
+  `UPLOT_MISSING_REJECT`. Existing line entry points break at non-finite values;
+  existing point entry points drop them.
+- Series may have different lengths. The rectangular internal frame is padded
+  with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
 ## ABI compatibility
 
