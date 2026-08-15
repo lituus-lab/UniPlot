@@ -54,12 +54,14 @@ The installer and tasks are written in Nim. Native artifacts are pinned to
 wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 
 `prepareWgpuScene(scene, font)` uses the same UniGlyph layouts and UniVector
-tessellation as the CPU backends. `submitWgpuPrepared` uploads and enqueues the
-retained indexed geometry without readback; `renderWgpuPrepared` additionally
-returns unpadded RGBA8 pixels. The convenience scene overloads prepare on every
-call. The headless validation task checks both individual pixels and an exact
-CPU/GPU fixture. Run `nimble wgpuBenchmark` to measure preparation, submission
-and publication separately.
+tessellation as the CPU backends. Its first submission uploads and enqueues the
+retained indexed geometry. Reusing that exact prepared handle keeps the last
+vertex/index pair resident; switching prepared handles or issuing a direct mesh
+render invalidates the slot. `renderWgpuPrepared` additionally returns unpadded
+RGBA8 pixels. The convenience scene overloads prepare on every call. The
+headless validation task checks individual pixels, exact CPU/GPU parity and
+upload invalidation. Run `nimble wgpuBenchmark` to measure preparation,
+upload-plus-submit, resident submission and publication separately.
 
 ## Typed failures
 

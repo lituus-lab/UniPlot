@@ -311,14 +311,33 @@ UNIPLOT_WGPU_LIBRARY="$PWD/.deps/wgpu/29.0.1.1/macos-aarch64/lib/libwgpu_native.
   benchmarks/baselines/apple-m4-metal.json
 ```
 
-It reports preparation, enqueue-only frames and publication frames separately.
-Preparation shapes UniGlyph text and tessellates UniVector paths. Warm frames
-reuse that geometry; publication additionally reads the 800×500 RGBA8 texture
-back. Enqueue timing is CPU-side submission latency, not guaranteed GPU
-completion or a universal frame-rate claim.
+It reports preparation, alternating-identity upload plus submission,
+same-identity resident submission and publication separately. Preparation
+shapes UniGlyph text and tessellates UniVector paths. The upload stage
+alternates two prepared handles so every iteration performs a real buffer
+write. Warm submission reuses the resident vertex/index pair, while publication
+also reads the 800×500 RGBA8 texture back. Enqueue timing is CPU-side
+submission latency, not guaranteed GPU completion or a universal frame-rate
+claim. The harness checks the backend's issued-upload counter so a skipped
+write cannot be mislabeled as an upload measurement.
+
+On the 2026-08-16 Apple M4 Metal run, three alternating before/after runs of 50
+iterations measured 0.9784 ms for the former upload-on-every-submit path and
+0.9807 ms for the new explicit upload-plus-submit stage. Resident submission
+averaged 0.0925 ms, a measured 90.5% reduction in CPU-side submission time.
+Publication moved from 4.4218 ms to 3.0970 ms, a measured 30.0% reduction, as
+the same buffer write was removed before readback. Preparation remained within
+noise at 74.0418 ms before and 73.8936 ms after. These figures apply only to
+this adapter, runtime, dependency state and 1,000-point workload.
+
+The earlier 3.13 ms preparation entry in the checked-in baseline was stale:
+the immediately preceding UniPlot revision measured 74.04 ms against the same
+current local UniGlyph/UniVector dependencies. The baseline now records the
+controlled 3×50 result and includes a residency-version field so incompatible
+semantics fail instead of being compared.
 
 The optional fourth argument compares the current means with a baseline only
-after adapter, backend, workload and canvas identity match. Each phase carries
-its own ratio derived from repeated runs, because asynchronous submission is
-materially noisier than preparation or readback. Add a separate baseline for a
-different machine; never reuse these thresholds across hardware.
+after adapter, backend, workload, canvas and residency semantics match. Each
+phase carries its own ratio derived from repeated runs, because asynchronous
+submission is materially noisier than preparation or readback. Add a separate
+baseline for a different machine; never reuse these thresholds across hardware.

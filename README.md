@@ -120,10 +120,13 @@ downloaded runtime stays in the ignored `.deps` directory.
 
 `prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once,
 including UniVector marker geometry and expanded dashed strokes.
-`submitWgpuPrepared` reuses that geometry without readback;
+The first `submitWgpuPrepared` uploads that geometry; repeated submission or
+publication of the same prepared scene keeps its vertex/index buffers resident
+and does not issue another upload. Switching prepared scenes, using a direct
+mesh render, or growing either buffer invalidates that single resident slot.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
-prepare on each call. `nimble wgpuBenchmark` measures preparation, submission
-and publication separately.
+prepare on each call. `nimble wgpuBenchmark` measures preparation,
+upload-plus-submit, resident submission and publication separately.
 
 ## License
 
