@@ -20,6 +20,8 @@ from ._core import (
     abi_version,
     facet_png,
     facet_svg,
+    facet_matrix_png,
+    facet_matrix_svg,
     grid_png,
     grid_svg,
     version,
@@ -31,6 +33,6 @@ __all__ = [
     "LINE_SOLID", "MARKER_CIRCLE", "MARKER_CROSS", "MARKER_DIAMOND",
     "MARKER_PLUS", "MARKER_SQUARE", "MARKER_TRIANGLE", "Plot",
     "MISSING_BREAK", "MISSING_DROP", "MISSING_REJECT",
-    "abi_version", "facet_png", "facet_svg", "grid_png", "grid_svg",
-    "version", "__version__",
+    "abi_version", "facet_matrix_png", "facet_matrix_svg", "facet_png",
+    "facet_svg", "grid_png", "grid_svg", "version", "__version__",
 ]

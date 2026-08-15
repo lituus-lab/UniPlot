@@ -48,6 +48,12 @@ cdef extern from "UniPlot.h":
     int uplot_render_facet_grid_png(uplot_plot *, const char *, int, int, int,
                                      int, int, int, const char *, uint8_t **,
                                      size_t *)
+    int uplot_render_facet_matrix_svg(uplot_plot *, const char *,
+                                       const char *, int, int, int, int, int,
+                                       const char *, uint8_t **, size_t *)
+    int uplot_render_facet_matrix_png(uplot_plot *, const char *,
+                                       const char *, int, int, int, int, int,
+                                       const char *, uint8_t **, size_t *)
     void uplot_buffer_free(void *, size_t)
     void uplot_plot_free(uplot_plot *)
 
@@ -272,6 +278,46 @@ def facet_png(Plot plot, column, font, int columns, int width=1200,
               bint shared_y=False):
     return _render_facets(plot, column, font, columns, width, height, gap,
                           False, shared_x, shared_y)
+
+cdef bytes _render_facet_matrix(Plot plot, row_column, column_column, font,
+                                int width, int height, int gap, bint svg,
+                                bint shared_x, bint shared_y):
+    cdef bytes encoded_row = str(row_column).encode("utf-8")
+    cdef bytes encoded_column = str(column_column).encode("utf-8")
+    cdef bytes encoded_font = str(font).encode("utf-8")
+    cdef uint8_t *output = NULL
+    cdef size_t length = 0
+    cdef int status
+    if svg:
+        status = uplot_render_facet_matrix_svg(
+            plot._handle, encoded_row, encoded_column, width, height, gap,
+            shared_x, shared_y, encoded_font, &output, &length)
+    else:
+        status = uplot_render_facet_matrix_png(
+            plot._handle, encoded_row, encoded_column, width, height, gap,
+            shared_x, shared_y, encoded_font, &output, &length)
+    try:
+        if status == 1:
+            raise ValueError("invalid facet matrix arguments")
+        if status != 0:
+            raise RuntimeError("facet matrix render failed")
+        return PyBytes_FromStringAndSize(<char *>output, length)
+    finally:
+        uplot_buffer_free(output, length)
+
+def facet_matrix_svg(Plot plot, row_column, column_column, font,
+                     int width=1200, int height=800, int gap=16,
+                     bint shared_x=False, bint shared_y=False):
+    return _render_facet_matrix(
+        plot, row_column, column_column, font, width, height, gap, True,
+        shared_x, shared_y)
+
+def facet_matrix_png(Plot plot, row_column, column_column, font,
+                     int width=1200, int height=800, int gap=16,
+                     bint shared_x=False, bint shared_y=False):
+    return _render_facet_matrix(
+        plot, row_column, column_column, font, width, height, gap, False,
+        shared_x, shared_y)
 
 def version(): return uplot_version().decode("ascii")
 def abi_version(): return uplot_abi_version()

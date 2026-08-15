@@ -36,13 +36,20 @@ def test_categorical_facets_render_svg_and_png():
     plot = (uniplot.Plot()
             .line([0, 1, 2, 3], [1, 3, 2, 4])
             .categorical_column(
-                "group", (value for value in ["west", "east", "west", "east"])))
+                "group", (value for value in ["west", "east", "west", "east"]))
+            .categorical_column("side", ["left", "right", "right", "right"]))
     assert uniplot.facet_svg(
         plot, "group", FONT, columns=2, width=656, height=240,
         shared_x=True, shared_y=True).startswith(b"<svg")
     assert uniplot.facet_png(
         plot, "group", FONT, columns=2, width=656,
         height=240).startswith(b"\x89PNG")
+    assert uniplot.facet_matrix_svg(
+        plot, "group", "side", FONT, width=656, height=480,
+        shared_x=True, shared_y=True).startswith(b"<svg")
+    assert uniplot.facet_matrix_png(
+        plot, "group", "side", FONT, width=656,
+        height=480).startswith(b"\x89PNG")
     with pytest.raises(ValueError):
         plot.categorical_column("bad", ["short"])
     with pytest.raises(RuntimeError):
