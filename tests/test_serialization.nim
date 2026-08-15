@@ -81,6 +81,14 @@ suite "PlotSpec JSON schema":
     check abs(encoded["layers"][0]["boxWidth"].getFloat - 0.65) < 1e-6
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "categorical y domains and tiles round trip optionally":
+    var spec = heatmapPlot(["a", "b"], ["north", "south"], [1.0, 2.0])
+    spec.yCategories(["south", "north", "reserved"])
+    let encoded = spec.toJsonNode
+    check encoded["layers"][0]["mark"].getStr == "mkTile"
+    check encoded["yScale"]["categories"].len == 3
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])

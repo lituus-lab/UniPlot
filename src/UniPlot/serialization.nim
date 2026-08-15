@@ -194,6 +194,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
   if spec.yScaleSpec.domain.configured:
     yScale["domain"] = %*{"minimum": spec.yScaleSpec.domain.minimum,
       "maximum": spec.yScaleSpec.domain.maximum}
+  if spec.yScaleSpec.categories.configured:
+    yScale["categories"] = %spec.yScaleSpec.categories.values
   if spec.secondaryYSpec.enabled:
     yScale["secondary"] = %*{"scale": spec.secondaryYSpec.scale,
       "offset": spec.secondaryYSpec.offset, "label": spec.secondaryYSpec.label}
@@ -306,6 +308,13 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
     result.yScaleSpec.domain = AxisDomainSpec(configured: true,
       minimum: domain.finiteNumber("minimum"),
       maximum: domain.finiteNumber("maximum"))
+  if yScale.hasKey("categories"):
+    let categories = yScale.field("categories", JArray)
+    result.yScaleSpec.categories = AxisCategoryDomainSpec(configured: true)
+    for category in categories:
+      if category.kind != JString:
+        raise fail("y scale categories must be strings")
+      result.yScaleSpec.categories.values.add category.getStr
   if yScale.hasKey("secondary"):
     let secondary = yScale.field("secondary", JObject)
     result.secondaryYSpec = SecondaryAxisSpec(enabled: true,
