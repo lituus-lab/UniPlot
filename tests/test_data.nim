@@ -15,7 +15,9 @@ suite "data":
   test "finiteRows filters non-finite numeric values":
     var frame = initDataFrame()
     frame.addColumn("x", [1.0, NaN, 3.0])
-    check frame.finiteRows(["x"]) == @[0, 2]
+    frame.addColumn("y", [Inf, 2.0, 3.0])
+    frame.addColumn("label", ["a", "b", "c"])
+    check frame.finiteRows(["x", "y", "label"]) == @[2]
 
   test "an empty first column still fixes the row count":
     var frame = initDataFrame()

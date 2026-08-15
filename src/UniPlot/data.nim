@@ -52,13 +52,18 @@ proc categorical*(frame: DataFrame; name: string): seq[string] =
   frame.columns[name].categories
 
 proc finiteRows*(frame: DataFrame; columns: openArray[string]): seq[int] =
+  var numericColumns = newSeqOfCap[seq[float64]](columns.len)
+  for name in columns:
+    if name notin frame.columns:
+      raise newException(PlotError, "column not found: " & name)
+    let column = frame.columns[name]
+    if column.kind == ckNumeric:
+      numericColumns.add column.numbers
+  result = newSeqOfCap[int](frame.rowCount)
   for row in 0 ..< frame.rowCount:
     var valid = true
-    for name in columns:
-      if name notin frame.columns:
-        raise newException(PlotError, "column not found: " & name)
-      let column = frame.columns[name]
-      if column.kind == ckNumeric and classify(column.numbers[row]) in
-          {fcNan, fcInf, fcNegInf}:
+    for values in numericColumns:
+      if classify(values[row]) in {fcNan, fcInf, fcNegInf}:
         valid = false
+        break
     if valid: result.add row
