@@ -185,6 +185,11 @@ process. This 2.21x ratio includes actual UniVector stroke expansion for all
 100,000 intervals. It is an internal regression baseline, not a comparison
 with differently specified uncertainty marks in other libraries.
 
+The reusable-theme diagnostic averaged 21.47 ms for the dark preset versus
+21.37 ms for the default theme at 100,000 points in the same five-iteration
+run. The 0.10 ms difference is within run-to-run noise; it records that preset
+application introduced no detected construction regression.
+
 `benchmarkDeps` is deliberately explicit. It creates isolated environments
 under `build/`, installs Python plotting dependencies there, and only installs
 ggplot2/Plots.jl when their R/Julia runtimes already exist. The normal library

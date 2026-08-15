@@ -84,6 +84,10 @@ proc uncertaintySpec(count: int): PlotSpec =
   result.geomErrorBar(interval)
   result.geomLine(aes("x", "estimate"))
 
+proc themedSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  result.applyTheme(darkTheme())
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -97,7 +101,7 @@ when isMainModule:
 
   var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
-      uncertaintyCompileTimes, pngTimes: RunningStat
+      uncertaintyCompileTimes, themedCompileTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -133,6 +137,10 @@ when isMainModule:
     let uncertaintyCompileMs = elapsedMs(started)
 
     started = getMonoTime()
+    let themedScene = themedSpec(pointCount).compileScene(size)
+    let themedCompileMs = elapsedMs(started)
+
+    started = getMonoTime()
     let svg = reference.toSvg(font)
     let svgMs = elapsedMs(started)
 
@@ -141,7 +149,8 @@ when isMainModule:
     let pngMs = elapsedMs(started)
     consumed += svg.len + png.len + scene.nodes.len + styledScene.nodes.len +
       continuousColorScene.nodes.len + referenceScene.nodes.len + finiteCount +
-      uncertaintyScene.nodes.len + int(trained.domainMax)
+      uncertaintyScene.nodes.len + themedScene.nodes.len +
+      int(trained.domainMax)
 
     if iteration >= warmups:
       scaleTimes.push scaleMs
@@ -151,6 +160,7 @@ when isMainModule:
       continuousColorCompileTimes.push continuousColorCompileMs
       referenceCompileTimes.push referenceCompileMs
       uncertaintyCompileTimes.push uncertaintyCompileMs
+      themedCompileTimes.push themedCompileMs
       svgTimes.push svgMs
       pngTimes.push pngMs
 
@@ -171,6 +181,7 @@ when isMainModule:
         continuousColorCompileTimes),
       "reference_construct_compile": summary(referenceCompileTimes),
       "uncertainty_construct_compile": summary(uncertaintyCompileTimes),
+      "themed_construct_compile": summary(themedCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
       "png_from_compiled_scene": summary(pngTimes)
     },

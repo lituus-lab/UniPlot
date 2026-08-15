@@ -80,6 +80,12 @@ ranking:
   five measured iterations, versus 21.29 ms for the common line-plus-point
   construction in the same process. The 2.21x ratio reflects 100,000 expanded
   capped intervals and is a regression baseline, not a cross-library result.
+- `themed_construct_compile` applies the reusable dark preset before compiling
+  the common workload. It guards against theme resolution regressions without
+  treating a colour/style choice as a separate cross-provider workload. On
+  the 2026-08-15 Darwin arm64 run it averaged 21.47 ms for 100,000 points over
+  five measured iterations, versus 21.37 ms for the default theme in the same
+  process. The 0.10 ms difference is within run-to-run noise.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other
