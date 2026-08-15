@@ -207,7 +207,35 @@ always returns one bin per adjacent boundary pair, including zero-count bins;
 Those bars have equal screen width: their labels preserve the numeric
 boundaries, but an interval twice as wide does not receive a bar twice as wide
 and heights are raw counts rather than width-normalised densities. Numeric
-variable-width histogram geometry remains a separate roadmap item.
+geometry is available through the `histogramPlot(values, breaks, ...)`
+overload below; `histogramBreaksPlot` remains useful when interval labels are
+the intended categorical axis.
+
+## Numeric histogram geometry and density
+"""
+
+nbCode:
+  var densityHistogram = histogramPlot(
+    [0.0, 0.2, 0.8, 1.0, 1.4, 2.0, 2.4, 3.0],
+    [0.0, 0.5, 1.0, 2.0, 3.0], density = true, color = "#d65f2d")
+  densityHistogram.labels(title = "Variable-width probability density",
+    x = "value", y = "density")
+  let densityHistogramSvg = densityHistogram.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(densityHistogramSvg,
+  "Numeric rectangle widths follow the supplied intervals; total bar area is one.")
+
+nbText: """
+The explicit-break overload of `histogramPlot` uses retained numeric
+`geomRect` marks with `xMin`, `xMax`, `yMin` and `yMax` mappings. With
+`density = false`, heights are counts. With `density = true`, each height is
+`count / (finite in-domain count × interval width)`, so the sum of rectangle
+areas is one whenever at least one observation is counted. An empty in-domain
+sample produces zero-height rectangles. Interval widths must remain finite;
+the ordinary explicit-break validation still requires finite strictly
+increasing boundaries.
 
 Automatic Scott, Sturges and Freedman–Diaconis selection is intentionally not
 implemented locally: those rules need floating-point transcendental/root
@@ -345,4 +373,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 7)
+validatePage("scales_stats.html", minSvg = 8)
