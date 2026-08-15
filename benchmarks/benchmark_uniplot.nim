@@ -114,6 +114,12 @@ proc themedSpec(count: int): PlotSpec =
   result = sampleSpec(count)
   result.applyTheme(darkTheme())
 
+proc facetedSpec(count: int): PlotSpec =
+  result = sampleSpec(count)
+  var groups = newSeqOfCap[string](count)
+  for index in 0 ..< count: groups.add "panel-" & $(index mod 4)
+  result.data.addColumn("facet", groups)
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -127,6 +133,7 @@ when isMainModule:
   let panelPointCount = max(1, pointCount div 4)
   let gridSpecs = [sampleSpec(panelPointCount), sampleSpec(panelPointCount),
     sampleSpec(panelPointCount), sampleSpec(panelPointCount)]
+  let facetSpec = facetedSpec(pointCount)
   let referenceX = referenceSpec.data.numeric("x")
   let referenceJson = referenceSpec.toJson
 
@@ -134,8 +141,8 @@ when isMainModule:
       continuousColorCompileTimes, referenceCompileTimes, svgTimes,
       uncertaintyCompileTimes, themedCompileTimes, jsonEncodeTimes,
       jsonDecodeTimes, gridCompileTimes, sharedGridCompileTimes,
-      prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
-        pngTimes: RunningStat
+      facetCompileTimes, prepareSceneTimes, preparedSvgTimes, preparedPngTimes,
+      pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + warmups:
     var started = getMonoTime()
@@ -161,6 +168,8 @@ when isMainModule:
     let gridResult = measureScene(compileGrid(gridSpecs, 2, size, gap = 12))
     let sharedGridResult = measureScene(compileGrid(gridSpecs, 2, size,
       gap = 12, sharedX = true, sharedY = true))
+    let facetResult = measureScene(compileFacetGrid(facetSpec, "facet", 2,
+      size, gap = 12, sharedX = true, sharedY = true))
 
     started = getMonoTime()
     let encodedSpec = referenceSpec.toJson
@@ -191,7 +200,7 @@ when isMainModule:
       styledResult.nodes + continuousColorResult.nodes +
       referenceResult.nodes + finiteCount + uncertaintyResult.nodes +
       themedResult.nodes + gridResult.nodes +
-      sharedGridResult.nodes +
+      sharedGridResult.nodes + facetResult.nodes +
       encodedSpec.len + decodedSpec.data.rowCount + preparedSvgResult.bytes +
       preparedPngResult.bytes + preparedWidth + int(trained.domainMax)
 
@@ -206,6 +215,7 @@ when isMainModule:
       themedCompileTimes.push themedResult.ms
       gridCompileTimes.push gridResult.ms
       sharedGridCompileTimes.push sharedGridResult.ms
+      facetCompileTimes.push facetResult.ms
       jsonEncodeTimes.push jsonEncodeMs
       jsonDecodeTimes.push jsonDecodeMs
       prepareSceneTimes.push prepareSceneMs
@@ -235,6 +245,7 @@ when isMainModule:
       "themed_construct_compile": summary(themedCompileTimes),
       "grid_construct_compile": summary(gridCompileTimes),
       "shared_grid_construct_compile": summary(sharedGridCompileTimes),
+      "facet_construct_compile": summary(facetCompileTimes),
       "json_encode": summary(jsonEncodeTimes),
       "json_decode": summary(jsonDecodeTimes),
       "cpu_prepare_scene": summary(prepareSceneTimes),

@@ -119,6 +119,8 @@ than introducing competing geometry or text implementations.
 - [ ] Measure SIMD opportunities through UniMath/UniLinalg rather than local
   vector kernels.
 - [ ] Measure parallel scene compilation before adding concurrency.
+- [ ] Replace materialised facet-frame copies with an immutable indexed data
+  view after measuring its effects on compilation and binding ownership.
 - [ ] Track peak resident memory and bytes allocated per rendered frame.
 - [x] Add 10³, 10⁵ and 10⁶-point workloads with explicit output semantics.
 - [x] Compare warm and cold paths separately for every provider.

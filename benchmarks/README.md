@@ -100,6 +100,14 @@ ranking:
   domains in the same process. The measured 1.74 ms (5.39%) is the cost of the
   additional domain scans and contract-preserving union on this workload; it
   is neither a rendering measurement nor a cross-library comparison.
+- `facet_construct_compile` partitions one 100,000-row, three-column
+  specification into four categorical panels, copies each panel's complete
+  typed frame, derives shared numeric domains and compiles the grid. On the
+  2026-08-15 Darwin arm64 run it averaged 46.76 ms over five iterations after
+  three warmups, versus 34.32 ms for the already separated shared grid in the
+  same process. The measured 12.44 ms (36.25%) exposes the current ownership
+  cost of materialising facet frames; it is recorded as optimisation work, not
+  hidden as plotting overhead.
 - `json_encode` and `json_decode` measure the complete versioned PlotSpec,
   including both 100,000-value numeric columns. The decode input is prepared
   outside the timed loop; encoding and parsing are reported separately. On the
