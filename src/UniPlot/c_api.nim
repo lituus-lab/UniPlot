@@ -167,6 +167,35 @@ proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
+    values: ptr float64; count: csize_t; aggregation: cint;
+    color: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or groups.isNil or values.isNil or count == 0 or
+      count > csize_t(high(int)) or color.isNil or
+      aggregation < cint(low(AggregationKind).ord) or
+      aggregation > cint(high(AggregationKind).ord):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputGroups = cast[ptr UncheckedArray[cstring]](groups)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+    var
+      copiedGroups = newSeqOfCap[string](int(count))
+      copiedValues = newSeqOfCap[float64](int(count))
+    for index in 0 ..< int(count):
+      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      copiedGroups.add $inputGroups[index]
+      copiedValues.add inputValues[index]
+    h.spec = groupedAggregatePlot(copiedGroups, copiedValues,
+      AggregationKind(aggregation), $color)
+    h.nextColumn = 0
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint): cint {.
     exportc, dynlib, cdecl.} =

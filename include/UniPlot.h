@@ -58,6 +58,9 @@ int uplot_add_box_plot(uplot_plot *, const char *const *groups,
 int uplot_add_histogram_breaks(uplot_plot *, const double *values,
                                size_t value_count, const double *breaks,
                                size_t break_count, const char *color);
+int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
+                                const double *values, size_t count,
+                                int aggregation, const char *color);
 int uplot_add_heatmap(uplot_plot *, const char *const *xs,
                       const char *const *ys, const double *values,
                       size_t count, int aggregation);

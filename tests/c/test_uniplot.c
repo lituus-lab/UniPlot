@@ -222,6 +222,43 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   uplot_plot_free(invalid_histogram);
 
+  uplot_plot *grouped = uplot_plot_new(320, 240);
+  assert(grouped != NULL);
+  const char *aggregate_groups[] = {"beta", "alpha", "beta", "empty"};
+  const double aggregate_values[] = {1, 4, 3, NAN};
+  assert(uplot_add_grouped_aggregate(grouped, aggregate_groups,
+                                     aggregate_values, 4, UPLOT_AGG_MEAN,
+                                     "#7a3db8") == UPLOT_OK);
+  assert(uplot_add_grouped_aggregate(grouped, aggregate_groups,
+                                     aggregate_values, 4, UPLOT_AGG_MEAN,
+                                     "#7a3db8") == UPLOT_ERR_ARGUMENT);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(grouped, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(grouped);
+  uplot_plot *invalid_grouped = uplot_plot_new(320, 240);
+  assert(invalid_grouped != NULL);
+  const char *invalid_groups[] = {"beta", NULL};
+  const char *empty_group[] = {""};
+  assert(uplot_add_grouped_aggregate(invalid_grouped, invalid_groups,
+                                     aggregate_values, 2, UPLOT_AGG_MEAN,
+                                     "#7a3db8") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_grouped_aggregate(invalid_grouped, aggregate_groups,
+                                     aggregate_values, 4, 999,
+                                     "#7a3db8") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_grouped_aggregate(invalid_grouped, empty_group,
+                                     aggregate_values, 1, UPLOT_AGG_MEAN,
+                                     "#7a3db8") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_grouped_aggregate(invalid_grouped, aggregate_groups,
+                                     aggregate_values, 4, UPLOT_AGG_MEAN,
+                                     "not-a-color") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_grouped_aggregate(NULL, aggregate_groups, aggregate_values,
+                                     4, UPLOT_AGG_MEAN,
+                                     "#7a3db8") == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(invalid_grouped);
+
   uplot_plot *heatmap = uplot_plot_new(320, 360);
   assert(heatmap != NULL);
   const char *heat_x[] = {"left", "right", "left", "left"};
