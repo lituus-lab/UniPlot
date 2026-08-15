@@ -170,6 +170,30 @@ int main(void) {
          UPLOT_ERR_RENDER);
   assert(svg == NULL && svg_len == 0);
   uplot_plot_free(rejecting_plot);
+
+  uplot_plot *box_plot = uplot_plot_new(320, 240);
+  assert(box_plot != NULL);
+  const char *box_groups[] = {"a", "a", "a", "a", "a", "b", "b"};
+  const char *bad_box_groups[] = {"a", NULL};
+  const double box_values[] = {1, 2, 3, 4, 100, 8, 9};
+  assert(uplot_add_box_plot(box_plot, bad_box_groups, box_values, 2, 1.5,
+                            "#3366cc", "#cc3344") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_box_plot(box_plot, box_groups, box_values, 7, -1.0,
+                            "#3366cc", "#cc3344") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_box_plot(box_plot, box_groups, box_values, 7, 1.5,
+                            "invalid", "#cc3344") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_box_plot(box_plot, box_groups, box_values, 7, 1.5,
+                            "#3366cc", "#cc3344") == UPLOT_OK);
+  assert(uplot_add_box_plot(box_plot, box_groups, box_values, 7, 1.5,
+                            "#3366cc", "#cc3344") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_box_plot(NULL, box_groups, box_values, 7, 1.5,
+                            "#3366cc", "#cc3344") == UPLOT_ERR_ARGUMENT);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(box_plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(box_plot);
   puts("All UniPlot C ABI tests passed.");
   return 0;
 }

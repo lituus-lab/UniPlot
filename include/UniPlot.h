@@ -44,6 +44,10 @@ int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                      const char *color, float radius);
+int uplot_add_box_plot(uplot_plot *, const char *const *groups,
+                       const double *values, size_t count,
+                       double whisker_length, const char *color,
+                       const char *outlier_color);
 int uplot_add_categorical_column(uplot_plot *, const char *name,
                                  const char *const *values, size_t count);
 int uplot_add_line_styled(uplot_plot *, const double *, const double *, size_t,

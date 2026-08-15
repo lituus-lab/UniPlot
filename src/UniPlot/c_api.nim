@@ -114,6 +114,32 @@ proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
   addSeries(value, xs, ys, count, mkPoint, color, radius)
 
+proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
+    values: ptr float64; count: csize_t; whiskerLength: float64; color,
+    outlierColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or groups.isNil or values.isNil or count == 0 or
+      count > csize_t(high(int)) or color.isNil or outlierColor.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputGroups = cast[ptr UncheckedArray[cstring]](groups)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+    var copiedGroups = newSeqOfCap[string](int(count))
+    var copiedValues = newSeqOfCap[float64](int(count))
+    for index in 0 ..< int(count):
+      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      copiedGroups.add $inputGroups[index]
+      copiedValues.add inputValues[index]
+    h.spec = boxPlot(copiedGroups, copiedValues, whiskerLength, $color,
+      $outlierColor)
+    h.nextColumn = 0
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_categorical_column*(value: pointer; name: cstring;
     values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
   if value.isNil or name.isNil or values.isNil or count == 0 or
