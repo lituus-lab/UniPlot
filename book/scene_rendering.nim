@@ -84,6 +84,31 @@ nbRawHtml gallery([
     "UniPlot line and point plot rendered as PNG")
 ])
 
+nbText: """
+## Reusable CPU preparation
+
+For repeated export, `prepareScene` shapes every UniGlyph text node and
+flattens every UniVector path once. The resulting `PreparedScene` owns an
+independent copy of its vector paths: later mutation of the source `Scene`
+cannot desynchronise SVG from cached raster geometry.
+"""
+
+nbCode:
+  let prepared = scene.prepareScene(font)
+  let preparedSvg = prepared.toSvg()
+  let preparedPng = prepared.encodePng()
+  doAssert preparedSvg == svg
+  doAssert preparedPng == png
+  echo "prepared size: ", prepared.size.width, " × ", prepared.size.height
+  echo "exact SVG/PNG parity: true"
+
+nbText: """
+`PreparedScene.toSvg`, `renderImage`, `encodePng`, `saveSvg` and `savePng` no
+longer require a font because shaping is already complete. Preparation is
+explicit and bounded by the caller; UniPlot does not retain an unbounded global
+cache. WGPU has the analogous `WgpuPreparedScene` resource boundary.
+"""
+
 nbCode:
   let temporary = getTempDir() / "uniplot-book-export"
   scene.saveSvg(font, temporary & ".svg")

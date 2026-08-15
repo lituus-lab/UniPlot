@@ -104,7 +104,8 @@ than introducing competing geometry or text implementations.
   or sorting concatenated samples.
 - [x] Compile layers through allocation-light row filters while preserving the
   materialising `finiteRows` compatibility helper.
-- [x] Expose reusable prepared scenes that retain shaped and tessellated paths.
+- [x] Expose reusable CPU/SVG and WGPU prepared scenes that retain shaped,
+      flattened and tessellated paths.
 - [ ] Add bounded automatic prepared-scene caching by stable semantic key.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
 - [x] Use a prepared or batch ordered-palette sampler supplied by UniColor;
