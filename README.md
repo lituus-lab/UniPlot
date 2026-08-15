@@ -19,6 +19,7 @@ rendering engines.
 - CSS colour styling through UniColor;
 - line, point, bar, area and text layers, plus histogram recipes;
 - Cartesian axes, ticks, labels, titles and themes;
+- explicit layer-derived legends with deterministic layout;
 - an inspectable retained scene shared by SVG and raster rendering;
 - deterministic SVG and PNG export;
 - value-oriented plot specifications and deterministic scene compilation;

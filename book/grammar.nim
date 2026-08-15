@@ -87,6 +87,31 @@ Layer order is rendering order. A zero line width or point radius selects the
 theme default; an explicit positive value overrides it for that layer. Text
 requires the mapped label column to be categorical.
 
+## Legends
+
+A non-empty `legend` argument names a layer. Calling `legend` on the plot
+enables a deterministic right-side guide compiled into the same retained scene
+as the data marks. `lpNone` disables it explicitly.
+"""
+
+nbCode:
+  var documented = linePlot([0.0, 1.0, 2.0, 3.0],
+    [1.0, 2.5, 2.0, 4.0], color = "#3366cc", legend = "Trend")
+  documented.geomPoint(aes("x", "y"), color = "#d1495b", radius = 5,
+    legend = "Samples")
+  documented.labels(title = "Layer-derived legend", x = "x", y = "y")
+  documented.legend(title = "Series")
+  let documentedSvg = documented.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(documentedSvg,
+  "Line and point swatches are derived from their layer geometry and colour.")
+
+nbText: """
+Legend entries are opt-in: unnamed layers never appear accidentally. The guide
+reserves layout space before scales are trained, so it cannot cover the data
+area. SVG, PNG and WGPU need no legend-specific rendering code.
+
 ## Labels and themes
 
 `labels` sets the title and axis labels. `defaultTheme()` exposes background,
@@ -119,4 +144,4 @@ Next: [Scales and statistics](scales_stats.html).
 """
 
 nbSave
-validatePage("grammar.html", minSvg = 6)
+validatePage("grammar.html", minSvg = 7)

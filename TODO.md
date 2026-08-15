@@ -57,7 +57,8 @@ scene without weakening its deterministic CPU semantics.
 These are required for broad Matplotlib/ggplot2/Plotly parity, but are not
 silently claimed by the focused 1.0 publication contract.
 
-- [ ] Legends derived from mapped aesthetics and explicit legend control.
+- [x] Legends derived from named layers with explicit visibility and title
+  control.
 - [ ] Facets, subplot grids, shared axes and secondary axes.
 - [ ] Colour, fill, size, shape, alpha and line-style aesthetic mappings.
 - [ ] Continuous colour maps, discrete palettes and colour bars.
