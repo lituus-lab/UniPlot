@@ -3,10 +3,10 @@ build/
 # Anchored: this is the build output dir, and unanchored `bin/` would also
 # swallow any nested bin/ a subdirectory legitimately tracks.
 /bin/
-libUniTemplate.so
-libUniTemplate.so.*
-libUniTemplate.dylib
-libUniTemplate.a
+libUniPlot.so
+libUniPlot.so.*
+libUniPlot.dylib
+libUniPlot.a
 *.o
 *.obj
 *.exe
@@ -33,9 +33,10 @@ docs/
 nimdoc.out.css
 
 # python binding artifacts (sources tracked; generated + bundled lib not)
-py/unitemplate/_core.c
-py/unitemplate/*.so
-py/unitemplate/libUniTemplate.so
+py/uniplot/_core.c
+py/uniplot/*.so
+py/uniplot/libUniPlot.so
+py/uniplot/libUniPlot.dylib
 py/dist/
 py/build/
 py/*.egg-info/
@@ -46,7 +47,7 @@ py/.pytest_cache/
 py/_nimsrc/
 
 # c test/example binaries
-tests/c/test_unitemplate
+tests/c/test_uniplot
 examples/c/demo
 
 # os / editor
