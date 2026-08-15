@@ -105,6 +105,42 @@ tick that overflows is rejected. The guide reserves its own right-side width
 and coexists with a right legend without overlap. `clearSecondaryY` removes it.
 The optional transform round-trips through schema-v1 JSON.
 
+## Retained annotations
+"""
+
+nbCode:
+  var annotated = linePlot([0.0, 1.0, 2.0, 3.0],
+    [1.0, 2.2, 1.7, 3.4], color = "#2457c5")
+  annotated.geomPoint(aes("x", "y"), color = "#d64255", radius = 5)
+  annotated.labels(title = "Data-coordinate annotations", x = "sample",
+    y = "value")
+  annotated.annotateText(3.0, 3.4, "maximum", color = "#7a3db8",
+    fontSize = 14)
+  annotated.annotateArrow(2.25, 2.5, 3.0, 3.4, color = "#7a3db8",
+    width = 2, headSize = 9)
+  let annotatedSvg = annotated.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(annotatedSvg,
+  "Plain text and a UniVector arrow retained in the plot specification.")
+
+nbText: """
+`annotateText` and `annotateArrow` use numeric data coordinates, participate
+in automatic domain training and render above marks. Font size, shaft width
+and arrow-head size are screen-space values, so zooming the data domain does
+not make them unreadable. Arrow geometry is built by UniVector and text is
+shaped by UniGlyph; the same scene nodes feed CPU, SVG, PNG and WGPU rendering.
+
+Annotations currently require numeric x coordinates. They repeat in every
+observed facet because they belong to the retained plot rather than to one
+panel. `clearAnnotations` removes all of them. Schema-v1 JSON preserves their
+order and complete style.
+
+This API deliberately supports plain text only. Multi-style text runs remain
+blocked on a run-level styling primitive in UniGlyph; UniPlot does not create
+a competing rich-text model.
+
 ## Categorical band scales
 """
 
@@ -144,4 +180,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 2)
+validatePage("scales_stats.html", minSvg = 3)
