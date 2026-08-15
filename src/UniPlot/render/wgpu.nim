@@ -14,6 +14,9 @@ const WgpuNativeTargetVersion* = "29.0.1.1"
 const MaxPreparedCacheEntries* = 64
 const MinPreparedCacheByteBudget* = 512'u64
 const DefaultPreparedCacheByteBudget* = 256'u64 * 1024'u64 * 1024'u64
+const MinUploadChunkBytes* = 4'u64
+const MaxUploadChunkBytes* = 64'u64 * 1024'u64 * 1024'u64
+const DefaultUploadChunkBytes* = 4'u64 * 1024'u64 * 1024'u64
 
 type
   WgpuError* = object of CatchableError
@@ -48,6 +51,8 @@ type
 
   WgpuDiagnostics* = object
     meshUploads*: uint64
+    uploadWriteCalls*, uploadBytes*, largestUploadWrite*: uint64
+    uploadChunkBytes*: uint64
     preparedCacheHits*, preparedCacheMisses*: uint64
     preparedCacheEvictions*: uint64
     preparedCacheBytes*, preparedCachePeakBytes*: uint64
@@ -97,13 +102,16 @@ proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
 
 proc openWgpuBackend*(libraryPath: string;
     preparedCacheCapacity = 4;
-    preparedCacheByteBudget = DefaultPreparedCacheByteBudget): WgpuBackend {.
+    preparedCacheByteBudget = DefaultPreparedCacheByteBudget;
+    uploadChunkBytes = DefaultUploadChunkBytes): WgpuBackend {.
     contractual.} =
   ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
     libraryPath.len > 0
     preparedCacheCapacity in 1 .. MaxPreparedCacheEntries
     preparedCacheByteBudget >= MinPreparedCacheByteBudget
+    uploadChunkBytes in MinUploadChunkBytes .. MaxUploadChunkBytes
+    uploadChunkBytes mod 4'u64 == 0'u64
   ensure:
     not result.isNil and result.state == wbsReady
   body:
@@ -117,10 +125,15 @@ proc openWgpuBackend*(libraryPath: string;
       raise newException(WgpuError,
         "prepared WGPU cache byte budget must be at least " &
         $MinPreparedCacheByteBudget)
+    if uploadChunkBytes notin MinUploadChunkBytes .. MaxUploadChunkBytes or
+        uploadChunkBytes mod 4'u64 != 0:
+      raise newException(WgpuError,
+        "WGPU upload chunk size must be a multiple of 4 bytes in " &
+        $MinUploadChunkBytes & ".." & $MaxUploadChunkBytes)
     result = WgpuBackend(state: wbsUnavailable)
     try:
       result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity,
-        preparedCacheByteBudget)
+        preparedCacheByteBudget, uploadChunkBytes)
       result.state = wbsReady
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
@@ -160,8 +173,14 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
   body:
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
-    let cache = backend.runtime.preparedCacheStats()
+    let
+      cache = backend.runtime.preparedCacheStats()
+      uploads = backend.runtime.uploadStats()
     WgpuDiagnostics(meshUploads: backend.runtime.meshUploadCount(),
+      uploadWriteCalls: uploads.writeCalls,
+      uploadBytes: uploads.bytes,
+      largestUploadWrite: uploads.largestWrite,
+      uploadChunkBytes: uploads.chunkBytes,
       preparedCacheHits: cache.hits,
       preparedCacheMisses: cache.misses,
       preparedCacheEvictions: cache.evictions,

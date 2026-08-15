@@ -294,6 +294,8 @@ type
     preparedCacheCapacity: int
     preparedCacheByteBudget, preparedCacheBytes: uint64
     preparedCachePeakBytes: uint64
+    uploadChunkBytes, uploadWriteCalls, uploadBytes: uint64
+    largestUploadWrite: uint64
     preparedMeshes: seq[PreparedMeshBuffers]
     preparedUseClock: uint64
     meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
@@ -465,7 +467,8 @@ proc backendName(value: uint32): string =
 
 proc openNativeWgpu*(libraryPath: string;
                      preparedCacheCapacity: int;
-                     preparedCacheByteBudget: uint64): NativeWgpuRuntime =
+                     preparedCacheByteBudget: uint64;
+                     uploadChunkBytes: uint64): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
   if preparedCacheCapacity <= 0:
     raise newException(LibraryError,
@@ -473,12 +476,18 @@ proc openNativeWgpu*(libraryPath: string;
   if preparedCacheByteBudget < 512'u64:
     raise newException(LibraryError,
       "prepared WGPU cache byte budget must be at least 512")
+  if uploadChunkBytes < 4'u64 or
+      uploadChunkBytes > 64'u64 * 1024'u64 * 1024'u64 or
+      uploadChunkBytes mod 4'u64 != 0:
+    raise newException(LibraryError,
+      "WGPU upload chunk size must be a multiple of 4 bytes in 4..67108864")
   let library = loadLib(libraryPath)
   if library == nil:
     raise newException(LibraryError, "cannot load wgpu-native: " & libraryPath)
   result = NativeWgpuRuntime(library: library,
     preparedCacheCapacity: preparedCacheCapacity,
-    preparedCacheByteBudget: preparedCacheByteBudget)
+    preparedCacheByteBudget: preparedCacheByteBudget,
+    uploadChunkBytes: uploadChunkBytes)
   try:
     let
       createInstance = loadSymbol[CreateInstanceProc](library,
@@ -617,6 +626,26 @@ proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
     runtime.preparedCacheEvictions, runtime.preparedCacheBytes,
     runtime.preparedCachePeakBytes, runtime.preparedCacheByteBudget,
     runtime.preparedMeshes.len, runtime.preparedCacheCapacity)
+
+proc uploadStats*(runtime: NativeWgpuRuntime): tuple[
+    writeCalls, bytes, largestWrite, chunkBytes: uint64] =
+  if runtime.isNil: return (0'u64, 0'u64, 0'u64, 0'u64)
+  (runtime.uploadWriteCalls, runtime.uploadBytes, runtime.largestUploadWrite,
+    runtime.uploadChunkBytes)
+
+proc writeBufferChunked(runtime: NativeWgpuRuntime;
+                        writeBuffer: WriteBufferProc; buffer: pointer;
+                        data: pointer; size: uint64) =
+  ## Bound each queue write while preserving the byte-exact buffer payload.
+  var offset = 0'u64
+  while offset < size:
+    let chunk = min(runtime.uploadChunkBytes, size - offset)
+    writeBuffer(runtime.queue, buffer, offset,
+      cast[pointer](cast[uint](data) + uint(offset)), csize_t(chunk))
+    inc runtime.uploadWriteCalls
+    runtime.uploadBytes += chunk
+    runtime.largestUploadWrite = max(runtime.largestUploadWrite, chunk)
+    offset += chunk
 
 proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
@@ -835,10 +864,10 @@ struct VertexOut {
         BufferUsageVertex, "vertex")
       ensureBuffer(runtime.indexBuffer, runtime.indexCapacity, indexSize,
         BufferUsageIndex, "index")
-      writeBuffer(runtime.queue, runtime.vertexBuffer, 0,
-        unsafeAddr meshVertices[0], csize_t(vertexSize))
-      writeBuffer(runtime.queue, runtime.indexBuffer, 0,
-        unsafeAddr meshIndices[0], csize_t(indexSize))
+      runtime.writeBufferChunked(writeBuffer, runtime.vertexBuffer,
+        unsafeAddr meshVertices[0], vertexSize)
+      runtime.writeBufferChunked(writeBuffer, runtime.indexBuffer,
+        unsafeAddr meshIndices[0], indexSize)
       inc runtime.meshUploadCount
       activeVertexBuffer = runtime.vertexBuffer
       activeIndexBuffer = runtime.indexBuffer
@@ -900,10 +929,10 @@ struct VertexOut {
           entry.indexCapacity
         runtime.preparedCachePeakBytes = max(runtime.preparedCachePeakBytes,
           runtime.preparedCacheBytes)
-        writeBuffer(runtime.queue, entry.vertexBuffer, 0,
-          unsafeAddr meshVertices[0], csize_t(vertexSize))
-        writeBuffer(runtime.queue, entry.indexBuffer, 0,
-          unsafeAddr meshIndices[0], csize_t(indexSize))
+        runtime.writeBufferChunked(writeBuffer, entry.vertexBuffer,
+          unsafeAddr meshVertices[0], vertexSize)
+        runtime.writeBufferChunked(writeBuffer, entry.indexBuffer,
+          unsafeAddr meshIndices[0], indexSize)
         entry.token = uploadToken
         entry.vertexSize = vertexSize
         entry.indexSize = indexSize
