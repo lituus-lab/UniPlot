@@ -4,11 +4,11 @@
 ## no module imports a higher layer, no `requires` names an undeclared engine.
 ## Line-based scan of import/from/include, which covers the forms Nim sources
 ## actually use; a macro-built import would slip past it.
-import std/[os, strformat, strutils, tables]
+import std/[os, strformat, strutils]
 
 const
   Cfg = "vgraph.cfg"
-  Nimble = "UniTemplate.nimble"
+  Nimble = "UniPlot.nimble"
 
 proc section(name: string): seq[string] =
   ## Entries under `[name]`, in file order.
@@ -30,8 +30,20 @@ proc layerOf(path: string, order: seq[string]): int =
         return i
   -1
 
+proc layerOfModule(modulePath: string, order: seq[string]): int =
+  ## Index of the layer owning an imported module path, or -1. Matches a layer
+  ## name against any path component, so `UniPlot/glyph/outline` resolves to
+  ## the `glyph` layer and a bare `c_api` to the `c_api` layer.
+  let parts = modulePath.split({'/', '\\'})
+  for i, name in order:
+    for part in parts:
+      if part == name or part == name & ".nim":
+        return i
+  -1
+
 iterator importedModules(path: string): string =
-  ## Last path component of every module the file pulls in.
+  ## Full slash-separated path of every module the file pulls in. Directory
+  ## components are preserved so a directory layer (`glyph`) can be resolved.
   for raw in readFile(path).splitLines:
     let line = raw.split('#')[0].strip
     var body = ""
@@ -42,7 +54,7 @@ iterator importedModules(path: string): string =
     # `std/[os, strutils]` -> the bracket members carry the meaningful names.
     body = body.multiReplace(("[", ","), ("]", ","))
     for item in body.split(','):
-      let module = item.strip.split({'/', '\\'})[^1].strip
+      let module = item.strip
       if module.len > 0:
         yield module
 
@@ -54,24 +66,27 @@ proc packageName(spec: string): string =
   result = result.split({'/', '\\'})[^1]
 
 iterator requiredPackages(path: string): string =
-  ## Package name of every `requires` line.
+  ## Package name of every spec on each `requires` line. A line may list
+  ## several comma-separated quoted specs (`requires "nim >= 2.0", "https://…"`),
+  ## so every quoted segment is parsed, not only the first.
   for raw in readFile(path).splitLines:
-    let line = raw.strip
-    if not line.startsWith("requires"): continue
-    let a = line.find('"')
-    let b = line.find('"', a + 1)
-    if a >= 0 and b > a:
-      let name = packageName(line[a + 1 ..< b])
+    var rest = raw.strip
+    if not rest.startsWith("requires"): continue
+    rest = rest[8 .. ^1] # drop the leading `requires` keyword
+    while rest.len > 0:
+      let a = rest.find('"')
+      if a < 0: break
+      let b = rest.find('"', a + 1)
+      if b < 0: break
+      let name = packageName(rest[a + 1 ..< b])
       if name.len > 0:
         yield name
+      rest = rest[b + 1 .. ^1]
 
 proc main() =
   if not fileExists(Cfg):
     quit(&"vgraph: {Cfg} not found", 1)
   let order = section("layers")
-  var index = initTable[string, int]()
-  for i, name in order:
-    index[name] = i
 
   var violations: seq[string]
 
@@ -82,7 +97,7 @@ proc main() =
     if own < 0: continue
     inc checked
     for module in importedModules(path):
-      let other = index.getOrDefault(module, -1)
+      let other = layerOfModule(module, order)
       if other > own:
         violations.add &"{path}: imports {module} ({order[other]}) from {order[own]}"
 

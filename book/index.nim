@@ -3,100 +3,76 @@
 import nimib
 
 nbInit
-nb.title = "UniTemplate"
+nb.title = "UniPlot 1.0"
 
 nbText: """
-# UniTemplate
+# UniPlot 1.0
 
-The reference scaffold every `Uni*` engine is cloned from. It carries one
-hello-world function, `fibonacci`, exposed across the three surfaces each engine
-must ship: **Nim**, a **C ABI**, and a **Python** binding.
+UniPlot compiles typed data and a plotting grammar into a retained scene. The
+same scene feeds vector and raster backends, so layout, guides and layer order
+do not drift between export formats.
 
-This page is a nimib book: every Nim block below is compiled and run when the
-book is built, and the output shown is what the code actually produced. A change
-that breaks the API breaks the docs build, so the two cannot drift apart.
-
-## The Nim surface
-
-The umbrella module re-exports every public submodule.
+## Data and grammar
 """
 
 nbCode:
-  import UniTemplate
+  import UniPlot
 
-  echo "version ", UniTemplateVersion
-  echo "fib(10) = ", fibonacci(10)
-  echo "fib(92) = ", fibonacci(92)
+  var frame = initDataFrame()
+  frame.addColumn("time", [0.0, 1.0, 2.0, 3.0])
+  frame.addColumn("value", [1.0, 3.0, 2.0, 4.0])
+
+  var figure = plot(frame)
+  figure.geomLine(aes("time", "value"), color = "#3366cc")
+  figure.geomPoint(aes("time", "value"), color = "#cc3344")
+  figure.labels(title = "Measured value", x = "time", y = "value")
+
+  let scene = figure.compileScene(Size(width: 640, height: 400))
+  echo "version ", UniPlotVersion
+  echo "layers ", figure.layers.len
+  echo "scene nodes ", scene.nodes.len
 
 nbText: """
-## The domain is part of the contract
+Finite values train the shared scales. Grid lines, tick labels and data marks
+become ordered scene nodes. Each data mark receives a stable identifier that a
+future interactive backend can reuse for picking.
 
-`fibonacci` is not defined for every `int`. `FibMaxN` is the largest argument
-whose result still fits in `int64`, and that bound is stated as a precondition
-rather than left to the caller to remember.
+## Statistics
 """
 
 nbCode:
-  echo "FibMaxN = ", FibMaxN
-  echo "fib(FibMaxN) = ", fibonacci(FibMaxN)
+  let bins = histogram([0.1, 0.2, 0.8, 1.0, 1.1, 1.8], 3)
+  var total = 0
+  for bin in bins: total += bin.count
+  echo "bins ", bins.len
+  echo "samples ", total
 
 nbText: """
-The contract is written with NimContracts (`require:` / `ensure:` / `body:`).
-Under `-d:release` it compiles away entirely: the release build pays nothing,
-while debug builds and the test suite catch a violation at the call site.
+Statistics run in data space before scale transformation. Invalid bin counts
+and empty scale-training inputs are explicit errors.
 
-A postcondition never re-derives the result by calling the function again — it
-states a property cheaper to check than the body is to run. Here, `result >= 0`.
+## Rendering
 
-## The C ABI
+Text is shaped and outlined by UniGlyph. Paths are filled by UniVector and PNG
+encoding belongs to UniImage. A caller supplies the font, making the result
+reproducible and avoiding platform font discovery.
+"""
 
-The same function, reachable from anything that speaks C. The header is
-hand-written and kept in sync with `src/UniTemplate/c_api.nim`; `tests/c` links
-one against the other on every CI run, so a drift is caught rather than shipped.
+nbCode:
+  import UniGlyph
+  let font = loadTtf("tests/DejaVuSans.ttf")
+  let svg = scene.toSvg(font)
+  let png = scene.encodePng(font)
+  echo "svg prefix ", svg[0 .. 3]
+  echo "png signature ", png[0 .. 3]
 
-```c
-#define UNITEMPLATE_FIB_MAX_N 92
+nbText: """
+## Backend boundary
 
-const char *unitemplate_version(void);
-long long   unitemplate_fibonacci(int n);
-```
-
-The C ABI **never raises**. Where the Nim function has a precondition, the C
-entry point clamps instead: out-of-range input returns a defined value rather
-than unwinding across the ABI boundary, which would be undefined behaviour.
-
-```c
-unitemplate_fibonacci(-5);   /* 0       — clamped, not a trap */
-unitemplate_fibonacci(200);  /* fib(92) — clamped to the domain */
-```
-
-## The Python surface
-
-A Cython extension over the C ABI, shipped as a self-contained wheel: the
-library travels inside the package, so installing it needs neither Nim nor a
-compiler.
-
-```python
-import unitemplate
-
-unitemplate.fibonacci(10)   # 55
-unitemplate.version()       # '0.1.0'
-```
-
-Here the domain check returns, because Python has exceptions to carry it:
-`fibonacci(-1)` and `fibonacci(93)` raise `ValueError`, a non-`int` argument
-raises `TypeError`. Each surface expresses one contract in the terms its own
-callers expect — a precondition in Nim, a clamp in C, an exception in Python.
-
-`py/notebooks/quickstart.ipynb` runs these calls against an installed wheel and
-renders on GitHub directly.
-
-## Cloning this into an engine
-
-Rename the tokens (`UniTemplate` → `UniFoo`, `unitemplate` → `unifoo`, `ut_` →
-the engine's prefix), replace `fibonacci.nim` with the domain modules, then
-rewrite this book for the domain. The generated reference lists the API; the
-book is where the domain gets explained.
+The core scene contains paths, text runs, colours and stable identifiers but no
+window, device, queue or shader handle. SVG and PNG are the 1.0 reference
+backends. WGPU consumes the same scene through an optional package and never
+becomes a dependency of the default import.
 """
 
 nbSave
