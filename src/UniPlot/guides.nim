@@ -14,6 +14,11 @@ type LegendEntry = object
   shape: MarkerShape
   lineStyle: LineStyle
 
+type ContinuousGuide = object
+  label: string
+  palette: Palette
+  scale: ContinuousScale
+
 proc polygon(points: openArray[Point]): Path =
   result = newPath()
   if points.len == 0: return
@@ -151,16 +156,14 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     if spec.data.columns[layer.mapping.y].kind != ckNumeric:
       raise newException(PlotError, "y mappings must reference numeric columns")
     if layer.mapping.color.len > 0 and
-        (layer.mapping.color notin spec.data.columns or
-        spec.data.columns[layer.mapping.color].kind != ckCategorical):
+        layer.mapping.color notin spec.data.columns:
       raise newException(PlotError,
-        "color mappings must reference categorical columns")
+        "color mappings must reference an existing column")
     if layer.mapping.fill.len > 0 and
         (layer.mark notin {mkPoint, mkBar} or
-        layer.mapping.fill notin spec.data.columns or
-        spec.data.columns[layer.mapping.fill].kind != ckCategorical):
+        layer.mapping.fill notin spec.data.columns):
       raise newException(PlotError,
-        "fill mappings require a categorical point or bar column")
+        "fill mappings require a point or bar column")
     if layer.mapping.color.len > 0 and layer.mapping.fill.len > 0:
       raise newException(PlotError,
         "a layer cannot map both color and fill")
@@ -193,12 +196,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         "text label mappings must reference categorical columns")
   result = initScene(size, spec.theme.background)
   var legendEntries: seq[LegendEntry]
+  var continuousGuides: seq[ContinuousGuide]
+  var continuousMappings = initTable[string, bool]()
   if spec.legendSpec.visible:
     for layer in spec.layers:
       let paintMapping = if layer.mapping.fill.len > 0:
         layer.mapping.fill else: layer.mapping.color
       if paintMapping.len > 0:
-        legendEntries.add spec.categoricalEntries(layer, paintMapping)
+        case spec.data.columns[paintMapping].kind
+        of ckCategorical:
+          legendEntries.add spec.categoricalEntries(layer, paintMapping)
+        of ckNumeric:
+          if paintMapping notin continuousMappings:
+            continuousMappings[paintMapping] = true
+            let scale = trainContinuous(spec.data.numeric(paintMapping), 0, 1)
+            continuousGuides.add ContinuousGuide(
+              label: if layer.legendLabel.len > 0:
+                layer.legendLabel else: paintMapping,
+              palette: spec.continuousColors, scale: scale)
       if layer.mapping.shape.len > 0 and
           layer.mapping.shape != paintMapping:
         legendEntries.add spec.shapeEntries(layer)
@@ -215,14 +230,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.theme.margins.right,
     yMax: float32(size.height) - spec.theme.margins.bottom)
   const legendWidth = 150'f32
-  if legendEntries.len > 0:
+  if legendEntries.len > 0 or continuousGuides.len > 0:
     if spec.legendSpec.position != lpRight:
       raise newException(PlotError, "unsupported legend position")
     area.xMax -= legendWidth
   if area.width <= 0 or area.height <= 0:
     raise newException(PlotError, "plot margins leave no drawing area")
-  let legendRows = legendEntries.len + ord(spec.legendSpec.title.len > 0)
-  if legendRows > 0 and float32(legendRows * 24) > area.height:
+  let legendHeight = float32(legendEntries.len * 24 +
+    continuousGuides.len * 168 + ord(spec.legendSpec.title.len > 0) * 24)
+  if legendHeight > area.height:
     raise newException(PlotError, "legend does not fit the drawing height")
   let xKind = spec.data.columns[spec.layers[0].mapping.x].kind
   var xDomain = initContinuousDomain()
@@ -285,6 +301,11 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var finiteColumns = @[layer.mapping.x, layer.mapping.y]
     if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
     if layer.mapping.alpha.len > 0: finiteColumns.add layer.mapping.alpha
+    let paintMapping = if layer.mapping.fill.len > 0:
+      layer.mapping.fill else: layer.mapping.color
+    if paintMapping.len > 0 and
+        spec.data.columns[paintMapping].kind == ckNumeric:
+      finiteColumns.add paintMapping
     let rowFilter = spec.data.initRowFilter(finiteColumns)
     var points: seq[Point]
     var colors: seq[Color]
@@ -294,13 +315,18 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var labels: seq[string]
     var breakBefore: seq[bool]
     var categoryColors = initTable[string, Color]()
-    let paintMapping = if layer.mapping.fill.len > 0:
-      layer.mapping.fill else: layer.mapping.color
-    let paintValues = if paintMapping.len > 0:
+    let categoricalPaintValues = if paintMapping.len > 0 and
+        spec.data.columns[paintMapping].kind == ckCategorical:
       spec.data.categorical(paintMapping) else: @[]
-    if paintMapping.len > 0:
+    let numericPaintValues = if paintMapping.len > 0 and
+        spec.data.columns[paintMapping].kind == ckNumeric:
+      spec.data.numeric(paintMapping) else: @[]
+    if categoricalPaintValues.len > 0:
       for entry in spec.categoricalEntries(layer, paintMapping):
         categoryColors[entry.category] = entry.color
+    var paintScale: ContinuousScale
+    if numericPaintValues.len > 0:
+      paintScale = trainContinuous(numericPaintValues, 0, 1)
     let shapeValues = if layer.mapping.shape.len > 0:
       spec.data.categorical(layer.mapping.shape) else: @[]
     let lineStyleValues = if layer.mapping.lineStyle.len > 0:
@@ -346,8 +372,15 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       points.add Point(x: x, y: yScale.map(ys[row]))
       if layer.mark in {mkLine, mkArea}: breakBefore.add pendingBreak
       pendingBreak = false
-      var paint = if paintValues.len > 0:
-        categoryColors[paintValues[row]] else: layer.color
+      var paint = if categoricalPaintValues.len > 0:
+        categoryColors[categoricalPaintValues[row]] else: layer.color
+      if numericPaintValues.len > 0:
+        let sampled = spec.continuousColors.sample(
+          float64(paintScale.map(numericPaintValues[row])))
+        if sampled.isErr:
+          raise newException(PlotError,
+            "cannot sample the continuous color palette")
+        paint = sampled.get
       if alphaValues.len > 0:
         paint = paint.withOpacity(alphaScale.map(alphaValues[row]))
       colors.add paint
@@ -421,7 +454,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       for i, label in labels:
         result.addText(label, points[i], sizes[i],
           colors[i], nodeId); inc nodeId
-  if legendEntries.len > 0:
+  if legendEntries.len > 0 or continuousGuides.len > 0:
     let legendX = area.xMax + 24
     var legendY = area.yMin + 14
     if spec.legendSpec.title.len > 0:
@@ -450,3 +483,28 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       result.addText(entry.label, Point(x: legendX + 30, y: legendY),
         12, spec.theme.foreground)
       legendY += 24
+    const
+      colorBarSteps = 24
+      colorBarHeight = 120'f32
+    for guide in continuousGuides:
+      result.addText(guide.label, Point(x: legendX, y: legendY), 12,
+        spec.theme.foreground)
+      legendY += 18
+      let barTop = legendY
+      let stepHeight = colorBarHeight / float32(colorBarSteps)
+      for index in 0 ..< colorBarSteps:
+        let t = 1.0 - (float64(index) + 0.5) / float64(colorBarSteps)
+        let sampled = guide.palette.sample(t)
+        if sampled.isErr:
+          raise newException(PlotError,
+            "cannot sample the continuous color guide")
+        var swatch = newPath()
+        swatch.rect(legendX, barTop + float32(index) * stepHeight,
+          18, stepHeight)
+        result.addPath(swatch, sampled.get)
+      result.addText(tickLabel(guide.scale.domainMax),
+        Point(x: legendX + 26, y: barTop + 10), 11, spec.theme.foreground)
+      result.addText(tickLabel(guide.scale.domainMin),
+        Point(x: legendX + 26, y: barTop + colorBarHeight), 11,
+        spec.theme.foreground)
+      legendY = barTop + colorBarHeight + 30

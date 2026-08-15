@@ -191,6 +191,50 @@ suite "plot compilation":
     check spec.continuousColors.len == 7
     expect PlotError: spec.continuousPalette(okabeIto())
 
+  test "numeric color mappings sample UniColor and derive a color bar":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0, 2.0])
+    frame.addColumn("y", [1.0, 2.0, 3.0])
+    frame.addColumn("temperature", [0.0, 5.0, 10.0])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y", color = "temperature"), radius = 5)
+    spec.legend()
+    let scene = spec.compileScene()
+    var colors: seq[Color]
+    var colorBarLabels = 0
+    for node in scene.nodes:
+      if node.id != 0: colors.add node.color
+      if node.kind == snText and node.text == "temperature":
+        inc colorBarLabels
+    check colors.len == 3
+    check colors[0] != colors[1]
+    check colors[1] != colors[2]
+    check colors[0] == spec.continuousColors.sample(0.0).get
+    check colors[2] == spec.continuousColors.sample(1.0).get
+    check colorBarLabels == 1
+
+    spec.geomLine(aes("x", "y", color = "temperature"))
+    let combined = spec.compileScene()
+    var combinedColorBarLabels = 0
+    for node in combined.nodes:
+      if node.kind == snText and node.text == "temperature":
+        inc combinedColorBarLabels
+    check combinedColorBarLabels == 1
+
+  test "numeric fill mappings support bars and missing-value filtering":
+    var frame = initDataFrame()
+    frame.addColumn("category", ["A", "B", "C"])
+    frame.addColumn("value", [1.0, 2.0, 3.0])
+    frame.addColumn("weight", [0.0, NaN, 1.0])
+    var spec = plot(frame)
+    spec.geomBar(aes("category", "value", fill = "weight"))
+    let scene = spec.compileScene()
+    var colors: seq[Color]
+    for node in scene.nodes:
+      if node.id != 0: colors.add node.color
+    check colors.len == 2
+    check colors[0] != colors[1]
+
   test "numeric size and alpha mappings use explicit output ranges":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0])
