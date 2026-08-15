@@ -37,6 +37,8 @@ ranking:
   row filtering;
 - `styled_construct_compile` uses a real UniVector dot-dash stroke and
   categorical marker shapes.
+- `continuous_color_construct_compile` samples the configured UniColor ramp
+  for every point and compiles the resulting marker paths.
 
 They isolate implementation regressions that the common end-to-end workload
 could hide. They are not comparisons with similarly named operations in other

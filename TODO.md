@@ -102,6 +102,9 @@ than introducing competing geometry or text implementations.
 - [x] Expose reusable prepared scenes that retain shaped and tessellated paths.
 - [ ] Add bounded automatic prepared-scene caching by stable semantic key.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
+- [ ] Use a prepared or batch ordered-palette sampler supplied by UniColor;
+  never duplicate its interpolation, gamut mapping or palette semantics in
+  UniPlot.
 - [ ] Measure SIMD opportunities through UniMath/UniLinalg rather than local
   vector kernels.
 - [ ] Measure parallel scene compilation before adding concurrency.

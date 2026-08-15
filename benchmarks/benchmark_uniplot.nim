@@ -38,6 +38,22 @@ proc styledSpec(count: int): PlotSpec =
   result.geomLine(aes("x", "y"), lineStyle = DotDashLine)
   result.geomPoint(aes("x", "y", shape = "group"), radius = 2)
 
+proc continuousColorSpec(count: int): PlotSpec =
+  var
+    x = newSeq[float64](count)
+    y = newSeq[float64](count)
+    intensity = newSeq[float64](count)
+  for index in 0 ..< count:
+    x[index] = float64(index) / 25.0
+    y[index] = sin(x[index]) + 0.02 * x[index]
+    intensity[index] = float64(index)
+  var frame = initDataFrame()
+  frame.addColumn("x", x)
+  frame.addColumn("y", y)
+  frame.addColumn("intensity", intensity)
+  result = plot(frame)
+  result.geomPoint(aes("x", "y", color = "intensity"), radius = 2)
+
 when isMainModule:
   let iterations = if paramCount() >= 1: parseInt(paramStr(1)) else: 20
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
@@ -48,8 +64,8 @@ when isMainModule:
   let reference = referenceSpec.compileScene(size)
   let referenceX = referenceSpec.data.numeric("x")
 
-  var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes, svgTimes,
-      pngTimes: RunningStat
+  var scaleTimes, rowFilterTimes, compileTimes, styledCompileTimes,
+      continuousColorCompileTimes, svgTimes, pngTimes: RunningStat
   var consumed = 0
   for iteration in 0 ..< iterations + 3:
     var started = getMonoTime()
@@ -72,6 +88,11 @@ when isMainModule:
     let styledCompileMs = elapsedMs(started)
 
     started = getMonoTime()
+    let continuousColorScene = continuousColorSpec(pointCount).compileScene(
+      size)
+    let continuousColorCompileMs = elapsedMs(started)
+
+    started = getMonoTime()
     let svg = reference.toSvg(font)
     let svgMs = elapsedMs(started)
 
@@ -79,13 +100,15 @@ when isMainModule:
     let png = reference.encodePng(font)
     let pngMs = elapsedMs(started)
     consumed = consumed xor svg.len xor png.len xor scene.nodes.len xor
-      styledScene.nodes.len xor finiteCount xor int(trained.domainMax)
+      styledScene.nodes.len xor continuousColorScene.nodes.len xor
+      finiteCount xor int(trained.domainMax)
 
     if iteration >= 3:
       scaleTimes.push scaleMs
       rowFilterTimes.push rowFilterMs
       compileTimes.push compileMs
       styledCompileTimes.push styledCompileMs
+      continuousColorCompileTimes.push continuousColorCompileMs
       svgTimes.push svgMs
       pngTimes.push pngMs
 
@@ -102,6 +125,8 @@ when isMainModule:
       "row_filter_scan": summary(rowFilterTimes),
       "construct_compile": summary(compileTimes),
       "styled_construct_compile": summary(styledCompileTimes),
+      "continuous_color_construct_compile": summary(
+        continuousColorCompileTimes),
       "svg_from_compiled_scene": summary(svgTimes),
       "png_from_compiled_scene": summary(pngTimes)
     },
