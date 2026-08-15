@@ -115,7 +115,9 @@ proc train*(domain: BandDomain; rangeMin, rangeMax: float32;
     raise newException(PlotError, "cannot train a band scale from empty data")
   result.rangeMin = rangeMin
   result.rangeMax = rangeMax
-  result.domain = domain.values
+  result.domain = newSeqOfCap[string](domain.values.len)
+  for value in domain.values:
+    result.domain.add value
   result.positions = initTable[string, float32]()
   let step = (rangeMax - rangeMin) / float32(result.domain.len)
   result.bandwidth = abs(step) * (1 - padding)

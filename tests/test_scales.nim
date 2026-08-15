@@ -37,6 +37,7 @@ suite "scales":
     domain.addValues(["b", "a"])
     domain.addValues(["a", "c"])
     let scale = domain.train(0, 120)
+    domain.addValues(["d"])
     check scale.domain == @["b", "a", "c"]
     check scale.map("b") < scale.map("c")
 
