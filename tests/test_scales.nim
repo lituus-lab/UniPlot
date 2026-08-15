@@ -10,6 +10,13 @@ suite "scales":
     check scale.map(10) == 120
     check scale.ticks(3) == @[0.0, 5.0, 10.0]
 
+  test "continuous and band ranges may be reversed":
+    let continuous = continuousScale(0, 10, 120, 20)
+    check continuous.map(0) == 120
+    check continuous.map(10) == 20
+    let band = trainBand(["a", "b"], 100, 0)
+    check band.map("a") > band.map("b")
+
   test "log scale rejects non-positive domains":
     expect PlotError: discard continuousScale(0, 10, 0, 1, skLog10)
 

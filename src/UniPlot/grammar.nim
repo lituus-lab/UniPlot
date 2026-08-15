@@ -40,6 +40,10 @@ type
   AestheticRange* = object
     minimum*, maximum*: float32
 
+  AxisScaleSpec* = object
+    kind*: ScaleKind
+    reversed*: bool
+
   Aes* = object
     x*, y*: string
     label*: string
@@ -74,6 +78,7 @@ type
     categoricalColors*: Palette
     continuousColors*: Palette
     mappedSizeRange*, mappedAlphaRange*: AestheticRange
+    xScaleSpec*, yScaleSpec*: AxisScaleSpec
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -183,6 +188,15 @@ proc alphaRange*(spec: var PlotSpec; minimum,
       raise newException(PlotError,
         "alpha range must be finite, ordered and within [0, 1]")
     spec.mappedAlphaRange = AestheticRange(minimum: minimum, maximum: maximum)
+
+proc scaleX*(spec: var PlotSpec; kind = skLinear; reversed = false) =
+  ## Configure the numeric x transform and the direction of numeric or
+  ## categorical x coordinates.
+  spec.xScaleSpec = AxisScaleSpec(kind: kind, reversed: reversed)
+
+proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
+  ## Configure the numeric y transform and coordinate direction.
+  spec.yScaleSpec = AxisScaleSpec(kind: kind, reversed: reversed)
 
 proc linePlot*(x, y: openArray[float64]; color = "#3366cc";
     legend = ""): PlotSpec =

@@ -254,9 +254,12 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if legendHeight > area.height:
     raise newException(PlotError, "legend does not fit the drawing height")
   let xKind = spec.data.columns[spec.layers[0].mapping.x].kind
-  var xDomain = initContinuousDomain()
+  if xKind == ckCategorical and spec.xScaleSpec.kind != skLinear:
+    raise newException(PlotError,
+      "categorical x coordinates only support a linear scale")
+  var xDomain = initContinuousDomain(spec.xScaleSpec.kind)
   var xBandDomain = initBandDomain()
-  var yDomain = initContinuousDomain()
+  var yDomain = initContinuousDomain(spec.yScaleSpec.kind)
   var includeZero = false
   for layer in spec.layers:
     if spec.data.columns[layer.mapping.x].kind != xKind:
@@ -268,11 +271,19 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     yDomain.addValues(spec.data.numeric(layer.mapping.y))
     includeZero = includeZero or layer.mark in {mkBar, mkArea}
   if includeZero: yDomain.addValues([0.0])
+  if includeZero and spec.yScaleSpec.kind == skLog10:
+    raise newException(PlotError,
+      "bar and area layers require a linear y scale with a zero baseline")
   var xScale: ContinuousScale
   var xBand: BandScale
-  if xKind == ckNumeric: xScale = xDomain.train(area.xMin, area.xMax)
-  else: xBand = xBandDomain.train(area.xMin, area.xMax)
-  let yScale = yDomain.train(area.yMax, area.yMin)
+  let
+    xRangeMin = if spec.xScaleSpec.reversed: area.xMax else: area.xMin
+    xRangeMax = if spec.xScaleSpec.reversed: area.xMin else: area.xMax
+    yRangeMin = if spec.yScaleSpec.reversed: area.yMin else: area.yMax
+    yRangeMax = if spec.yScaleSpec.reversed: area.yMax else: area.yMin
+  if xKind == ckNumeric: xScale = xDomain.train(xRangeMin, xRangeMax)
+  else: xBand = xBandDomain.train(xRangeMin, xRangeMax)
+  let yScale = yDomain.train(yRangeMin, yRangeMax)
   var nodeId = 1'u64
   if xKind == ckNumeric:
     for value in xScale.ticks():

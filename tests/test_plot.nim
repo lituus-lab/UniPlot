@@ -31,6 +31,36 @@ suite "plot compilation":
     let scene = spec.compileScene()
     check scene.nodes.len > 10
 
+  test "numeric axes support logarithmic transforms and reversal":
+    var frame = initDataFrame()
+    frame.addColumn("x", [1.0, 10.0, 100.0])
+    frame.addColumn("y", [1.0, 10.0, 100.0])
+    frame.addColumn("label", ["one", "ten", "hundred"])
+    var spec = plot(frame)
+    spec.geomText(aes("x", "y", label = "label"))
+    spec.scaleX(skLog10, reversed = true)
+    spec.scaleY(skLog10, reversed = true)
+    let scene = spec.compileScene()
+    var positions: seq[Point]
+    for node in scene.nodes:
+      if node.id != 0:
+        positions.add node.position
+    check positions.len == 3
+    check positions[0].x > positions[1].x
+    check positions[1].x > positions[2].x
+    check positions[0].y < positions[1].y
+    check positions[1].y < positions[2].y
+    check abs((positions[0].x - positions[1].x) -
+      (positions[1].x - positions[2].x)) < 0.01
+
+  test "incompatible transformed coordinates fail explicitly":
+    var categorical = barPlot(["a", "b"], [1.0, 2.0])
+    categorical.scaleX(skLog10)
+    expect PlotError: discard categorical.compileScene()
+    var logBars = barPlot(["a", "b"], [1.0, 2.0])
+    logBars.scaleY(skLog10)
+    expect PlotError: discard logBars.compileScene()
+
   test "invalid margins and missing mappings are typed errors":
     var spec = sample()
     spec.theme.margins.left = 1000
