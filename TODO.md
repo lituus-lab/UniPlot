@@ -80,7 +80,8 @@ silently claimed by the focused 1.0 publication contract.
 - [ ] Statistical transforms: binning variants, smoothing, aggregation,
   quantiles and confidence intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.
-- [ ] Free annotations, arrows and rich text.
+- [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
+- [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
 - [ ] Image marks and raster layers.
 - [x] Missing-value policies and intentional line breaks.
 - [x] Theme inheritance, reusable style values and publication presets.
