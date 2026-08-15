@@ -29,8 +29,9 @@ device and queue. Downloaded binaries remain outside the package in `.deps`.
 ## Current scope and deferred work
 
 The backend freezes its runtime boundary against wgpu-native 29.0.1.1 and does
-not bundle native binaries. It currently opens the first available adapter and
-owns a real device and queue. Scene drawing, explicit adapter selection, window
-surfaces, asynchronous device loss and shader packaging remain separate
-milestones. Additional raw declarations must continue to match the pinned
-release's `ffi/webgpu-headers/webgpu.h` and `ffi/wgpu.h` exactly.
+not bundle native binaries. It opens the first available adapter, owns a real
+device and queue, retains its WGSL mesh pipeline, renders ordered scene geometry
+offscreen and supports aligned RGBA8 readback. Explicit adapter selection,
+window surfaces and asynchronous device loss remain separate milestones.
+Additional raw declarations must continue to match the pinned release's
+`ffi/webgpu-headers/webgpu.h` and `ffi/wgpu.h` exactly.

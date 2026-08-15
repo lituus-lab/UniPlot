@@ -23,7 +23,8 @@ rendering engines.
 - deterministic SVG and PNG export;
 - value-oriented plot specifications and deterministic scene compilation;
 - a `uniplot` CLI, C ABI and Python binding;
-- an optional backend boundary for WGPU, with no GPU dependency in the core.
+- an optional native WGPU backend for offscreen scene rendering and readback,
+  with no GPU dependency in the core.
 
 ## Architecture
 
@@ -109,6 +110,10 @@ semantics on every supported platform.
 Install the pinned runtime with `nimble wgpuDeps`, then validate the native
 device path with `nimble wgpuTest`. Both tasks are implemented in Nim; the
 downloaded runtime stays in the ignored `.deps` directory.
+
+`renderWgpuScene` compiles retained paths and UniGlyph text through UniVector,
+uploads indexed meshes, submits a WGSL render pass and returns unpadded RGBA8
+pixels. `nimble wgpuBenchmark` measures that complete warm-frame path.
 
 ## License
 

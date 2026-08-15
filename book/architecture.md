@@ -34,7 +34,8 @@ therefore produce equal scene ordering and deterministic vector output.
 SVG and PNG are the 1.0 reference backends. The optional WGPU module preserves
 resource identities and frame preparation, then dynamically loads the pinned
 wgpu-native runtime only when requested. It already creates and owns a native
-adapter, device and queue; drawing the compiled scene is the next backend layer.
+adapter, device, queue, shader and retained render pipeline. Paths and UniGlyph
+text are tessellated by UniVector, rendered offscreen and readable as RGBA8.
 
 ## Current extension points
 

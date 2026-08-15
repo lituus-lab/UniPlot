@@ -23,7 +23,7 @@ scene without weakening its deterministic CPU semantics.
 - [x] Debug contracts, release tests, import-layer validation and lint gates.
 - [ ] Add direct regression tests for every public constructor and rejection
   path, including release-mode runtime guards where contracts compile away.
-- [ ] Record a clean full-suite debug/release/C/Python/book result for the
+- [x] Record a clean full-suite debug/release/C/Python/book result for the
   release candidate.
 
 ## 1.0 GPU and performance
@@ -41,7 +41,8 @@ scene without weakening its deterministic CPU semantics.
   pay a synchronous CPU transfer.
 - [ ] Handle uncaptured validation errors and asynchronous device loss.
 - [ ] Expose adapter identity and limits without leaking WGPU ABI types.
-- [ ] Add CPU/GPU pixel-parity fixtures with documented edge tolerance.
+- [x] Add an exact CPU/GPU pixel-parity fixture for pixel-aligned geometry.
+- [ ] Add antialiased CPU/GPU edge fixtures with a documented tolerance.
 - [ ] Add release benchmarks for scene compilation, tessellation, upload,
   submission, readback and retained-frame throughput.
 - [ ] Establish regression thresholds from repeated same-machine runs; never

@@ -50,6 +50,12 @@ nimble wgpuTest
 The installer and tasks are written in Nim. Native artifacts are pinned to
 wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 
+`renderWgpuScene(backend, scene, font)` uses the same UniGlyph layouts and
+UniVector tessellation as the CPU backends. It uploads an ordered indexed mesh,
+submits the retained WGSL pipeline and reads unpadded RGBA8 pixels back. The
+headless validation task checks both individual pixels and an exact CPU/GPU
+fixture. Run `nimble wgpuBenchmark` for the end-to-end warm-frame measurement.
+
 ## Typed failures
 
 Plotting-domain and user-input failures raise `PlotError`. UniPlot rejects
