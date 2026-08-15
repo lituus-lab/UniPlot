@@ -56,6 +56,34 @@ proc categorical*(frame: DataFrame; name: string): seq[string] =
     raise newException(PlotError, "categorical column not found: " & name)
   frame.columns[name].categories
 
+proc selectRows*(frame: DataFrame; rows: openArray[int]): DataFrame {.
+    contractual.} =
+  ## Copy rows in caller-provided order while preserving every column type.
+  require:
+    block:
+      var valid = true
+      for row in rows:
+        valid = valid and row >= 0 and row < frame.rowCount
+      valid
+  ensure:
+    result.rowCount == rows.len
+    result.order == frame.order
+  body:
+    for row in rows:
+      if row < 0 or row >= frame.rowCount:
+        raise newException(PlotError, "row index is outside the data frame")
+    result = initDataFrame()
+    for name in frame.order:
+      case frame.columns[name].kind
+      of ckNumeric:
+        var values = newSeqOfCap[float64](rows.len)
+        for row in rows: values.add frame.columns[name].numbers[row]
+        result.addColumn(name, values)
+      of ckCategorical:
+        var values = newSeqOfCap[string](rows.len)
+        for row in rows: values.add frame.columns[name].categories[row]
+        result.addColumn(name, values)
+
 proc initRowFilter*(frame: DataFrame;
     columns: openArray[string]): RowFilter =
   result.rowCount = frame.rowCount

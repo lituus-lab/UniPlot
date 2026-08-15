@@ -34,6 +34,22 @@ suite "data":
     frame.addColumn("empty", newSeq[float64]())
     expect PlotError: frame.addColumn("nonempty", [1.0])
 
+  test "row selection preserves schema and caller order":
+    var frame = initDataFrame()
+    frame.addColumn("x", [1.0, 2.0, 3.0])
+    frame.addColumn("label", ["a", "b", "c"])
+    let selected = frame.selectRows([2, 0, 2])
+    check selected.order == @["x", "label"]
+    check selected.rowCount == 3
+    check selected.numeric("x") == @[3.0, 1.0, 3.0]
+    check selected.categorical("label") == @["c", "a", "c"]
+    when defined(release):
+      expect PlotError: discard frame.selectRows([-1])
+      expect PlotError: discard frame.selectRows([3])
+    else:
+      expect PreConditionDefect: discard frame.selectRows([-1])
+      expect PreConditionDefect: discard frame.selectRows([3])
+
   test "column access rejects empty names, missing columns and wrong kinds":
     var frame = initDataFrame()
     expect PlotError: frame.addColumn("", [1.0])
