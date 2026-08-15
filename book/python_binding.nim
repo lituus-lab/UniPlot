@@ -45,6 +45,12 @@ figure = uniplot.Plot.from_json(payload, width=800, height=500)
 
 Path("plot.svg").write_bytes(figure.svg(font))
 Path("plot.png").write_bytes(figure.png(font))
+
+other = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3])
+Path("grid.svg").write_bytes(
+    uniplot.grid_svg([figure, other], font, columns=2))
+Path("grid.png").write_bytes(
+    uniplot.grid_png([figure, other], font, columns=2))
 ```
 
 Methods return `self`, so construction can be chained. `svg()` and `png()`
@@ -65,6 +71,9 @@ copying it.
   the retained specification.
 - `title(text)` sets the plot title.
 - `svg(font_path)` and `png(font_path)` render bytes.
+- `grid_svg(plots, font_path, columns, width=1200, height=800, gap=16)` and
+  `grid_png(...)` compose borrowed `Plot` instances without transferring their
+  ownership.
 - `to_json()` returns the complete schema-v1 specification as `str`;
   `Plot.from_json(payload, width, height)` accepts `str` or UTF-8 `bytes` and
   restores a full Nim grammar specification.
@@ -96,9 +105,9 @@ let
   pythonSvg = readFile("../assets/generated/python_binding.svg")
   pythonPng = pngDataUri(readFile("../assets/generated/python_binding.png"))
 nbRawHtml gallery([
-  svgFigure(pythonSvg, "SVG returned after a Python JSON round trip."),
-  pngFigure(pythonPng, "PNG returned by the restored Python Plot instance.",
-    "Dashed line and cross markers rendered through the UniPlot Python binding")
+  svgFigure(pythonSvg, "Two-panel SVG returned by Python `grid_svg`."),
+  pngFigure(pythonPng, "The same Python Plot instances composed as PNG.",
+    "Two plot panels rendered through the UniPlot Python binding")
 ])
 
 nbSave
