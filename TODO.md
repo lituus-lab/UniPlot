@@ -64,7 +64,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Explicit subplot grids with independent axes and retained-scene output.
 - [x] Numeric shared domains across explicit plot grids, including C and
   Python bindings.
-- [ ] Data-driven facets, shared categorical axes and secondary axes.
+- [x] One-dimensional categorical facets in Nim, C and Python.
+- [ ] Two-dimensional facets, shared categorical axes and secondary axes.
 - [x] Categorical colour aesthetic mappings through UniColor palettes.
 - [x] Numeric size and alpha aesthetic mappings with explicit ranges.
 - [x] Fill, shape and line-style aesthetic mappings.
