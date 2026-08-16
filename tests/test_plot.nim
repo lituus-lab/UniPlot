@@ -77,6 +77,64 @@ suite "plot compilation":
     logarithmic.scaleX(skLog10)
     expect PlotError: discard logarithmic.compileScene()
 
+  test "data-mapped image marks resolve owned resources in row order":
+    var frame = initDataFrame()
+    frame.addColumn("left", [0.0, 1.0, 99.0])
+    frame.addColumn("right", [1.0, 2.0, 100.0])
+    frame.addColumn("bottom", [0.0, 0.0, NaN])
+    frame.addColumn("top", [1.0, 1.0, 1.0])
+    frame.addColumn("resource", ["red", "blue", "red"])
+    var red = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    red.data = @[255'u8, 0, 0, 255]
+    var blue = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    blue.data = @[0'u8, 0, 255, 255]
+    var spec = plot(frame)
+    spec.addImageResource("red", red)
+    spec.addImageResource("blue", blue)
+    spec.geomImage(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top", image = "resource"), RasterNearest)
+    red.data[0] = 0
+    let scene = spec.compileScene(Size(width: 320, height: 240))
+    let images = scene.nodes.filterIt(it.kind == snImage)
+    check images.len == 2
+    check images[0].image.data[0 .. 3] == @[255'u8, 0, 0, 255]
+    check images[1].image.data[0 .. 3] == @[0'u8, 0, 255, 255]
+    spec.xLimits(0, 2)
+    spec.yLimits(0, 1)
+    check spec.compileScene(Size(width: 320, height: 240)).nodes.countIt(
+      it.kind == snImage) == 2
+
+  test "image mark contracts reject invalid registries and references":
+    var frame = initDataFrame()
+    frame.addColumn("left", [0.0])
+    frame.addColumn("right", [1.0])
+    frame.addColumn("bottom", [0.0])
+    frame.addColumn("top", [1.0])
+    frame.addColumn("resource", ["missing"])
+    var image = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    var spec = plot(frame)
+    spec.addImageResource("known", image)
+    when defined(release) or defined(danger):
+      expect PlotError: spec.addImageResource("", image)
+    else:
+      expect PreConditionDefect: spec.addImageResource("", image)
+    expect PlotError: spec.addImageResource("known", image)
+    spec.geomImage(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top", image = "resource"))
+    expect PlotError: discard spec.compileScene()
+    var validFrame = initDataFrame()
+    validFrame.addColumn("left", [1.0])
+    validFrame.addColumn("right", [2.0])
+    validFrame.addColumn("bottom", [1.0])
+    validFrame.addColumn("top", [2.0])
+    validFrame.addColumn("resource", ["known"])
+    var logarithmic = plot(validFrame)
+    logarithmic.addImageResource("known", image)
+    logarithmic.geomImage(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top", image = "resource"))
+    logarithmic.scaleY(skLog10)
+    expect PlotError: discard logarithmic.compileScene()
+
   test "an empty specification is rejected":
     var frame = initDataFrame()
     frame.addColumn("x", [1.0])
