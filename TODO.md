@@ -95,9 +95,10 @@ silently claimed by the focused 1.0 publication contract.
   in Nim, C and Python, using UniAccurate for compensated sum and mean.
 - [x] Retained numeric rectangle marks and variable-width count/density
   histograms in Nim, C and Python.
-- [ ] Statistical transforms: automatic bin-selection rules after UniMath
-  exposes the required float64 roots/transcendentals, smoothing, multi-column
-  or windowed grouped transforms and confidence intervals.
+- [x] Automatic square-root, Sturges, Rice, Scott and Freedman–Diaconis
+  histogram bin selection through UniMath, including C and Python bindings.
+- [ ] Smoothing, multi-column or windowed grouped transforms and confidence
+  intervals.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
