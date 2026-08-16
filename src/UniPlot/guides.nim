@@ -205,7 +205,7 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   if spec.layers.len == 0 and spec.rasters.len == 0:
     raise newException(PlotError, "plot has no layers")
   let firstX = if spec.layers.len > 0:
-    (if spec.layers[0].mark == mkRect:
+    (if spec.layers[0].mark in {mkRect, mkImage}:
       spec.layers[0].mapping.xMin else: spec.layers[0].mapping.x)
     else: ""
   if spec.layers.len > 0 and firstX notin spec.data.columns:
@@ -218,11 +218,11 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
   result.xBand = initBandDomain()
   let firstY = if spec.layers.len > 0:
-    (if spec.layers[0].mark == mkRect:
+    (if spec.layers[0].mark in {mkRect, mkImage}:
       spec.layers[0].mapping.yMin else: spec.layers[0].mapping.y)
     else: ""
   if spec.layers.len > 0 and
-      spec.layers[0].mark in {mkErrorBar, mkRibbon, mkRect}:
+      spec.layers[0].mark in {mkErrorBar, mkRibbon, mkRect, mkImage}:
     result.yKind = ckNumeric
   elif spec.layers.len > 0:
     if firstY notin spec.data.columns:
@@ -299,7 +299,7 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
     result.yContinuous.addValues([raster.yMin, raster.yMax])
   var includeZero = false
   for layer in spec.layers:
-    let xMapping = if layer.mark == mkRect:
+    let xMapping = if layer.mark in {mkRect, mkImage}:
       layer.mapping.xMin else: layer.mapping.x
     if xMapping notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
@@ -311,18 +311,19 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
         "tile layers require categorical x and y coordinates")
     if spec.data.columns[xMapping].kind != result.xKind:
       raise newException(PlotError, "all x mappings must use the same column kind")
-    if layer.mark == mkRect:
+    if layer.mark in {mkRect, mkImage}:
       for mapping in [layer.mapping.xMin, layer.mapping.xMax]:
         if mapping notin spec.data.columns or
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
-            "rectangle x bounds must reference numeric columns")
-        result.xContinuous.addValues(spec.data.numeric(mapping))
+            "bounded x coordinates must reference numeric columns")
+        if layer.mark == mkRect:
+          result.xContinuous.addValues(spec.data.numeric(mapping))
     elif result.xKind == ckNumeric:
       result.xContinuous.addValues(spec.data.numeric(xMapping))
     else:
       result.xBand.addValues(spec.data.categorical(xMapping))
-    if layer.mark notin {mkErrorBar, mkRibbon, mkRect} and
+    if layer.mark notin {mkErrorBar, mkRibbon, mkRect, mkImage} and
         (layer.mapping.y notin spec.data.columns or
         spec.data.columns[layer.mapping.y].kind != result.yKind):
       raise newException(PlotError,
@@ -333,13 +334,14 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
           "categorical y coordinates require categorical tile layers")
       result.yBand.addValues(spec.data.categorical(layer.mapping.y))
       continue
-    if layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect}:
+    if layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect, mkImage}:
       for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
         if mapping notin spec.data.columns or
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
-            "uncertainty bounds must reference numeric columns")
-        result.yContinuous.addValues(spec.data.numeric(mapping))
+            "bounded y coordinates must reference numeric columns")
+        if layer.mark != mkImage:
+          result.yContinuous.addValues(spec.data.numeric(mapping))
       if layer.mark == mkBoxPlot:
         for mapping in [layer.mapping.y, layer.mapping.yQ1, layer.mapping.yQ3]:
           if mapping notin spec.data.columns or
@@ -347,6 +349,29 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
             raise newException(PlotError,
               "box-plot statistics must reference numeric columns")
           result.yContinuous.addValues(spec.data.numeric(mapping))
+      if layer.mark == mkImage:
+        if spec.xScaleSpec.kind != skLinear or
+            spec.yScaleSpec.kind != skLinear:
+          raise newException(PlotError,
+            "image marks currently require linear x and y scales")
+        if layer.mapping.image notin spec.data.columns or
+            spec.data.columns[layer.mapping.image].kind != ckCategorical:
+          raise newException(PlotError,
+            "image mappings must reference categorical columns")
+        let
+          xMinValues = spec.data.numeric(layer.mapping.xMin)
+          xMaxValues = spec.data.numeric(layer.mapping.xMax)
+          yMinValues = spec.data.numeric(layer.mapping.yMin)
+          yMaxValues = spec.data.numeric(layer.mapping.yMax)
+          filter = spec.data.initRowFilter([layer.mapping.xMin,
+            layer.mapping.xMax, layer.mapping.yMin, layer.mapping.yMax])
+        for row in 0 ..< spec.data.rowCount:
+          if filter.rowIsFinite(row):
+            result.xContinuous.addValues([xMinValues[row], xMaxValues[row]])
+            result.yContinuous.addValues([yMinValues[row], yMaxValues[row]])
+          elif layer.missingValues == RejectMissing:
+            raise newException(PlotError,
+              "image mark contains a non-finite mapped bound")
     else:
       if layer.mapping.y notin spec.data.columns or
           spec.data.columns[layer.mapping.y].kind != ckNumeric:
@@ -386,8 +411,17 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     raise newException(PlotError,
       "alpha range must be finite, ordered and within [0, 1]")
   var usesContinuousColors = false
+  var imageResourceIndices = initTable[string, int]()
+  for index, resource in spec.imageResources:
+    if resource.name.len == 0 or resource.name in imageResourceIndices or
+        not resource.image.validPackedImage or
+        resource.image.colorspace notin {ucore.csGray, ucore.csRgb,
+          ucore.csRgba}:
+      raise newException(PlotError, "invalid image resource registry")
+    imageResourceIndices[resource.name] = index
   for layer in spec.layers:
-    let bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect}
+    let bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect,
+      mkImage}
     if layer.size < 0 or not layer.size.isFinite:
       raise newException(PlotError,
         "mark size must be finite and non-negative")
@@ -398,22 +432,22 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     if layer.mark == mkBoxPlot and (layer.boxWidth <= 0 or
         layer.boxWidth > 1 or not layer.boxWidth.isFinite or layer.size <= 0):
       raise newException(PlotError, "invalid box-plot dimensions")
-    let xMapping = if layer.mark == mkRect:
+    let xMapping = if layer.mark in {mkRect, mkImage}:
       layer.mapping.xMin else: layer.mapping.x
     if xMapping notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
-    if layer.mark == mkRect:
+    if layer.mark in {mkRect, mkImage}:
       for mapping in [layer.mapping.xMin, layer.mapping.xMax]:
         if mapping notin spec.data.columns or
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
-            "rectangle x bounds must reference numeric columns")
+            "bounded x coordinates must reference numeric columns")
     if bounded:
       for mapping in [layer.mapping.yMin, layer.mapping.yMax]:
         if mapping notin spec.data.columns or
             spec.data.columns[mapping].kind != ckNumeric:
           raise newException(PlotError,
-            "uncertainty bounds must reference numeric columns")
+            "bounded y coordinates must reference numeric columns")
       if layer.mark == mkBoxPlot:
         for mapping in [layer.mapping.y, layer.mapping.yQ1, layer.mapping.yQ3]:
           if mapping notin spec.data.columns or
@@ -469,6 +503,18 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
       raise newException(PlotError,
         "text label mappings must reference categorical columns")
+    if layer.mark == mkImage and
+        (layer.mapping.image.len == 0 or
+        layer.mapping.image notin spec.data.columns or
+        spec.data.columns[layer.mapping.image].kind != ckCategorical):
+      raise newException(PlotError,
+        "image mappings must reference categorical columns")
+    if layer.mark == mkImage and (layer.mapping.color.len > 0 or
+        layer.mapping.fill.len > 0 or layer.mapping.size.len > 0 or
+        layer.mapping.alpha.len > 0 or layer.mapping.shape.len > 0 or
+        layer.mapping.lineStyle.len > 0 or layer.mapping.label.len > 0):
+      raise newException(PlotError,
+        "image marks only support bounds and image-resource mappings")
   var continuousSampler: PreparedPaletteSampler
   if usesContinuousColors:
     let prepared = spec.continuousColors.prepareSampler()
@@ -690,7 +736,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           reference.color)
   for layer in spec.layers:
     let
-      bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect}
+      bounded = layer.mark in {mkErrorBar, mkRibbon, mkBoxPlot, mkRect,
+        mkImage}
       ys = if yKind == ckNumeric and
           (not bounded or layer.mark == mkBoxPlot):
         spec.data.numeric(layer.mapping.y) else: @[]
@@ -702,19 +749,21 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.numeric(layer.mapping.yQ1) else: @[]
       thirdQuartileValues = if layer.mark == mkBoxPlot:
         spec.data.numeric(layer.mapping.yQ3) else: @[]
-      numericXs = if xKind == ckNumeric and layer.mark != mkRect:
+      numericXs = if xKind == ckNumeric and
+          layer.mark notin {mkRect, mkImage}:
         spec.data.numeric(layer.mapping.x)
       else:
         @[]
-      categoricalXs = if xKind == ckCategorical and layer.mark != mkRect:
+      categoricalXs = if xKind == ckCategorical and
+          layer.mark notin {mkRect, mkImage}:
         spec.data.categorical(layer.mapping.x)
       else:
         @[]
-      xLowerValues = if layer.mark == mkRect:
+      xLowerValues = if layer.mark in {mkRect, mkImage}:
         spec.data.numeric(layer.mapping.xMin) else: @[]
-      xUpperValues = if layer.mark == mkRect:
+      xUpperValues = if layer.mark in {mkRect, mkImage}:
         spec.data.numeric(layer.mapping.xMax) else: @[]
-    var finiteColumns = if layer.mark == mkRect:
+    var finiteColumns = if layer.mark in {mkRect, mkImage}:
       @[layer.mapping.xMin, layer.mapping.xMax] else: @[layer.mapping.x]
     if bounded:
       finiteColumns.add layer.mapping.yMin
@@ -739,6 +788,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     var shapes: seq[MarkerShape]
     var lineStyles: seq[LineStyle]
     var labels: seq[string]
+    var imageNames: seq[string]
     var breakBefore: seq[bool]
     var lowerPoints, upperPoints, firstQuartilePoints, thirdQuartilePoints:
       seq[Point]
@@ -765,6 +815,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       spec.data.numeric(layer.mapping.size) else: @[]
     let labelValues = if layer.mapping.label.len > 0:
       spec.data.categorical(layer.mapping.label) else: @[]
+    let imageValues = if layer.mark == mkImage:
+      spec.data.categorical(layer.mapping.image) else: @[]
     var shapeMap = initTable[string, MarkerShape]()
     var lineStyleMap = initTable[string, LineStyle]()
     var alphaScale: ContinuousScale
@@ -780,7 +832,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       of mkPoint: spec.theme.pointSize
       of mkLine, mkErrorBar, mkBoxPlot: spec.theme.lineWidth
       of mkText: 12'f32
-      of mkBar, mkArea, mkRibbon, mkTile, mkRect: 0'f32
+      of mkBar, mkArea, mkRibbon, mkTile, mkRect, mkImage: 0'f32
     var pendingBreak = false
     for row in 0 ..< spec.data.rowCount:
       if not rowFilter.rowIsFinite(row):
@@ -793,7 +845,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           raise newException(PlotError,
             "layer contains a non-finite mapped value")
         continue
-      let x = if layer.mark == mkRect:
+      let x = if layer.mark in {mkRect, mkImage}:
         (xScale.map(xLowerValues[row]) + xScale.map(xUpperValues[row])) * 0.5
       elif xKind == ckNumeric:
         xScale.map(numericXs[row])
@@ -801,7 +853,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         xBand.map(categoricalXs[row])
       if bounded:
         if lowerValues[row] > upperValues[row] or
-            (layer.mark == mkRect and
+            (layer.mark in {mkRect, mkImage} and
               xLowerValues[row] >= xUpperValues[row]):
           raise newException(PlotError,
             "rectangle x bounds must increase and y bounds must be ordered")
@@ -813,9 +865,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           raise newException(PlotError,
             "box-plot statistics must be monotonically ordered")
         let
-          lowerX = if layer.mark == mkRect:
+          lowerX = if layer.mark in {mkRect, mkImage}:
             xScale.map(xLowerValues[row]) else: x
-          upperX = if layer.mark == mkRect:
+          upperX = if layer.mark in {mkRect, mkImage}:
             xScale.map(xUpperValues[row]) else: x
           lower = Point(x: lowerX, y: yScale.map(lowerValues[row]))
           upper = Point(x: upperX, y: yScale.map(upperValues[row]))
@@ -863,6 +915,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       sizes.add(if sizeValues.len > 0:
         sizeScale.map(sizeValues[row]) else: fallbackSize)
       if labelValues.len > 0: labels.add labelValues[row]
+      if imageValues.len > 0: imageNames.add imageValues[row]
     case layer.mark
     of mkPoint:
       for i, point in points:
@@ -972,6 +1025,33 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           abs(upperPoints[index].y - lowerPoints[index].y))
         result.addPath(rectangle, colors[index], nodeId)
         inc nodeId
+    of mkImage:
+      for index in 0 ..< lowerPoints.len:
+        if imageNames[index] notin imageResourceIndices:
+          raise newException(PlotError,
+            "image mark references an unknown image resource")
+        let resourceIndex = imageResourceIndices[imageNames[index]]
+        let
+          mappedX0 = lowerPoints[index].x
+          mappedX1 = upperPoints[index].x
+          mappedY0 = lowerPoints[index].y
+          mappedY1 = upperPoints[index].y
+          pixelX = int(round(min(mappedX0, mappedX1)))
+          pixelY = int(round(min(mappedY0, mappedY1)))
+          pixelWidth = max(1, int(round(abs(mappedX1 - mappedX0))))
+          pixelHeight = max(1, int(round(abs(mappedY1 - mappedY0))))
+          filter = case layer.imageFilter
+            of RasterNearest: uresize.rfNearest
+            of RasterBilinear: uresize.rfBilinear
+            of RasterBox: uresize.rfBox
+        var resized = uresize.resize(spec.imageResources[resourceIndex].image,
+          pixelWidth, pixelHeight, filter)
+        if mappedX1 < mappedX0:
+          resized = urotate.rotate(resized, urotate.flipH)
+        if mappedY1 > mappedY0:
+          resized = urotate.rotate(resized, urotate.flipV)
+        result.addImage(resized, pixelX, pixelY, id = nodeId)
+        inc nodeId
   for annotation in spec.annotations:
     let startPoint = Point(x: xScale.map(annotation.x),
       y: yScale.map(annotation.y))
@@ -1007,7 +1087,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
         result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
-      of mkBar, mkArea, mkRibbon, mkBoxPlot, mkTile, mkRect:
+      of mkBar, mkArea, mkRibbon, mkBoxPlot, mkTile, mkRect, mkImage:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
         result.addPath(swatch, entry.color)

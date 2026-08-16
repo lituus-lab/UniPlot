@@ -22,6 +22,7 @@ type
     mkBoxPlot
     mkTile
     mkRect
+    mkImage
 
   LineStyle* = enum
     SolidLine
@@ -100,6 +101,10 @@ type
     xMin*, xMax*, yMin*, yMax*: float64
     filter*: RasterFilter
 
+  ImageResource* = object
+    name*: string
+    image*: ucore.Image[uint8]
+
   Aes* = object
     x*, y*: string
     xMin*, xMax*: string
@@ -112,6 +117,7 @@ type
     alpha*: string
     shape*: string
     lineStyle*: string
+    image*: string
 
   Layer* = object
     mark*: MarkKind
@@ -124,6 +130,7 @@ type
     missingValues*: MissingValuePolicy
     capWidth*: float32
     boxWidth*: float32
+    imageFilter*: RasterFilter
 
   Theme* = object
     background*, foreground*, gridColor*: Color
@@ -144,6 +151,7 @@ type
     references*: seq[Reference]
     annotations*: seq[Annotation]
     rasters*: seq[RasterLayer]
+    imageResources*: seq[ImageResource]
 
 proc snapshot(image: ucore.Image[uint8]): ucore.Image[uint8] =
   result = image
@@ -170,6 +178,25 @@ proc raster*(spec: var PlotSpec; image: ucore.Image[uint8]; xMin, xMax, yMin,
       raise newException(PlotError, "raster extents must be finite and increasing")
     spec.rasters.add RasterLayer(image: image.snapshot, xMin: xMin,
       xMax: xMax, yMin: yMin, yMax: yMax, filter: filter)
+
+proc addImageResource*(spec: var PlotSpec; name: string;
+    image: ucore.Image[uint8]) {.contractual.} =
+  ## Retain one named immutable image snapshot for data-mapped image marks.
+  require:
+    name.len > 0
+    image.validPackedImage
+    image.colorspace in {ucore.csGray, ucore.csRgb, ucore.csRgba}
+  body:
+    if name.len == 0:
+      raise newException(PlotError, "image resource name cannot be empty")
+    if not image.validPackedImage or
+        image.colorspace notin {ucore.csGray, ucore.csRgb, ucore.csRgba}:
+      raise newException(PlotError,
+        "image resource requires a valid Gray/RGB/RGBA8 image")
+    for resource in spec.imageResources:
+      if resource.name == name:
+        raise newException(PlotError, "image resource names must be unique")
+    spec.imageResources.add ImageResource(name: name, image: image.snapshot)
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)
@@ -242,22 +269,27 @@ proc plot*(data: DataFrame): PlotSpec =
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
     shape = ""; lineStyle = ""; fill = ""; xMin = ""; xMax = "";
-    yMin = ""; yMax = ""; yQ1 = ""; yQ3 = ""): Aes =
+    yMin = ""; yMax = ""; yQ1 = ""; yQ3 = ""; image = ""): Aes =
   Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
     alpha: alpha, shape: shape, lineStyle: lineStyle, xMin: xMin, xMax: xMax,
-    yMin: yMin, yMax: yMax, yQ1: yQ1, yQ3: yQ3)
+    yMin: yMin, yMax: yMax, yQ1: yQ1, yQ3: yQ3, image: image)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
     shape = CircleMarker; lineStyle = SolidLine;
     missingValues = DropMissing) =
-  if (mark != mkRect and mapping.x.len == 0) or
-      (mark notin {mkErrorBar, mkRibbon, mkRect} and mapping.y.len == 0):
+  if (mark notin {mkRect, mkImage} and mapping.x.len == 0) or
+      (mark notin {mkErrorBar, mkRibbon, mkRect, mkImage} and
+      mapping.y.len == 0):
     raise newException(PlotError, "required position mappings are missing")
-  if mark == mkRect and (mapping.xMin.len == 0 or mapping.xMax.len == 0 or
+  if mark in {mkRect, mkImage} and
+      (mapping.xMin.len == 0 or mapping.xMax.len == 0 or
       mapping.yMin.len == 0 or mapping.yMax.len == 0):
     raise newException(PlotError,
       "rectangles require xMin, xMax, yMin and yMax mappings")
+  if mark == mkImage and mapping.image.len == 0:
+    raise newException(PlotError,
+      "image marks require an image-resource mapping")
   if mark in {mkErrorBar, mkRibbon} and
       (mapping.yMin.len == 0 or mapping.yMax.len == 0):
     raise newException(PlotError,
@@ -291,6 +323,11 @@ proc geomRect*(spec: var PlotSpec; mapping: Aes; color = "#3366cc";
   ## Add numeric rectangles with increasing x and nondecreasing y bounds.
   spec.addLayer(mkRect, mapping, color, legend = legend,
     missingValues = missingValues)
+proc geomImage*(spec: var PlotSpec; mapping: Aes;
+    filter = RasterBilinear; missingValues = DropMissing) =
+  ## Add row-wise named image resources within numeric data-space bounds.
+  spec.addLayer(mkImage, mapping, missingValues = missingValues)
+  spec.layers[^1].imageFilter = filter
 proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
     legend = ""; missingValues = BreakOnMissing) =
   spec.addLayer(mkArea, mapping, color, legend = legend,
