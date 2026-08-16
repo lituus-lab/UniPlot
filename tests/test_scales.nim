@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/unittest
+import std/[sequtils, unittest]
 import UniPlot
 
 suite "scales":
@@ -9,6 +9,14 @@ suite "scales":
     check scale.map(0) == 20
     check scale.map(10) == 120
     check scale.ticks(3) == @[0.0, 5.0, 10.0]
+
+  test "ticks remain unique at floating-point resolution":
+    let
+      first = 1_704_067_200.0
+      last = first + 2.384185791015625e-7
+      scale = continuousScale(first, last, 0, 1)
+    check scale.ticks() == @[first, last]
+    check scale.axisTicks(alkUtcDateTime) == @[first, last]
 
   test "continuous and band ranges may be reversed":
     let continuous = continuousScale(0, 10, 120, 20)
@@ -81,3 +89,73 @@ suite "scales":
     expect PlotError: discard trainBand(["a"], 0, 0)
     expect PlotError: discard trainBand(["a"], 0, 1, 1)
     expect PlotError: discard trainBand(["a"], 0, 1).map("b")
+
+  test "UTC ticks are deterministic and calendar aligned":
+    let year = continuousScale(1_704_067_200, 1_735_689_600, 0, 100)
+    let values = year.axisTicks(alkUtcDateTime)
+    check values.len == 13
+    check year.axisTickLabel(values[0], alkUtcDateTime) == "2024-01"
+    check year.axisTickLabel(values[^1], alkUtcDateTime) == "2025-01"
+    let seconds = continuousScale(1_704_067_200, 1_704_067_260, 0, 100)
+    check seconds.axisTicks(alkUtcDateTime) == @[
+      1_704_067_200.0, 1_704_067_215.0, 1_704_067_230.0,
+      1_704_067_245.0, 1_704_067_260.0]
+    check seconds.axisTickLabel(1_704_067_200, alkUtcDateTime) ==
+      "2024-01-01 00:00:00"
+
+  test "duration labels are signed and reject invalid combinations":
+    let duration = continuousScale(-90, 3690, 0, 100)
+    check duration.axisTickLabel(-90, alkDuration) == "−1:30"
+    check duration.axisTickLabel(3690, alkDuration) == "1:01:30"
+    check duration.axisTicks(alkDuration).len >= 2
+    expect PlotError:
+      discard continuousScale(1, 10, 0, 1, skLog10).axisTicks(alkDuration)
+    expect PlotError:
+      discard continuousScale(MinimumUtcSecond - 1, 0, 0, 1).axisTicks(
+        alkUtcDateTime)
+    expect PlotError: discard duration.axisTicks(alkDuration, 1)
+
+  test "temporal boundaries and singleton padding remain valid":
+    for value in [MinimumUtcSecond, MaximumUtcSecond]:
+      var domain = initContinuousDomain()
+      domain.addValues([value])
+      let scale = domain.trainAxis(0, 100, alkUtcDateTime)
+      check scale.domainMin >= MinimumUtcSecond
+      check scale.domainMax <= MaximumUtcSecond
+      check scale.axisTicks(alkUtcDateTime).len >= 2
+    var durationDomain = initContinuousDomain()
+    durationDomain.addValues([MaximumDurationSecond])
+    let durationScale = durationDomain.trainAxis(0, 1, alkDuration)
+    check durationScale.domainMax == MaximumDurationSecond
+    check durationScale.domainMin < durationScale.domainMax
+
+    let reversedDomain = continuousScale(120, -120, 0, 1)
+    check reversedDomain.axisTicks(alkDuration).len >= 2
+    expect PlotError:
+      discard continuousScale(0, MaximumDurationSecond + 1, 0, 1).
+        axisTicks(alkDuration)
+
+  test "duration labels preserve tick precision beyond one day":
+    let scale = continuousScale(86_400, 86_520, 0, 100)
+    let values = scale.axisTicks(alkDuration)
+    let labels = values.mapIt(scale.axisTickLabel(it, alkDuration))
+    check labels == @["1d 00:00:00", "1d 00:00:30", "1d 00:01:00",
+      "1d 00:01:30", "1d 00:02:00"]
+    expect PlotError: discard scale.axisTickLabel(NaN, alkDuration)
+    expect PlotError: discard scale.axisTickLabel(Inf, alkUtcDateTime)
+    expect PlotError:
+      discard scale.axisTickLabel(MaximumDurationSecond + 1, alkDuration)
+
+    let fractionalDuration = continuousScale(86_400.1, 86_400.5, 0, 100)
+    let durationLabels = fractionalDuration.axisTicks(alkDuration).mapIt(
+      fractionalDuration.axisTickLabel(it, alkDuration))
+    check durationLabels == @["1d 00:00:00.1", "1d 00:00:00.2",
+      "1d 00:00:00.3", "1d 00:00:00.4", "1d 00:00:00.5"]
+
+    let fractionalUtc = continuousScale(
+      1_704_067_200.1, 1_704_067_200.5, 0, 100)
+    let utcLabels = fractionalUtc.axisTicks(alkUtcDateTime).mapIt(
+      fractionalUtc.axisTickLabel(it, alkUtcDateTime))
+    check utcLabels == @["2024-01-01 00:00:00.1",
+      "2024-01-01 00:00:00.2", "2024-01-01 00:00:00.3",
+      "2024-01-01 00:00:00.4", "2024-01-01 00:00:00.5"]
