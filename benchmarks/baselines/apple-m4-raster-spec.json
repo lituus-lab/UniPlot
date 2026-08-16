@@ -1,0 +1,27 @@
+{
+  "date": "2026-08-16",
+  "machine": "Apple M4",
+  "architecture": "arm64",
+  "os": "macosx",
+  "nim": "2.2.10",
+  "build": "-d:release --mm:orc",
+  "runs": 3,
+  "iterations_per_run": 10,
+  "warmup_iterations": 3,
+  "source": "512x512 RGBA8",
+  "canvas": "800x600",
+  "filter": "bilinear",
+  "semantics": "PlotSpec construction plus snapshot; compile includes alpha-correct resize; publication includes CPU render",
+  "construction_snapshot": {
+    "run_mean_ms": [0.3149959, 0.3129666, 0.3162834],
+    "median_run_mean_ms": 0.3149959
+  },
+  "compile": {
+    "run_mean_ms": [8.3061583, 8.2757331, 8.293908299999998],
+    "median_run_mean_ms": 8.293908299999998
+  },
+  "publication": {
+    "run_mean_ms": [7.9844791, 7.976716700000001, 7.9795041],
+    "median_run_mean_ms": 7.9795041
+  }
+}

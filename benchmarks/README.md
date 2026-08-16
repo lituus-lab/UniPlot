@@ -7,6 +7,16 @@ Agg backend, Plotly/Kaleido, ggplot2 and Plots.jl when available, on the same
 1,000-point line-plus-scatter plot, 800×500 canvas, three warmups and a
 configurable number of measured iterations.
 
+## Retained PlotSpec raster stages
+
+Run `nimble rasterSpecBaseline` for the reproducible 3×10 Apple M4 protocol.
+It separates PlotSpec construction plus the caller-buffer snapshot, scene compilation (including the
+alpha-correct 512×512 to plot-area resize), and complete 800×600 CPU
+publication. The versioned JSON records the measured medians for all three
+phases. Allocation is included in every phase; setup and warmups are not.
+The exact samples are stored in
+`benchmarks/baselines/apple-m4-raster-spec.json`.
+
 ```bash
 nimble benchmarkDeps         # explicit, isolated optional dependency setup
 nimble benchmark             # 20 iterations, 1,000 points
