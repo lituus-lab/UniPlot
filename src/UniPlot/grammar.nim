@@ -701,10 +701,14 @@ proc histogramPlot*(values, breaks: openArray[float64]; density = false;
         "numeric histogram intervals must have finite positive widths")
     lower.add bin.lower
     upper.add bin.upper
-    heights.add(if density and finiteCount > 0:
+    let height = if density and finiteCount > 0:
       float64(bin.count) / float64(finiteCount) / width
     else:
-      float64(bin.count))
+      float64(bin.count)
+    if not height.isFinite:
+      raise newException(PlotError,
+        "numeric histogram height must remain finite")
+    heights.add height
   var frame = initDataFrame()
   frame.addColumn("xMin", lower)
   frame.addColumn("xMax", upper)
@@ -713,6 +717,15 @@ proc histogramPlot*(values, breaks: openArray[float64]; density = false;
   result = plot(frame)
   result.geomRect(aes("", "", xMin = "xMin", xMax = "xMax",
     yMin = "yMin", yMax = "yMax"), color, legend)
+
+proc histogramPlot*(values: openArray[float64]; rule: HistogramRule;
+    density = false; color = "#3366cc"; legend = ""): PlotSpec =
+  ## Build a numeric equal-width histogram using an automatic selection rule.
+  let breaks = automaticHistogramBreaks(values, rule)
+  if breaks.len == 0:
+    raise newException(PlotError,
+      "automatic histogram requires a finite sample")
+  result = histogramPlot(values, breaks, density, color, legend)
 
 proc groupedAggregatePlot*(groups: openArray[string];
     values: openArray[float64]; aggregation = agMean; color = "#3366cc";
