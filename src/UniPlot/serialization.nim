@@ -120,6 +120,8 @@ proc aesNode(value: Aes): JsonNode =
   if value.xMin.len > 0 or value.xMax.len > 0:
     result["xMin"] = %value.xMin
     result["xMax"] = %value.xMax
+  if value.image.len > 0:
+    result["image"] = %value.image
 
 proc decodeAes(node: JsonNode): Aes =
   for name in ["x", "y", "yMin", "yMax", "label", "color", "fill",
@@ -137,6 +139,8 @@ proc decodeAes(node: JsonNode): Aes =
   if node.hasKey("xMin") or node.hasKey("xMax"):
     result.xMin = node.field("xMin", JString).getStr
     result.xMax = node.field("xMax", JString).getStr
+  if node.hasKey("image"):
+    result.image = node.field("image", JString).getStr
 
 proc dataNode(frame: DataFrame): JsonNode =
   var columns = newJArray()
@@ -182,6 +186,7 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
       "lineStyle": $layer.lineStyle, "missingValues": $layer.missingValues,
       "capWidth": layer.capWidth}
     if layer.mark == mkBoxPlot: encoded["boxWidth"] = %layer.boxWidth
+    if layer.mark == mkImage: encoded["imageFilter"] = %($layer.imageFilter)
     layers.add encoded
   var references = newJArray()
   for reference in spec.references:
@@ -237,6 +242,14 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
         "text": annotation.text, "color": annotation.color.colorNode,
         "size": annotation.size, "headSize": annotation.headSize}
     result["annotations"] = annotations
+  if spec.imageResources.len > 0:
+    var resources = newJArray()
+    for resource in spec.imageResources:
+      resources.add %*{"name": resource.name, "width": resource.image.width,
+        "height": resource.image.height,
+        "colorspace": $resource.image.colorspace,
+        "pixelsBase64": encode(resource.image.data)}
+    result["imageResources"] = resources
   if spec.rasters.len > 0:
     var rasters = newJArray()
     for raster in spec.rasters:
@@ -255,6 +268,38 @@ proc toJson*(spec: PlotSpec; pretty = false): string =
 proc decodeRange(node: JsonNode): AestheticRange =
   AestheticRange(minimum: float32(node.finiteNumber("minimum")),
     maximum: float32(node.finiteNumber("maximum")))
+
+proc decodePackedImage(node: JsonNode; subject: string): ucore.Image[uint8] =
+  let
+    widthValue = node.field("width", JInt).getBiggestInt
+    heightValue = node.field("height", JInt).getBiggestInt
+    colorspace = enumValue[ucore.Colorspace](node, "colorspace")
+  if colorspace notin {ucore.csGray, ucore.csRgb, ucore.csRgba} or
+      widthValue <= 0 or heightValue <= 0 or
+      widthValue > BiggestInt(high(int)) or
+      heightValue > BiggestInt(high(int)):
+    raise fail(subject & " dimensions or colorspace are invalid")
+  let
+    width = int(widthValue)
+    height = int(heightValue)
+    channels = ucore.ChannelCount[colorspace]
+  if width > high(int) div height or
+      width * height > high(int) div channels:
+    raise fail(subject & " dimensions overflow packed storage")
+  let
+    expected = width * height * channels
+    encodedPixels = node.field("pixelsBase64", JString).getStr
+    expectedEncoded = ((uint64(expected) + 2'u64) div 3'u64) * 4'u64
+  if uint64(encodedPixels.len) != expectedEncoded:
+    raise fail(subject & " base64 length does not match its dimensions")
+  let decoded = decode(encodedPixels)
+  if decoded.len != expected:
+    raise fail(subject & " pixels do not match their dimensions")
+  result = ucore.Image[uint8](width: width, height: height,
+    channels: channels, colorspace: colorspace,
+    data: newSeq[uint8](decoded.len))
+  if decoded.len > 0:
+    copyMem(addr result.data[0], unsafeAddr decoded[0], decoded.len)
 
 proc fromJsonNode*(root: JsonNode): PlotSpec =
   ## Decode schema v1. compileScene remains the semantic validation boundary.
@@ -278,6 +323,9 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
       capWidth: float32(node.finiteNumber("capWidth")))
     if mark == mkBoxPlot:
       result.layers[^1].boxWidth = float32(node.finiteNumber("boxWidth"))
+    if mark == mkImage:
+      result.layers[^1].imageFilter = enumValue[RasterFilter](node,
+        "imageFilter")
   let labels = root.field("labels", JObject)
   result.title = labels.field("title", JString).getStr
   result.xLabel = labels.field("x", JString).getStr
@@ -358,39 +406,19 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
         size: float32(node.finiteNumber("size")),
         headSize: float32(node.finiteNumber("headSize")))
   result.rasters.setLen(0)
+  result.imageResources.setLen(0)
+  if root.hasKey("imageResources"):
+    var names = initTable[string, bool]()
+    for node in root.field("imageResources", JArray):
+      let name = node.field("name", JString).getStr
+      if name.len == 0 or name in names:
+        raise fail("image resource names must be non-empty and unique")
+      names[name] = true
+      result.imageResources.add ImageResource(name: name,
+        image: node.decodePackedImage("image resource"))
   if root.hasKey("rasters"):
     for node in root.field("rasters", JArray):
-      let
-        widthValue = node.field("width", JInt).getBiggestInt
-        heightValue = node.field("height", JInt).getBiggestInt
-        colorspace = enumValue[ucore.Colorspace](node, "colorspace")
-      if colorspace notin {ucore.csGray, ucore.csRgb, ucore.csRgba} or
-          widthValue <= 0 or heightValue <= 0 or
-          widthValue > BiggestInt(high(int)) or
-          heightValue > BiggestInt(high(int)):
-        raise fail("raster dimensions or colorspace are invalid")
-      let
-        width = int(widthValue)
-        height = int(heightValue)
-        channels = ucore.ChannelCount[colorspace]
-      if width > high(int) div height or
-          width * height > high(int) div channels:
-        raise fail("raster dimensions overflow packed storage")
-      let
-        expected = width * height * channels
-        encodedPixels = node.field("pixelsBase64", JString).getStr
-        expectedEncoded = ((uint64(expected) + 2'u64) div 3'u64) * 4'u64
-      if uint64(encodedPixels.len) != expectedEncoded:
-        raise fail("raster base64 length does not match its dimensions")
-      let decoded = decode(encodedPixels)
-      if decoded.len != expected:
-        raise fail("raster pixels do not match their dimensions")
-      var image = ucore.Image[uint8](width: width, height: height,
-        channels: channels, colorspace: colorspace,
-        data: newSeq[uint8](decoded.len))
-      if decoded.len > 0:
-        copyMem(addr image.data[0], unsafeAddr decoded[0], decoded.len)
-      let raster = RasterLayer(image: image,
+      let raster = RasterLayer(image: node.decodePackedImage("raster"),
         xMin: node.finiteNumber("xMin"), xMax: node.finiteNumber("xMax"),
         yMin: node.finiteNumber("yMin"), yMax: node.finiteNumber("yMax"),
         filter: enumValue[RasterFilter](node, "filter"))
