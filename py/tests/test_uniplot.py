@@ -27,6 +27,22 @@ def test_plot_renders_svg_and_png():
     with pytest.raises(ValueError):
         plot.annotate_arrow(1.0, 1.0, 1.0, 1.0)
 
+def test_temporal_axis_labels_round_trip_and_render():
+    plot = (uniplot.Plot(480, 320)
+            .line([1704067200, 1704067260], [-90, 3690])
+            .scale_x_utc()
+            .scale_y_duration(reversed=True))
+    encoded = plot.to_json()
+    assert "alkUtcDateTime" in encoded
+    assert "alkDuration" in encoded
+    assert plot.svg(FONT).startswith(b"<svg")
+    restored = uniplot.Plot.from_json(encoded, 480, 320)
+    assert restored.to_json() == encoded
+    with pytest.raises(ValueError):
+        plot.x_axis_labels(99)
+    assert plot.x_axis_labels(uniplot.AXIS_NUMERIC) is plot
+    assert plot.y_axis_labels(uniplot.AXIS_NUMERIC) is plot
+
 def test_plot_grid_renders_svg_and_png():
     first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
     second = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3]).title("second")
