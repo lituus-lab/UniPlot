@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[json, tables, unittest]
+import std/[json, sequtils, tables, unittest]
 import UniColor
 import UniImage/core as uimg
 import UniPlot
@@ -111,6 +111,36 @@ suite "PlotSpec JSON schema":
     expect PlotError: discard fromJson($hostile)
     hostile = parseJson(encoded)
     hostile["rasters"][0]["colorspace"] = %"csCmyk"
+    expect PlotError: discard fromJson($hostile)
+
+  test "image resources and mapped marks round trip in insertion order":
+    var frame = initDataFrame()
+    frame.addColumn("left", [0.0])
+    frame.addColumn("right", [1.0])
+    frame.addColumn("bottom", [0.0])
+    frame.addColumn("top", [1.0])
+    frame.addColumn("resource", ["badge"])
+    var image = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    image.data = @[12'u8, 34, 56, 78]
+    var spec = plot(frame)
+    spec.addImageResource("badge", image)
+    spec.geomImage(aes("", "", xMin = "left", xMax = "right",
+      yMin = "bottom", yMax = "top", image = "resource"), RasterBox)
+    let encoded = spec.toJson
+    let restored = fromJson(encoded)
+    check restored.toJson == encoded
+    check restored.imageResources.len == 1
+    check restored.imageResources[0].name == "badge"
+    check restored.imageResources[0].image.data == image.data
+    check restored.layers[0].mapping.image == "resource"
+    check restored.layers[0].imageFilter == RasterBox
+    check restored.compileScene().nodes.anyIt(it.kind == snImage)
+
+    var hostile = parseJson(encoded)
+    hostile["imageResources"].add hostile["imageResources"][0]
+    expect PlotError: discard fromJson($hostile)
+    hostile = parseJson(encoded)
+    hostile["imageResources"][0]["pixelsBase64"] = %"!!!!!!!!"
     expect PlotError: discard fromJson($hostile)
 
   test "box-plot mappings round trip as optional schema-v1 fields":
