@@ -117,10 +117,9 @@ than introducing competing geometry or text implementations.
 - [ ] Observable data updates and incremental scene diffs.
 - [ ] Persistent GPU resources keyed by semantic resource IDs.
 - [x] Keep a configurable, count- and byte-bounded LRU of `WgpuPreparedScene`
-  vertex/index buffers by collision-free handle identity, with independent
+  vertex/index buffers by unique process-local handle identity, with independent
   direct-stream buffers and explicit hit/miss/upload/eviction tests. The byte
-  budget covers allocated prepared-buffer capacities. Cross-rebuild semantic
-  identity remains in the broader item above.
+  budget covers allocated prepared-buffer capacities.
 - [x] Split vertex/index queue uploads into configurable aligned byte-bounded
   writes, with exact call/byte diagnostics and pixel-identity tests.
 - [x] Enforce a total configurable bound over UniPlot-managed prepared/direct
@@ -144,7 +143,10 @@ than introducing competing geometry or text implementations.
   materialising `finiteRows` compatibility helper.
 - [x] Expose reusable CPU/SVG and WGPU prepared scenes that retain shaped,
       flattened and tessellated paths.
-- [ ] Add bounded automatic prepared-scene caching by stable semantic key.
+- [x] Add count- and logical-payload-bounded automatic prepared-scene caching
+  by a versioned BLAKE3-256 key over canonical render values and UniGlyph's
+  exact font-content identity, with mutation/LRU/oversize tests, diagnostics,
+  an explicit purge and separate key/hit/automatic-submit benchmarks.
 - [ ] Batch compatible CPU fills and GPU draw calls without changing ordering.
 - [x] Use a prepared or batch ordered-palette sampler supplied by UniColor;
   never duplicate its interpolation, gamut mapping or palette semantics in

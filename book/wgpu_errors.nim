@@ -25,7 +25,9 @@ nbCode:
   spec.labels(title = "GPU-ready semantics")
   let scene = spec.compileScene(Size(width: 640, height: 400))
   let frame = prepareWgpuFrame(scene)
-  let prepared = prepareWgpuScene(scene, loadTtf("../../tests/DejaVuSans.ttf"))
+  let font = loadTtf("../../tests/DejaVuSans.ttf")
+  let prepared = prepareWgpuScene(scene, font)
+  let identity = wgpuSceneIdentity(scene, font)
   let capabilities = wgpuCapabilities()
 
   echo "target wgpu-native: ", WgpuNativeTargetVersion
@@ -33,6 +35,7 @@ nbCode:
   echo "scene nodes: ", frame.nodeCount
   echo "semantic resources: ", frame.resources.len
   echo "prepared target: ", prepared.size.width, " × ", prepared.size.height
+  echo "stable scene identity bytes: ", identity.len
   echo "native backend linked: ", capabilities.available
 
 nbText: """
@@ -63,10 +66,29 @@ contractual limits with `preparedCacheCapacity` (1 through 64) and
 until both limits hold; a single scene exceeding the byte budget is rejected.
 Direct streaming buffers, render targets and readback storage are outside that
 prepared-cache budget. `renderWgpuPrepared` additionally returns unpadded RGBA8
-pixels. The convenience scene overloads prepare on every call. The headless
-validation task checks individual pixels, exact CPU/GPU parity, direct uploads,
-cache hits and LRU eviction. Run `nimble wgpuBenchmark` to measure preparation,
-forced misses, alternating resident submission and publication separately.
+pixels.
+
+The convenience `submitWgpuScene` and `renderWgpuScene` overloads also maintain
+a host-side preparation LRU. Its key is BLAKE3-256 over canonical scene values
+and, when text exists, UniGlyph's BLAKE3 identity of the exact font bytes.
+Process-local pointers, node IDs and path-builder cursors are not keys. The
+defaults retain 16 entries and 256 MiB of logical vertex/index payload;
+`sceneCacheCapacity` and `sceneCacheByteBudget` configure them independently
+from GPU residency. Oversized preparations remain correct but are prepared
+again rather than retained. `clearWgpuSceneCache` explicitly releases them.
+Diagnostics report the two cache layers separately.
+
+Each `WgpuBackend` is confined to the thread that opened it. Submission,
+readback, diagnostics, cache purge, waiting and close must all occur on that
+thread. Debug contracts reject a violation and release builds raise
+`WgpuError`; renderer-free scene construction and `prepareWgpuScene` remain
+independent of a backend.
+
+The headless validation task checks individual pixels, exact CPU/GPU parity,
+direct uploads, canonical invalidation, both cache layers and LRU eviction. Run
+`nimble wgpuBenchmark` to measure identity construction, a host-cache hit,
+automatic submission, explicit preparation, forced GPU misses, alternating
+resident submission and publication separately.
 
 Vertex and index transfers are issued in aligned chunks no larger than 4 MiB
 by default. Pass `uploadChunkBytes` to choose a multiple of four bytes from 4

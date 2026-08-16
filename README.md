@@ -120,6 +120,15 @@ downloaded runtime stays in the ignored `.deps` directory.
 
 `prepareWgpuScene` shapes UniGlyph text and tessellates UniVector paths once,
 including UniVector marker geometry and expanded dashed strokes.
+`submitWgpuScene` and `renderWgpuScene` first derive a BLAKE3-256 key from the
+canonical render semantics and UniGlyph's exact font-content identity. A
+backend retains up to 16 host preparations and 256 MiB of vertex/index logical
+payload by default; `sceneCacheCapacity` and `sceneCacheByteBudget` configure
+those independent bounds. Node IDs and path-builder cursor state are excluded
+because neither changes pixels. Any render value or text-bearing font change
+causes a miss. `clearWgpuSceneCache` releases retained host preparations while
+preserving lifetime counters.
+
 The first `submitWgpuPrepared` uploads that geometry; repeated submission or
 publication keeps prepared scenes resident and does not issue another upload
 on a cache hit. `openWgpuBackend` accepts contractual bounds of 1 through 64
@@ -149,8 +158,16 @@ submission index returned by wgpu-native and is reused only after
 in the managed byte budget, and diagnostics distinguish selections from
 synchronization calls; they do not infer how long a fence blocked.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
-prepare on each call. `nimble wgpuBenchmark` measures preparation,
-forced LRU misses, alternating resident submission and publication separately.
+use the automatic host cache and then the GPU-residency cache. Diagnostics keep
+their hits, misses, evictions and byte counters distinct. `nimble wgpuBenchmark`
+measures identity construction, host-cache lookup, automatic submission,
+explicit preparation, forced GPU LRU misses, resident submission and
+publication separately.
+
+Each `WgpuBackend` belongs to the thread that opened it. All backend operations,
+including diagnostics, cache purge and close, must run on that thread; debug
+contracts reject violations and release builds raise `WgpuError`. Renderer-free
+scene construction and `prepareWgpuScene` do not carry this backend affinity.
 
 ## License
 

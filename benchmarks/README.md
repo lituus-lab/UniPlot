@@ -394,3 +394,21 @@ after adapter, backend, workload, canvas and residency semantics match. Each
 phase carries its own ratio derived from repeated runs, because asynchronous
 submission is materially noisier than preparation or readback. Add a separate
 baseline for a different machine; never reuse these thresholds across hardware.
+
+The semantic-key follow-up adds three CPU-side stages before submission. On
+the same Apple M4 Metal setup, three independent 50-iteration processes gave
+means of 0.8433 ms to hash the 1,000-point canonical scene, 0.8225 ms to hash
+and hit the host preparation cache, and 0.8399 ms to hash, hit both host and GPU
+caches, and enqueue. Explicit preparation averaged 73.7170 ms, so the automatic
+host hit avoided 98.88% of that measured preparation time. It was nevertheless
+about nine times the 0.0915 ms explicit resident-handle submission: automatic
+mutation detection is not free. The automatic path remained 19.1% below the
+1.0382 ms forced-upload stage on this workload. These comparisons are
+CPU-side wall times, not GPU completion or frame-rate claims.
+
+Every process recorded exactly one host-cache miss, 107 hits, no host eviction
+and 10,212,600 retained logical vertex/index bytes. That byte count excludes
+sequence capacity, object headers, allocator metadata and transient key/hash
+state; it is a cache admission budget, not process RSS. The native prepared
+cache and managed-GPU counters remain separate. The baseline's residency field
+includes `scene-key-v1`, preventing comparison with the earlier protocol.
