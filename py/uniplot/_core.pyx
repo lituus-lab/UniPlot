@@ -25,6 +25,8 @@ cdef extern from "UniPlot.h":
                          const char *, float)
     int uplot_add_raster(uplot_plot *, const uint8_t *, size_t, int, int, int,
                          double, double, double, double, int)
+    int uplot_add_image_mark(uplot_plot *, const uint8_t *, size_t, int, int,
+                             int, double, double, double, double, int)
     int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
                            double, const char *, const char *)
     int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
@@ -123,22 +125,42 @@ cdef class Plot:
         if self._handle != NULL:
             uplot_plot_free(self._handle)
 
-    def raster(self, pixels, int width, int height, int channels,
-               double x_min, double x_max, double y_min, double y_max,
-               int filter=RASTER_BILINEAR):
+    cdef _add_image_pixels(self, pixels, int width, int height, int channels,
+                           double x_min, double x_max, double y_min,
+                           double y_max, int filter, bint mark):
         cdef bytes payload = bytes(pixels)
         cdef const uint8_t *data = payload
         if len(payload) == 0:
-            raise ValueError("raster pixels cannot be empty")
-        cdef int status = uplot_add_raster(
-            self._handle, data, len(payload), width, height, channels,
-            x_min, x_max, y_min, y_max, filter)
+            raise ValueError("image pixels cannot be empty")
+        cdef int status
+        if mark:
+            status = uplot_add_image_mark(
+                self._handle, data, len(payload), width, height, channels,
+                x_min, x_max, y_min, y_max, filter)
+        else:
+            status = uplot_add_raster(
+                self._handle, data, len(payload), width, height, channels,
+                x_min, x_max, y_min, y_max, filter)
         if status == UPLOT_ERR_MEMORY:
             raise MemoryError()
         if status != 0:
             raise ValueError(
-                "invalid raster pixels, dimensions, extents, or filter")
+                "invalid image pixels, dimensions, extents, or filter")
         return self
+
+    def raster(self, pixels, int width, int height, int channels,
+               double x_min, double x_max, double y_min, double y_max,
+               int filter=RASTER_BILINEAR):
+        return self._add_image_pixels(pixels, width, height, channels,
+                                      x_min, x_max, y_min, y_max, filter,
+                                      False)
+
+    def image(self, pixels, int width, int height, int channels,
+              double x_min, double x_max, double y_min, double y_max,
+              int filter=RASTER_BILINEAR):
+        return self._add_image_pixels(pixels, width, height, channels,
+                                      x_min, x_max, y_min, y_max, filter,
+                                      True)
 
     @classmethod
     def from_json(cls, payload, int width=800, int height=500):
