@@ -13,13 +13,17 @@ Run `nimble rasterSpecBaseline` for the reproducible 3×10 Apple M4 protocol.
 It separates PlotSpec construction plus the caller-buffer snapshot, scene
 compilation (including the alpha-correct 512×512 to plot-area resize), and
 complete 800×600 CPU publication. The same processes also measure 64
-data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources.
+data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources and a
+1,000-point line with UTC x labels and duration y labels.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3133 / 8.5059 / 8.0370 ms for the retained
-raster construction / compile / publication phases, and 0.0168 / 3.0793 /
-7.3001 ms for the 64-mark construction / compile / publication phases. These
-are same-machine regression evidence, not cross-machine performance claims.
+The current Apple M4 medians are 0.3403 / 8.7735 / 8.4481 ms for the retained
+raster construction / compile / publication phases, 0.0244 / 3.2384 / 7.6097
+ms for the 64-mark phases, and 0.0150 / 0.1092 / 13.7159 ms for temporal
+construction / compile / CPU publication. Temporal construction copies the
+two 1,000-value columns; compilation includes deterministic tick selection and
+UTC/duration formatting. These are same-machine regression evidence, not
+cross-machine performance claims.
 The exact samples are stored in
 `benchmarks/baselines/apple-m4-raster-spec.json`.
 
