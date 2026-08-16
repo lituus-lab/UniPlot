@@ -3,6 +3,7 @@
 import std/[json, monotimes, os, stats, strutils, times]
 import UniGlyph
 import UniImage/core as uimg
+from UniMath import sin
 import UniPlot
 
 const Warmups = 3
@@ -64,6 +65,13 @@ proc main() =
     result = linePlot(temporalX, temporalY, color = "#2457c5")
     result.scaleXUtc()
     result.scaleYDuration()
+  var histogramValues = newSeq[float64](100_000)
+  for index in 0 ..< histogramValues.len:
+    let centered = float64((index * 7919) mod 100_003) / 10_000.0 - 5.0
+    histogramValues[index] = centered + 0.35 * sin(float64(index) * 0.013)
+  proc makeAutomaticHistogram(): PlotSpec =
+    histogramPlot(histogramValues, hrFreedmanDiaconis, density = true,
+      color = "#267a5e")
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
@@ -73,11 +81,18 @@ proc main() =
     let warmTemporal = makeTemporalSpec().compileScene(
       Size(width: 800, height: 600))
     discard warmTemporal.renderImage(font)
+    discard automaticHistogramBreaks(histogramValues,
+      hrFreedmanDiaconis)
+    let warmHistogram = makeAutomaticHistogram().compileScene(
+      Size(width: 800, height: 600))
+    discard warmHistogram.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
   var temporalConstructionStats, temporalCompileStats,
     temporalPublicationStats: RunningStat
+  var histogramSelectionStats, histogramConstructionStats,
+    histogramCompileStats, histogramPublicationStats: RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
     var started = getMonoTime()
@@ -112,12 +127,31 @@ proc main() =
     temporalPublicationStats.push elapsedMs(started)
     guard = guard xor int(temporalPixels.data[
       (iteration * 1999) mod temporalPixels.data.len])
+    started = getMonoTime()
+    let selectedBreaks = automaticHistogramBreaks(histogramValues,
+      hrFreedmanDiaconis)
+    histogramSelectionStats.push elapsedMs(started)
+    guard = guard xor selectedBreaks.len
+    started = getMonoTime()
+    let histogramSpec = makeAutomaticHistogram()
+    histogramConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let histogramScene = histogramSpec.compileScene(
+      Size(width: 800, height: 600))
+    histogramCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let histogramPixels = histogramScene.renderImage(font)
+    histogramPublicationStats.push elapsedMs(started)
+    guard = guard xor int(histogramPixels.data[
+      (iteration * 2371) mod histogramPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
     "image_mark_count": 64, "image_resource_count": resources.len,
     "temporal_point_count": temporalX.len,
-    "semantics": "PlotSpec construction; raster snapshots and temporal labels compile through retained scenes; publication includes CPU render",
+    "histogram_point_count": histogramValues.len,
+    "histogram_rule": "Freedman-Diaconis",
+    "semantics": "separate PlotSpec construction, automatic histogram selection, retained-scene compilation and complete CPU publication",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
     "publication_mean_ms": publicationStats.mean,
@@ -127,6 +161,10 @@ proc main() =
     "temporal_construction_mean_ms": temporalConstructionStats.mean,
     "temporal_compile_mean_ms": temporalCompileStats.mean,
     "temporal_publication_mean_ms": temporalPublicationStats.mean,
+    "histogram_selection_mean_ms": histogramSelectionStats.mean,
+    "histogram_construction_mean_ms": histogramConstructionStats.mean,
+    "histogram_compile_mean_ms": histogramCompileStats.mean,
+    "histogram_publication_mean_ms": histogramPublicationStats.mean,
     "guard": guard})
 
 main()
