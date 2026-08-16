@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/unittest
-import contracts
+import std/[sequtils, unittest]
+when not defined(release) and not defined(danger):
+  import contracts
 import UniColor
+import UniImage/core as uimg
 import UniPlot
 
 proc sample(): PlotSpec =
@@ -20,6 +22,60 @@ suite "plot compilation":
     check scene.size.width == 640
     check scene.nodes.len > 10
     check scene.nodes[^1].id > 0
+
+  test "raster layers snapshot pixels and compile behind data marks":
+    var spec = sample()
+    var image = uimg.newImage[uint8](2, 1, uimg.csRgba)
+    image.data = @[255'u8, 0, 0, 255, 0, 0, 255, 128]
+    spec.raster(image, 0.0, 2.0, 1.0, 3.0, RasterNearest)
+    image.data[0] = 0
+    check spec.rasters[0].image.data[0] == 255
+    let scene = spec.compileScene(Size(width: 320, height: 240))
+    var rasterIndex = -1
+    var firstDataIndex = -1
+    for index, node in scene.nodes:
+      if node.kind == snImage: rasterIndex = index
+      elif node.id != 0 and firstDataIndex < 0: firstDataIndex = index
+    check rasterIndex >= 0
+    check firstDataIndex > rasterIndex
+    check scene.nodes[rasterIndex].image.data[0] == 255
+
+    var rasterOnly = plot(initDataFrame())
+    rasterOnly.raster(image, 0.0, 2.0, 0.0, 1.0, RasterNearest)
+    check rasterOnly.compileScene(Size(width: 320, height: 240)).nodes.anyIt(
+      it.kind == snImage)
+
+  test "raster contracts reject malformed pixels and extents":
+    var spec = sample()
+    var malformed = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    malformed.data.setLen(3)
+    when defined(release) or defined(danger):
+      expect PlotError: spec.raster(malformed, 0, 1, 0, 1)
+      expect PlotError:
+        var valid = uimg.newImage[uint8](1, 1, uimg.csRgba)
+        spec.raster(valid, 1, 0, 0, 1)
+    else:
+      expect PreConditionDefect: spec.raster(malformed, 0, 1, 0, 1)
+
+  test "raster pixels follow reversed axes and reject nonlinear warps":
+    var image = uimg.newImage[uint8](2, 2, uimg.csRgba)
+    image.data = @[
+      255'u8, 0, 0, 255, 0, 255, 0, 255,
+      0, 0, 255, 255, 255, 255, 0, 255]
+    proc imagePixels(reverseX, reverseY: bool): seq[uint8] =
+      var spec = plot(initDataFrame())
+      spec.raster(image, 0, 2, 0, 2, RasterNearest)
+      spec.scaleX(reversed = reverseX)
+      spec.scaleY(reversed = reverseY)
+      for node in spec.compileScene(Size(width: 320, height: 240)).nodes:
+        if node.kind == snImage: return node.image.data
+    check imagePixels(false, false)[0 .. 3] == @[255'u8, 0, 0, 255]
+    check imagePixels(true, false)[0 .. 3] == @[0'u8, 255, 0, 255]
+    check imagePixels(false, true)[0 .. 3] == @[0'u8, 0, 255, 255]
+    var logarithmic = plot(initDataFrame())
+    logarithmic.raster(image, 1, 100, 1, 100)
+    logarithmic.scaleX(skLog10)
+    expect PlotError: discard logarithmic.compileScene()
 
   test "an empty specification is rejected":
     var frame = initDataFrame()
