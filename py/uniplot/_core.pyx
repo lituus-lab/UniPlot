@@ -34,6 +34,8 @@ cdef extern from "UniPlot.h":
     int uplot_add_numeric_histogram(uplot_plot *, const double *, size_t,
                                     const double *, size_t, int,
                                     const char *)
+    int uplot_add_automatic_histogram(uplot_plot *, const double *, size_t,
+                                      int, int, const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -117,6 +119,12 @@ RASTER_BOX = 2
 AXIS_NUMERIC = 0
 AXIS_UTC_DATETIME = 1
 AXIS_DURATION = 2
+HISTOGRAM_AUTO = 0
+HISTOGRAM_SQUARE_ROOT = 1
+HISTOGRAM_STURGES = 2
+HISTOGRAM_RICE = 3
+HISTOGRAM_SCOTT = 4
+HISTOGRAM_FREEDMAN_DIACONIS = 5
 
 cdef class Plot:
     cdef uplot_plot *_handle
@@ -366,6 +374,33 @@ cdef class Plot:
             free(value_items); free(break_items)
         if status != 0:
             raise ValueError("invalid histogram or non-empty plot")
+        return self
+
+    def automatic_histogram(self, values, int rule=HISTOGRAM_AUTO,
+                            color="#3366cc", bint density=False):
+        values = list(values)
+        if len(values) == 0:
+            raise ValueError("histogram values cannot be empty")
+        cdef size_t value_count = len(values)
+        cdef double *value_items = <double *>malloc(
+            value_count * sizeof(double))
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if value_items == NULL:
+            raise MemoryError()
+        try:
+            for index in range(value_count):
+                value_items[index] = float(values[index])
+            status = uplot_add_automatic_histogram(
+                self._handle, value_items, value_count, rule, density,
+                encoded_color)
+        finally:
+            free(value_items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid automatic histogram or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
