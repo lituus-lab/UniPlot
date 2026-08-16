@@ -18,6 +18,16 @@ suite "scales":
     check scale.ticks() == @[first, last]
     check scale.axisTicks(alkUtcDateTime) == @[first, last]
 
+  test "linear interpolation remains finite across an extreme domain":
+    let scale = continuousScale(-1e308, 1e308, 0, 100)
+    check scale.map(-1e308) == 0
+    check scale.map(0) == 50
+    check scale.map(1e308) == 100
+    check scale.ticks(3) == @[-1e308, 0.0, 1e308]
+
+    let extrapolated = continuousScale(1e308, 1.1e308, 0, 1)
+    check abs(extrapolated.map(-1e308) - -20.0) < 1e-5
+
   test "continuous and band ranges may be reversed":
     let continuous = continuousScale(0, 10, 120, 20)
     check continuous.map(0) == 120
