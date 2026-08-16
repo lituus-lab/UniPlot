@@ -40,6 +40,8 @@ suite "WGPU boundary":
       expect WgpuError:
         discard openWgpuBackend("/unused", managedGpuByteBudget =
           DefaultPreparedCacheByteBudget - 1)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", streamingRingCapacity = 0)
     else:
       expect PreConditionDefect: discard openWgpuBackend("/unused", 0)
       expect PreConditionDefect:
@@ -52,6 +54,8 @@ suite "WGPU boundary":
       expect PreConditionDefect:
         discard openWgpuBackend("/unused", managedGpuByteBudget =
           DefaultPreparedCacheByteBudget - 1)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", streamingRingCapacity = 0)
 
   test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
@@ -67,6 +71,8 @@ suite "WGPU boundary":
       check backend.wgpuDiagnostics.uploadChunkBytes == DefaultUploadChunkBytes
       check backend.wgpuDiagnostics.managedGpuByteBudget ==
         DefaultManagedGpuByteBudget
+      check backend.wgpuDiagnostics.streamingRingCapacity ==
+        DefaultStreamingRingEntries
       let capabilities = wgpuCapabilities(backend)
       check capabilities.available
       check capabilities.storageBuffers
@@ -198,6 +204,25 @@ suite "WGPU boundary":
       check chunkedDiagnostics.uploadWriteCalls == expectedWriteCalls
       check chunkedDiagnostics.largestUploadWrite <= 16
       chunked.close()
+
+      let ring = openWgpuBackend(libraryPath, streamingRingCapacity = 2)
+      for _ in 0 ..< 3:
+        ring.submitWgpuMeshTarget(Size(width: 10, height: 10),
+          parseColor("#ffffff").get, mesh, parseColor("#ff0000").get)
+      var ringDiagnostics = ring.wgpuDiagnostics
+      check ringDiagnostics.streamingRingEntries == 2
+      check ringDiagnostics.streamingRingRotations == 3
+      check ringDiagnostics.streamingRingSyncs == 1
+      check ringDiagnostics.streamingBufferBytes > 0
+      check ringDiagnostics.managedGpuBytes <=
+        ringDiagnostics.managedGpuByteBudget
+      let ringPixels = ring.readWgpuMeshTarget(Size(width: 10, height: 10),
+        parseColor("#ffffff").get, mesh, parseColor("#ff0000").get)
+      check ringPixels == meshPixels
+      ringDiagnostics = ring.wgpuDiagnostics
+      check ringDiagnostics.streamingRingRotations == 4
+      check ringDiagnostics.streamingRingSyncs == 2
+      ring.close()
 
       let samePrepared = scene.prepareWgpuScene(font)
       let byteLimited = openWgpuBackend(libraryPath,

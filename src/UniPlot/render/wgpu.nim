@@ -19,6 +19,8 @@ const MaxUploadChunkBytes* = 64'u64 * 1024'u64 * 1024'u64
 const DefaultUploadChunkBytes* = 4'u64 * 1024'u64 * 1024'u64
 const MinManagedGpuByteBudget* = 1024'u64
 const DefaultManagedGpuByteBudget* = 512'u64 * 1024'u64 * 1024'u64
+const MaxStreamingRingEntries* = 8
+const DefaultStreamingRingEntries* = 3
 
 type
   WgpuError* = object of CatchableError
@@ -62,6 +64,8 @@ type
     preparedCacheEntries*, preparedCacheCapacity*: int
     managedGpuBytes*, managedGpuPeakBytes*, managedGpuByteBudget*: uint64
     streamingBufferBytes*, targetTextureBytes*, readbackBufferBytes*: uint64
+    streamingRingEntries*, streamingRingCapacity*: int
+    streamingRingRotations*, streamingRingSyncs*: uint64
 
   WgpuBackend* = ref object
     state*: WgpuBackendState
@@ -108,7 +112,8 @@ proc openWgpuBackend*(libraryPath: string;
     preparedCacheCapacity = 4;
     preparedCacheByteBudget = DefaultPreparedCacheByteBudget;
     uploadChunkBytes = DefaultUploadChunkBytes;
-    managedGpuByteBudget = DefaultManagedGpuByteBudget): WgpuBackend {.
+    managedGpuByteBudget = DefaultManagedGpuByteBudget;
+    streamingRingCapacity = DefaultStreamingRingEntries): WgpuBackend {.
     contractual.} =
   ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
@@ -119,6 +124,7 @@ proc openWgpuBackend*(libraryPath: string;
     uploadChunkBytes mod 4'u64 == 0'u64
     managedGpuByteBudget >= MinManagedGpuByteBudget
     preparedCacheByteBudget <= managedGpuByteBudget
+    streamingRingCapacity in 1 .. MaxStreamingRingEntries
   ensure:
     not result.isNil and result.state == wbsReady
   body:
@@ -142,10 +148,15 @@ proc openWgpuBackend*(libraryPath: string;
       raise newException(WgpuError,
         "managed WGPU byte budget must be at least " &
         $MinManagedGpuByteBudget & " and contain the prepared-cache budget")
+    if streamingRingCapacity notin 1 .. MaxStreamingRingEntries:
+      raise newException(WgpuError,
+        "WGPU streaming ring capacity must be in 1.." &
+        $MaxStreamingRingEntries)
     result = WgpuBackend(state: wbsUnavailable)
     try:
       result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity,
-        preparedCacheByteBudget, uploadChunkBytes, managedGpuByteBudget)
+        preparedCacheByteBudget, uploadChunkBytes, managedGpuByteBudget,
+        streamingRingCapacity)
       result.state = wbsReady
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
@@ -159,6 +170,20 @@ proc close*(backend: WgpuBackend) {.contractual.} =
     backend.runtime.close()
     backend.runtime = nil
     backend.state = wbsUnavailable
+
+proc waitWgpuIdle*(backend: WgpuBackend) {.contractual.} =
+  ## Wait for all submitted GPU work and release streaming slots for reuse.
+  require:
+    not backend.isNil and backend.state == wbsReady
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    try:
+      backend.runtime.waitIdle()
+    except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
+      raise newException(WgpuError, error.msg)
 
 proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
   ## Report runtime availability without causing implicit library loading.
@@ -206,7 +231,11 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
       managedGpuByteBudget: uploads.managedBudget,
       streamingBufferBytes: uploads.streamingBytes,
       targetTextureBytes: uploads.targetBytes,
-      readbackBufferBytes: uploads.readbackBytes)
+      readbackBufferBytes: uploads.readbackBytes,
+      streamingRingEntries: uploads.ringEntries,
+      streamingRingCapacity: uploads.ringCapacity,
+      streamingRingRotations: uploads.ringRotations,
+      streamingRingSyncs: uploads.ringSyncs)
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =
@@ -240,6 +269,19 @@ proc clearWgpuTarget*(backend: WgpuBackend; size: Size; color: Color) =
   ## Submit a real offscreen render pass, discarding its validation readback.
   discard backend.readWgpuClearTarget(size, color)
 
+proc wgpuMeshVertices(size: Size; mesh: VectorMesh; fill: Color): seq[float32] =
+  result = newSeq[float32](mesh.vertexCount * 6)
+  for i in 0 ..< mesh.vertexCount:
+    let vertex = mesh.vertex(i)
+    let offset = i * 6
+    result[offset] = vertex.position.x * 2'f32 / float32(size.width) - 1'f32
+    result[offset + 1] = 1'f32 -
+      vertex.position.y * 2'f32 / float32(size.height)
+    result[offset + 2] = fill.comp(0)
+    result[offset + 3] = fill.comp(1)
+    result[offset + 4] = fill.comp(2)
+    result[offset + 5] = fill.alpha * vertex.coverage
+
 proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
     mesh: VectorMesh; color: Color): seq[byte] {.contractual.} =
   ## Render one UniVector indexed triangle mesh into an RGBA8 target.
@@ -265,21 +307,43 @@ proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
     let
       clear = convertedBackground.get
       fill = convertedColor.get
-    var vertices = newSeq[float32](mesh.vertexCount * 6)
-    for i in 0 ..< mesh.vertexCount:
-      let vertex = mesh.vertex(i)
-      let offset = i * 6
-      vertices[offset] = vertex.position.x * 2'f32 / float32(size.width) - 1'f32
-      vertices[offset + 1] = 1'f32 -
-        vertex.position.y * 2'f32 / float32(size.height)
-      vertices[offset + 2] = fill.comp(0)
-      vertices[offset + 3] = fill.comp(1)
-      vertices[offset + 4] = fill.comp(2)
-      vertices[offset + 5] = fill.alpha * vertex.coverage
+    let vertices = wgpuMeshVertices(size, mesh, fill)
     try:
       result = backend.runtime.renderMeshPixels(uint32(size.width),
         uint32(size.height), clear.comp(0), clear.comp(1), clear.comp(2),
         clear.alpha, vertices, mesh.indices)
+    except LibraryError as error:
+      if backend.runtime.deviceLostReason() != 0'u32:
+        backend.state = wbsDeviceLost
+      raise newException(WgpuError, error.msg)
+
+proc submitWgpuMeshTarget*(backend: WgpuBackend; size: Size;
+    background: Color; mesh: VectorMesh; color: Color) {.contractual.} =
+  ## Upload and enqueue one direct UniVector mesh without readback.
+  require:
+    not backend.isNil and backend.state == wbsReady
+    size.width > 0 and size.height > 0
+    uint64(size.width) <= uint64(high(uint32))
+    uint64(size.height) <= uint64(high(uint32))
+    mesh.indexCount mod 3 == 0
+  body:
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    size.validate()
+    if uint64(size.width) > uint64(high(uint32)) or
+        uint64(size.height) > uint64(high(uint32)):
+      raise newException(WgpuError, "WGPU target dimensions exceed uint32")
+    let convertedBackground = background.to(tagSRGB)
+    let convertedColor = color.to(tagSRGB)
+    if convertedBackground.isErr or convertedColor.isErr:
+      raise newException(WgpuError, "cannot convert WGPU mesh colors to sRGB")
+    let
+      clear = convertedBackground.get
+      vertices = wgpuMeshVertices(size, mesh, convertedColor.get)
+    try:
+      backend.runtime.submitMesh(uint32(size.width), uint32(size.height),
+        clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha, vertices,
+        mesh.indices)
     except LibraryError as error:
       if backend.runtime.deviceLostReason() != 0'u32:
         backend.state = wbsDeviceLost

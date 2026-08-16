@@ -241,8 +241,8 @@ type
   EndRenderPassProc = proc(renderPass: pointer) {.cdecl.}
   FinishCommandEncoderProc = proc(encoder,
       descriptor: pointer): pointer {.cdecl.}
-  SubmitProc = proc(queue: pointer; count: csize_t;
-      commands: ptr pointer) {.cdecl.}
+  SubmitForIndexProc = proc(queue: pointer; count: csize_t;
+      commands: ptr pointer): uint64 {.cdecl.}
   CreateBufferProc = proc(device: pointer;
       descriptor: ptr WgpuBufferDescriptor): pointer {.cdecl.}
   CopyTextureToBufferProc = proc(encoder: pointer;
@@ -283,20 +283,27 @@ type
     vertexCapacity, indexCapacity: uint64
     vertexSize, indexSize: uint64
 
+  StreamingMeshBuffers = object
+    vertexBuffer, indexBuffer: pointer
+    vertexCapacity, indexCapacity, submissionIndex: uint64
+
   NativeWgpuRuntime* = ref object
     library: LibHandle
     instance, adapter, device, queue: pointer
     meshShader, meshPipeline: pointer
     targetTexture, targetView: pointer
-    vertexBuffer, indexBuffer, readbackBuffer: pointer
+    readbackBuffer: pointer
     targetWidth, targetHeight: uint32
-    vertexCapacity, indexCapacity, readbackCapacity: uint64
+    readbackCapacity: uint64
     preparedCacheCapacity: int
     preparedCacheByteBudget, preparedCacheBytes: uint64
     preparedCachePeakBytes: uint64
     uploadChunkBytes, uploadWriteCalls, uploadBytes: uint64
     largestUploadWrite: uint64
     managedGpuByteBudget, managedGpuPeakBytes, targetTextureBytes: uint64
+    streamingRingCapacity, streamingRingCursor: int
+    streamingRing: seq[StreamingMeshBuffers]
+    streamingRingRotations, streamingRingSyncs: uint64
     preparedMeshes: seq[PreparedMeshBuffers]
     preparedUseClock: uint64
     meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
@@ -404,12 +411,15 @@ proc close*(runtime: NativeWgpuRuntime) =
         entry.vertexBuffer = nil
   runtime.preparedMeshes.setLen(0)
   runtime.preparedCacheBytes = 0
-  if runtime.indexBuffer != nil and runtime.releaseBuffer != nil:
-    runtime.releaseBuffer(runtime.indexBuffer)
-    runtime.indexBuffer = nil
-  if runtime.vertexBuffer != nil and runtime.releaseBuffer != nil:
-    runtime.releaseBuffer(runtime.vertexBuffer)
-    runtime.vertexBuffer = nil
+  if runtime.releaseBuffer != nil:
+    for slot in runtime.streamingRing.mitems:
+      if slot.indexBuffer != nil:
+        runtime.releaseBuffer(slot.indexBuffer)
+        slot.indexBuffer = nil
+      if slot.vertexBuffer != nil:
+        runtime.releaseBuffer(slot.vertexBuffer)
+        slot.vertexBuffer = nil
+  runtime.streamingRing.setLen(0)
   if runtime.targetView != nil and runtime.releaseView != nil:
     runtime.releaseView(runtime.targetView)
     runtime.targetView = nil
@@ -471,7 +481,8 @@ proc openNativeWgpu*(libraryPath: string;
                      preparedCacheCapacity: int;
                      preparedCacheByteBudget: uint64;
                      uploadChunkBytes: uint64;
-                     managedGpuByteBudget: uint64): NativeWgpuRuntime =
+                     managedGpuByteBudget: uint64;
+                     streamingRingCapacity: int): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
   if preparedCacheCapacity <= 0:
     raise newException(LibraryError,
@@ -488,6 +499,9 @@ proc openNativeWgpu*(libraryPath: string;
       preparedCacheByteBudget > managedGpuByteBudget:
     raise newException(LibraryError,
       "managed WGPU byte budget must contain the prepared-cache budget")
+  if streamingRingCapacity notin 1 .. 8:
+    raise newException(LibraryError,
+      "WGPU streaming ring capacity must be in 1..8")
   let library = loadLib(libraryPath)
   if library == nil:
     raise newException(LibraryError, "cannot load wgpu-native: " & libraryPath)
@@ -495,7 +509,9 @@ proc openNativeWgpu*(libraryPath: string;
     preparedCacheCapacity: preparedCacheCapacity,
     preparedCacheByteBudget: preparedCacheByteBudget,
     uploadChunkBytes: uploadChunkBytes,
-    managedGpuByteBudget: managedGpuByteBudget)
+    managedGpuByteBudget: managedGpuByteBudget,
+    streamingRingCapacity: streamingRingCapacity,
+    streamingRing: newSeq[StreamingMeshBuffers](streamingRingCapacity))
   try:
     let
       createInstance = loadSymbol[CreateInstanceProc](library,
@@ -617,6 +633,14 @@ proc deviceLostReason*(runtime: NativeWgpuRuntime): uint32 =
   if runtime.isNil or runtime.events == nil: 0'u32
   else: runtime.events.lostReason.load(moAcquire)
 
+proc waitIdle*(runtime: NativeWgpuRuntime) =
+  if runtime.isNil or runtime.device == nil or runtime.pollDevice == nil:
+    raise newException(LibraryError, "wgpu-native runtime is not ready")
+  discard runtime.pollDevice(runtime.device, 1'u32, nil)
+  for slot in runtime.streamingRing.mitems: slot.submissionIndex = 0
+  if runtime.deviceLostReason() != 0'u32:
+    raise newException(LibraryError, "wgpu-native device was lost")
+
 proc takeUncapturedError*(runtime: NativeWgpuRuntime): uint32 =
   if runtime.isNil or runtime.events == nil: result = 0'u32
   else: result = runtime.events.errorType.exchange(0'u32, moAcquireRelease)
@@ -638,17 +662,27 @@ proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
 proc uploadStats*(runtime: NativeWgpuRuntime): tuple[
     writeCalls, bytes, largestWrite, chunkBytes: uint64;
     managedBytes, managedPeakBytes, managedBudget: uint64;
-    streamingBytes, targetBytes, readbackBytes: uint64] =
+    streamingBytes, targetBytes, readbackBytes: uint64;
+    ringRotations, ringSyncs: uint64; ringEntries, ringCapacity: int] =
   if runtime.isNil:
     return (0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64,
-      0'u64, 0'u64, 0'u64)
+      0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0, 0)
+  var streamingBytes = 0'u64
+  var ringEntries = 0
+  for slot in runtime.streamingRing:
+    streamingBytes += slot.vertexCapacity + slot.indexCapacity
+    if slot.vertexBuffer != nil or slot.indexBuffer != nil: inc ringEntries
   (runtime.uploadWriteCalls, runtime.uploadBytes, runtime.largestUploadWrite,
     runtime.uploadChunkBytes, runtime.preparedCacheBytes +
-      runtime.vertexCapacity + runtime.indexCapacity +
-      runtime.targetTextureBytes + runtime.readbackCapacity,
+      streamingBytes + runtime.targetTextureBytes + runtime.readbackCapacity,
     runtime.managedGpuPeakBytes, runtime.managedGpuByteBudget,
-    runtime.vertexCapacity + runtime.indexCapacity,
-    runtime.targetTextureBytes, runtime.readbackCapacity)
+    streamingBytes, runtime.targetTextureBytes, runtime.readbackCapacity,
+    runtime.streamingRingRotations, runtime.streamingRingSyncs, ringEntries,
+    runtime.streamingRingCapacity)
+
+proc streamingBytes(runtime: NativeWgpuRuntime): uint64 =
+  for slot in runtime.streamingRing:
+    result += slot.vertexCapacity + slot.indexCapacity
 
 proc evictOldestPrepared(runtime: NativeWgpuRuntime;
                          protectedToken = 0'u64): bool =
@@ -670,11 +704,11 @@ proc evictOldestPrepared(runtime: NativeWgpuRuntime;
   true
 
 proc makeManagedRoom(runtime: NativeWgpuRuntime;
-                     vertexBytes, indexBytes, targetBytes,
+                     streamingBytes, targetBytes,
                      readbackBytes: uint64; incomingPrepared = 0'u64;
                      protectedToken = 0'u64) =
-  var base = vertexBytes
-  for value in [indexBytes, targetBytes, readbackBytes]:
+  var base = streamingBytes
+  for value in [targetBytes, readbackBytes]:
     if base > high(uint64) - value:
       raise newException(LibraryError,
         "managed WGPU resource capacities overflow uint64")
@@ -690,9 +724,8 @@ proc makeManagedRoom(runtime: NativeWgpuRuntime;
         "managed WGPU resources exceed the byte budget")
 
 proc recordManagedPeak(runtime: NativeWgpuRuntime) =
-  let current = runtime.preparedCacheBytes + runtime.vertexCapacity +
-    runtime.indexCapacity + runtime.targetTextureBytes +
-    runtime.readbackCapacity
+  let current = runtime.preparedCacheBytes + runtime.streamingBytes() +
+    runtime.targetTextureBytes + runtime.readbackCapacity
   runtime.managedGpuPeakBytes = max(runtime.managedGpuPeakBytes, current)
 
 proc writeBufferChunked(runtime: NativeWgpuRuntime;
@@ -719,6 +752,11 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     raise newException(LibraryError, "wgpu-native runtime is not ready")
   if width == 0 or height == 0:
     raise newException(LibraryError, "WGPU target dimensions must be positive")
+  if meshIndices.len > 0 and
+      (meshVertices.len == 0 or meshVertices.len mod 6 != 0):
+    raise newException(LibraryError, "invalid WGPU mesh vertex layout")
+  if uint64(meshIndices.len) > uint64(high(uint32)):
+    raise newException(LibraryError, "WGPU mesh index count exceeds uint32")
   if runtime.deviceLostReason() != 0'u32:
     raise newException(LibraryError, "wgpu-native device was lost")
   if runtime.takeUncapturedError() != 0'u32:
@@ -736,7 +774,8 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
         "wgpuRenderPassEncoderEnd")
     finishEncoder = loadSymbol[FinishCommandEncoderProc](runtime.library,
         "wgpuCommandEncoderFinish")
-    submit = loadSymbol[SubmitProc](runtime.library, "wgpuQueueSubmit")
+    submitForIndex = loadSymbol[SubmitForIndexProc](runtime.library,
+        "wgpuQueueSubmitForIndex")
     releaseTexture = loadSymbol[ReleaseProc](runtime.library,
         "wgpuTextureRelease")
     releaseView = loadSymbol[ReleaseProc](runtime.library,
@@ -779,6 +818,7 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
   runtime.releaseTexture = releaseTexture
   runtime.releaseView = releaseView
   runtime.releaseBuffer = releaseBuffer
+  var streamingIndex = -1
   if width > runtime.adapterCapabilities.maxTextureDimension2D or
       height > runtime.adapterCapabilities.maxTextureDimension2D:
     raise newException(LibraryError,
@@ -788,8 +828,8 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
   let requestedTargetBytes = uint64(width) * uint64(height) * 4'u64
   if runtime.targetTexture == nil or runtime.targetWidth != width or
       runtime.targetHeight != height:
-    runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
-      requestedTargetBytes, runtime.readbackCapacity)
+    runtime.makeManagedRoom(runtime.streamingBytes(), requestedTargetBytes,
+      runtime.readbackCapacity)
     if runtime.targetView != nil:
       releaseView(runtime.targetView)
       runtime.targetView = nil
@@ -820,6 +860,17 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     runtime.targetHeight = height
     runtime.targetTextureBytes = requestedTargetBytes
     runtime.recordManagedPeak()
+  if meshIndices.len > 0 and uploadToken == 0:
+    streamingIndex = runtime.streamingRingCursor
+    runtime.streamingRingCursor = (runtime.streamingRingCursor + 1) mod
+      runtime.streamingRingCapacity
+    inc runtime.streamingRingRotations
+    var slot = addr runtime.streamingRing[streamingIndex]
+    if slot.submissionIndex != 0:
+      var pending = slot.submissionIndex
+      discard runtime.pollDevice(runtime.device, 1'u32, addr pending)
+      slot.submissionIndex = 0
+      inc runtime.streamingRingSyncs
   let encoder = createEncoder(runtime.device, nil)
   if encoder == nil:
     raise newException(LibraryError, "wgpu-native did not create an encoder")
@@ -843,8 +894,6 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
       endPass(renderPass)
       releasePass(renderPass)
   if meshIndices.len > 0:
-    if meshVertices.len == 0 or meshVertices.len mod 6 != 0:
-      raise newException(LibraryError, "invalid WGPU mesh vertex layout")
     const shaderCode = """
 struct VertexOut {
   @builtin(position) position: vec4f,
@@ -934,24 +983,28 @@ struct VertexOut {
 
     var activeVertexBuffer, activeIndexBuffer: pointer
     if uploadToken == 0:
+      var slot = addr runtime.streamingRing[streamingIndex]
       let
-        desiredVertexCapacity = grownCapacity(runtime.vertexCapacity,
+        desiredVertexCapacity = grownCapacity(slot.vertexCapacity,
           vertexSize)
-        desiredIndexCapacity = grownCapacity(runtime.indexCapacity, indexSize)
-      runtime.makeManagedRoom(desiredVertexCapacity, desiredIndexCapacity,
+        desiredIndexCapacity = grownCapacity(slot.indexCapacity, indexSize)
+        desiredStreamingBytes = runtime.streamingBytes() -
+          slot.vertexCapacity - slot.indexCapacity + desiredVertexCapacity +
+          desiredIndexCapacity
+      runtime.makeManagedRoom(desiredStreamingBytes,
         runtime.targetTextureBytes, runtime.readbackCapacity)
-      ensureBuffer(runtime.vertexBuffer, runtime.vertexCapacity, vertexSize,
+      ensureBuffer(slot.vertexBuffer, slot.vertexCapacity, vertexSize,
         BufferUsageVertex, "vertex")
-      ensureBuffer(runtime.indexBuffer, runtime.indexCapacity, indexSize,
+      ensureBuffer(slot.indexBuffer, slot.indexCapacity, indexSize,
         BufferUsageIndex, "index")
       runtime.recordManagedPeak()
-      runtime.writeBufferChunked(writeBuffer, runtime.vertexBuffer,
+      runtime.writeBufferChunked(writeBuffer, slot.vertexBuffer,
         unsafeAddr meshVertices[0], vertexSize)
-      runtime.writeBufferChunked(writeBuffer, runtime.indexBuffer,
+      runtime.writeBufferChunked(writeBuffer, slot.indexBuffer,
         unsafeAddr meshIndices[0], indexSize)
       inc runtime.meshUploadCount
-      activeVertexBuffer = runtime.vertexBuffer
-      activeIndexBuffer = runtime.indexBuffer
+      activeVertexBuffer = slot.vertexBuffer
+      activeIndexBuffer = slot.indexBuffer
     else:
       var entryIndex = -1
       for index, entry in runtime.preparedMeshes:
@@ -976,7 +1029,7 @@ struct VertexOut {
         if requiredBytes > runtime.preparedCacheByteBudget:
           raise newException(LibraryError,
             "prepared WGPU scene exceeds the cache byte budget")
-        runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
+        runtime.makeManagedRoom(runtime.streamingBytes(),
           runtime.targetTextureBytes, runtime.readbackCapacity,
           incomingPrepared = requiredBytes)
         while runtime.preparedMeshes.len >= runtime.preparedCacheCapacity or
@@ -1038,7 +1091,7 @@ struct VertexOut {
     if runtime.readbackCapacity < bufferSize:
       let desiredReadbackCapacity = grownCapacity(runtime.readbackCapacity,
         bufferSize)
-      runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
+      runtime.makeManagedRoom(runtime.streamingBytes(),
         runtime.targetTextureBytes, desiredReadbackCapacity,
         protectedToken = uploadToken)
       if runtime.readbackBuffer != nil:
@@ -1067,7 +1120,13 @@ struct VertexOut {
     raise newException(LibraryError, "wgpu-native did not create a command buffer")
   defer: releaseCommand(command)
   var submittedCommand = command
-  submit(runtime.queue, 1, addr submittedCommand)
+  let submissionIndex = submitForIndex(runtime.queue, 1, addr submittedCommand)
+  if streamingIndex >= 0 and submissionIndex == 0:
+    discard runtime.pollDevice(runtime.device, 1'u32, nil)
+    raise newException(LibraryError,
+      "wgpu-native returned an invalid submission index")
+  if streamingIndex >= 0:
+    runtime.streamingRing[streamingIndex].submissionIndex = submissionIndex
   if not readback:
     processEvents(runtime.instance)
     if runtime.deviceLostReason() != 0'u32:
@@ -1091,6 +1150,8 @@ struct VertexOut {
     raise newException(LibraryError, "wgpu-native buffer mapping timed out")
   if mapStatus != MapSuccess:
     raise newException(LibraryError, "wgpu-native buffer mapping failed")
+  if streamingIndex >= 0:
+    runtime.streamingRing[streamingIndex].submissionIndex = 0
   let mapped = getMappedRange(runtime.readbackBuffer, 0, csize_t(bufferSize))
   if mapped == nil:
     raise newException(LibraryError, "wgpu-native returned no mapped data")
