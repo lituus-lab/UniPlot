@@ -66,6 +66,7 @@ func nodeCode(kind: SceneNodeKind): byte =
   case kind
   of snPath: 0
   of snText: 1
+  of snImage: 2
 
 func anchorCode(anchor: TextAnchor): byte =
   case anchor
@@ -127,6 +128,16 @@ proc sceneIdentity*(scene: Scene; font: Font): WgpuSceneIdentity =
       hasher.addFloat(node.position.y)
       hasher.addFloat(node.fontSize)
       hasher.addByte(node.anchor.anchorCode)
+    of snImage:
+      hasher.addU64(uint64(node.image.width))
+      hasher.addU64(uint64(node.image.height))
+      hasher.addByte(byte(node.image.colorspace))
+      hasher.addU64(uint64(node.imageX))
+      hasher.addU64(uint64(node.imageY))
+      hasher.addByte(node.opacity)
+      hasher.addU64(uint64(node.image.data.len))
+      if node.image.data.len > 0:
+        hasher.update(node.image.data)
   hasher.addByte(byte(usesFont))
   if usesFont:
     let identity = font.fontIdentity

@@ -259,6 +259,9 @@ proc compileCells(cells: openArray[GridCell]; columns: int; size: Size;
           Point(x: node.position.x + float32(dx),
             y: node.position.y + float32(dy)),
           node.fontSize, node.color, id, node.anchor)
+      of snImage:
+        result.addImage(node.image, node.imageX + dx, node.imageY + dy,
+          node.opacity, id)
 
 proc compileGrid*(specs: openArray[PlotSpec]; columns: int;
                   size = Size(width: 1200, height: 800);

@@ -143,7 +143,10 @@ proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
   result.nodeCount = scene.nodes.len
   for node in scene.nodes:
     if node.id != 0:
-      let kind = if node.kind == snText: wrGlyphAtlas else: wrPathMesh
+      let kind = case node.kind
+        of snPath: wrPathMesh
+        of snText: wrGlyphAtlas
+        of snImage: wrImageTexture
       result.resources.add WgpuResource(id: node.id, kind: kind)
 
 proc openWgpuBackend*(libraryPath: string;
@@ -452,12 +455,17 @@ proc prepareWgpuScene*(scene: Scene;
       uploadToken: newPreparedToken(),
       clear: [clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha])
     for node in scene.nodes:
+      if node.kind == snImage:
+        raise newException(WgpuError,
+          "WGPU image textures require the raster pipeline")
       let path = case node.kind
         of snPath: node.path
         of snText:
           let layout = layoutText(textStyle(font, node.fontSize), node.text)
           layout.combinedPath(vec2(node.anchor.anchoredTextX(node.position.x,
             layout.width), node.position.y))
+        of snImage:
+          newPath()
       let mesh = path.preparePath().tessellateFill()
       let converted = node.color.to(tagSRGB)
       if converted.isErr:

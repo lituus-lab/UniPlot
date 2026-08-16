@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/strformat
+import std/[base64, strformat]
 import UniColor
 import UniGlyph
 import UniImage/core as uimg
 import UniImage/formats
+from UniImage/process/composite import compositeOver
 import UniVector
 import contracts
 import UniPlot/[common, scene]
@@ -13,8 +14,15 @@ type
   PreparedRenderNode = object
     id: uint64
     color: Color
-    path: Path
-    geometry: PreparedPath
+    case kind: SceneNodeKind
+    of snPath, snText:
+      path: Path
+      geometry: PreparedPath
+    of snImage:
+      image: uimg.Image[uint8]
+      imageX: int
+      imageY: int
+      opacity: uint8
 
   PreparedScene* = ref object
     sizeData: Size
@@ -38,6 +46,11 @@ proc nodePath(node: SceneNode; font: Font): Path =
     let layout = layoutText(textStyle(font, node.fontSize), node.text)
     let x = node.anchor.anchoredTextX(node.position.x, layout.width)
     layout.combinedPath(vec2(x, node.position.y))
+  of snImage:
+    raise newException(PlotError, "image nodes do not have vector paths")
+
+proc imageDataUri(image: uimg.Image[uint8]): string =
+  "data:image/png;base64," & encode(cast[string](encodeImage(image, efPng)))
 
 proc prepareScene*(scene: Scene; font: Font): PreparedScene =
   ## Shape text and flatten all paths once for repeated CPU/SVG rendering.
@@ -49,9 +62,23 @@ proc prepareScene*(scene: Scene; font: Font): PreparedScene =
     backgroundPath: background.preparePath(),
     nodes: newSeqOfCap[PreparedRenderNode](scene.nodes.len))
   for node in scene.nodes:
-    let path = node.nodePath(font).copy
-    result.nodes.add PreparedRenderNode(id: node.id, color: node.color,
-      path: path, geometry: path.preparePath())
+    case node.kind
+    of snPath:
+      let path = node.nodePath(font).copy
+      result.nodes.add PreparedRenderNode(kind: snPath, id: node.id,
+        color: node.color, path: path, geometry: path.preparePath())
+    of snText:
+      let path = node.nodePath(font).copy
+      result.nodes.add PreparedRenderNode(kind: snText, id: node.id,
+        color: node.color, path: path, geometry: path.preparePath())
+    of snImage:
+      var image = node.image
+      image.data = newSeq[uint8](node.image.data.len)
+      for index, value in node.image.data:
+        image.data[index] = value
+      result.nodes.add PreparedRenderNode(kind: snImage, id: node.id,
+        image: image, imageX: node.imageX, imageY: node.imageY,
+        opacity: node.opacity)
 
 proc toSvg*(prepared: PreparedScene): string =
   ## Serialize previously shaped paths without requiring the font again.
@@ -64,10 +91,19 @@ proc toSvg*(prepared: PreparedScene): string =
   result &= &"<rect width=\"{width}\" height=\"{height}\" fill=\"" &
     toSvgColor(prepared.background) & "\"/>"
   for node in prepared.nodes:
-    result &= "<path d=\"" & $node.path & "\" fill=\"" &
-      toSvgColor(node.color) & "\""
-    if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
-    result &= "/>"
+    case node.kind
+    of snPath, snText:
+      result &= "<path d=\"" & $node.path & "\" fill=\"" &
+        toSvgColor(node.color) & "\""
+      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      result &= "/>"
+    of snImage:
+      result &= &"<image x=\"{node.imageX}\" y=\"{node.imageY}\" " &
+        &"width=\"{node.image.width}\" height=\"{node.image.height}\" " &
+        &"opacity=\"{float32(node.opacity) / 255'f32}\" href=\"" &
+        node.image.imageDataUri & "\""
+      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      result &= "/>"
   result &= "</svg>"
 
 proc toSvg*(scene: Scene; font: Font): string =
@@ -79,10 +115,19 @@ proc toSvg*(scene: Scene; font: Font): string =
   result &= &"<rect width=\"{width}\" height=\"{height}\" fill=\"" &
     toSvgColor(scene.background) & "\"/>"
   for node in scene.nodes:
-    result &= "<path d=\"" & $(node.nodePath(font)) & "\" fill=\"" &
-      toSvgColor(node.color) & "\""
-    if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
-    result &= "/>"
+    case node.kind
+    of snPath, snText:
+      result &= "<path d=\"" & $(node.nodePath(font)) & "\" fill=\"" &
+        toSvgColor(node.color) & "\""
+      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      result &= "/>"
+    of snImage:
+      result &= &"<image x=\"{node.imageX}\" y=\"{node.imageY}\" " &
+        &"width=\"{node.image.width}\" height=\"{node.image.height}\" " &
+        &"opacity=\"{float32(node.opacity) / 255'f32}\" href=\"" &
+        node.image.imageDataUri & "\""
+      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      result &= "/>"
   result &= "</svg>"
 
 proc renderImage*(scene: Scene; font: Font): uimg.Image[uint8] =
@@ -92,7 +137,10 @@ proc renderImage*(scene: Scene; font: Font): uimg.Image[uint8] =
   background.rect(0, 0, float32(scene.size.width), float32(scene.size.height))
   result.fillPath(background, scene.background)
   for node in scene.nodes:
-    result.fillPath(node.nodePath(font), node.color)
+    case node.kind
+    of snPath, snText: result.fillPath(node.nodePath(font), node.color)
+    of snImage:
+      result.compositeOver(node.image, node.imageX, node.imageY, node.opacity)
 
 proc renderImage*(prepared: PreparedScene): uimg.Image[uint8] =
   ## Rasterise cached UniVector geometry without reshaping or reflattening.
@@ -102,7 +150,10 @@ proc renderImage*(prepared: PreparedScene): uimg.Image[uint8] =
     prepared.sizeData.height, uimg.csRgba)
   result.fillPreparedPath(prepared.backgroundPath, prepared.background)
   for node in prepared.nodes:
-    result.fillPreparedPath(node.geometry, node.color)
+    case node.kind
+    of snPath, snText: result.fillPreparedPath(node.geometry, node.color)
+    of snImage:
+      result.compositeOver(node.image, node.imageX, node.imageY, node.opacity)
 
 proc encodePng*(scene: Scene; font: Font): seq[byte] =
   encodeImage(scene.renderImage(font), efPng)

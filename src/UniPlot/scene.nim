@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import UniColor
+import UniImage/core as uimg
 import UniVector
 import contracts
 import UniPlot/common
@@ -9,6 +10,7 @@ type
   SceneNodeKind* = enum
     snPath
     snText
+    snImage
 
   TextAnchor* = enum
     textStart
@@ -26,6 +28,11 @@ type
       position*: Point
       fontSize*: float32
       anchor*: TextAnchor
+    of snImage:
+      image*: uimg.Image[uint8]
+      imageX*: int
+      imageY*: int
+      opacity*: uint8
 
   Scene* = object
     size*: Size
@@ -65,3 +72,26 @@ proc addText*(scene: var Scene; text: string; position: Point;
       raise newException(PlotError, "text position must be finite")
     scene.nodes.add SceneNode(kind: snText, id: id, color: color, text: text,
       position: position, fontSize: fontSize, anchor: anchor)
+
+func validLayerImage*(image: uimg.Image[uint8]): bool =
+  if image.width <= 0 or image.height <= 0 or
+      image.colorspace notin {uimg.csGray, uimg.csRgb, uimg.csRgba} or
+      image.channels != uimg.ChannelCount[image.colorspace]:
+    return false
+  if image.width > high(int) div image.height:
+    return false
+  let pixels = image.width * image.height
+  pixels <= high(int) div image.channels and
+    image.data.len == pixels * image.channels
+
+proc addImage*(scene: var Scene; image: uimg.Image[uint8]; x, y: int;
+    opacity = 255'u8; id = 0'u64) {.contractual.} =
+  ## Add a pixel-aligned raster layer. The scene retains the image buffer;
+  ## `prepareScene` takes an owned snapshot for immutable repeated rendering.
+  require:
+    image.validLayerImage
+  body:
+    if not image.validLayerImage:
+      raise newException(PlotError, "image layer must contain a valid Gray, RGB, or RGBA image")
+    scene.nodes.add SceneNode(kind: snImage, id: id, image: image,
+      imageX: x, imageY: y, opacity: opacity)
