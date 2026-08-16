@@ -2,6 +2,7 @@
 # Copyright 2026 lituus-lab
 import std/[json, tables, unittest]
 import UniColor
+import UniImage/core as uimg
 import UniPlot
 
 proc completeSpec(): PlotSpec =
@@ -88,6 +89,29 @@ suite "PlotSpec JSON schema":
     let encoded = spec.toJsonNode
     check encoded["annotations"].len == 2
     check fromJsonNode(encoded).toJsonNode == encoded
+
+  test "raster pixels and placement round trip deterministically":
+    var spec = completeSpec()
+    var image = uimg.newImage[uint8](2, 1, uimg.csRgba)
+    image.data = @[255'u8, 0, 0, 255, 0, 0, 255, 64]
+    spec.raster(image, 1.0, 3.0, 2.0, 4.0, RasterBox)
+    let encoded = spec.toJson
+    let restored = fromJson(encoded)
+    check restored.toJson == encoded
+    check restored.rasters.len == 1
+    check restored.rasters[0].image.data == image.data
+    check restored.rasters[0].filter == RasterBox
+
+    for invalidPixels in ["AAAA", "!!!!!!!!!!!!"]:
+      var hostile = parseJson(encoded)
+      hostile["rasters"][0]["pixelsBase64"] = %invalidPixels
+      expect PlotError: discard fromJson($hostile)
+    var hostile = parseJson(encoded)
+    hostile["rasters"][0]["width"] = %high(BiggestInt)
+    expect PlotError: discard fromJson($hostile)
+    hostile = parseJson(encoded)
+    hostile["rasters"][0]["colorspace"] = %"csCmyk"
+    expect PlotError: discard fromJson($hostile)
 
   test "box-plot mappings round trip as optional schema-v1 fields":
     let spec = boxPlot(["a", "a", "b", "b"], [1.0, 2.0, 3.0, 4.0])

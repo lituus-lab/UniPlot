@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 ## Versioned, deterministic JSON representation of PlotSpec values.
-import std/[json, math, strutils, tables]
+import std/[base64, json, math, strutils, tables]
 import UniColor
+import UniImage/core as ucore
 import UniPlot/[common, data, grammar, scales]
 
 const PlotSpecSchemaVersion* = 1
@@ -236,6 +237,15 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
         "text": annotation.text, "color": annotation.color.colorNode,
         "size": annotation.size, "headSize": annotation.headSize}
     result["annotations"] = annotations
+  if spec.rasters.len > 0:
+    var rasters = newJArray()
+    for raster in spec.rasters:
+      rasters.add %*{"width": raster.image.width,
+        "height": raster.image.height, "colorspace": $raster.image.colorspace,
+        "pixelsBase64": encode(raster.image.data), "xMin": raster.xMin,
+        "xMax": raster.xMax, "yMin": raster.yMin, "yMax": raster.yMax,
+        "filter": $raster.filter}
+    result["rasters"] = rasters
 
 proc toJson*(spec: PlotSpec; pretty = false): string =
   ## Encode a PlotSpec using the stable schema-v1 field order.
@@ -347,6 +357,46 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
         color: node.field("color", JObject).decodeColor,
         size: float32(node.finiteNumber("size")),
         headSize: float32(node.finiteNumber("headSize")))
+  result.rasters.setLen(0)
+  if root.hasKey("rasters"):
+    for node in root.field("rasters", JArray):
+      let
+        widthValue = node.field("width", JInt).getBiggestInt
+        heightValue = node.field("height", JInt).getBiggestInt
+        colorspace = enumValue[ucore.Colorspace](node, "colorspace")
+      if colorspace notin {ucore.csGray, ucore.csRgb, ucore.csRgba} or
+          widthValue <= 0 or heightValue <= 0 or
+          widthValue > BiggestInt(high(int)) or
+          heightValue > BiggestInt(high(int)):
+        raise fail("raster dimensions or colorspace are invalid")
+      let
+        width = int(widthValue)
+        height = int(heightValue)
+        channels = ucore.ChannelCount[colorspace]
+      if width > high(int) div height or
+          width * height > high(int) div channels:
+        raise fail("raster dimensions overflow packed storage")
+      let
+        expected = width * height * channels
+        encodedPixels = node.field("pixelsBase64", JString).getStr
+        expectedEncoded = ((uint64(expected) + 2'u64) div 3'u64) * 4'u64
+      if uint64(encodedPixels.len) != expectedEncoded:
+        raise fail("raster base64 length does not match its dimensions")
+      let decoded = decode(encodedPixels)
+      if decoded.len != expected:
+        raise fail("raster pixels do not match their dimensions")
+      var image = ucore.Image[uint8](width: width, height: height,
+        channels: channels, colorspace: colorspace,
+        data: newSeq[uint8](decoded.len))
+      if decoded.len > 0:
+        copyMem(addr image.data[0], unsafeAddr decoded[0], decoded.len)
+      let raster = RasterLayer(image: image,
+        xMin: node.finiteNumber("xMin"), xMax: node.finiteNumber("xMax"),
+        yMin: node.finiteNumber("yMin"), yMax: node.finiteNumber("yMax"),
+        filter: enumValue[RasterFilter](node, "filter"))
+      if raster.xMin >= raster.xMax or raster.yMin >= raster.yMax:
+        raise fail("raster extents must be increasing")
+      result.rasters.add raster
 
 proc fromJson*(payload: string): PlotSpec =
   ## Parse and decode schema-v1 JSON as PlotError on all malformed input.
