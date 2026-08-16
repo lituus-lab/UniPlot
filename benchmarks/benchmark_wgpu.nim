@@ -106,6 +106,13 @@ proc main() =
     quit("a queue write exceeded the configured upload chunk", 1)
   if diagnostics.uploadWriteCalls < diagnostics.meshUploads * 2'u64:
     quit("mesh uploads did not issue both vertex and index writes", 1)
+  if diagnostics.managedGpuBytes > diagnostics.managedGpuByteBudget or
+      diagnostics.managedGpuPeakBytes > diagnostics.managedGpuByteBudget:
+    quit("managed GPU resources exceeded their byte budget", 1)
+  if diagnostics.managedGpuBytes != diagnostics.preparedCacheBytes +
+      diagnostics.streamingBufferBytes + diagnostics.targetTextureBytes +
+      diagnostics.readbackBufferBytes:
+    quit("managed GPU resource accounting is inconsistent", 1)
   let report = %*{
     "provider": "UniPlot-WGPU",
     "wgpu_native": WgpuNativeTargetVersion,
@@ -115,14 +122,15 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "prepared-lru-byte-budget-chunked-2-v1",
+    "residency": "managed-budget-chunked-lru-2-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
       "upload_submit": "cycle three identities through two slots and enqueue",
       "submit": "alternate two resident identities without upload/readback",
       "publication_frame": "submit resident geometry and read back RGBA8",
       "prepared_cache_bytes": "allocated prepared vertex/index capacities only",
-      "upload_writes": "queue writes split at the configured byte bound"
+      "upload_writes": "queue writes split at the configured byte bound",
+      "managed_gpu_bytes": "tracked buffers plus logical RGBA target bytes"
     },
     "preparation": summary(preparationTimes),
     "upload_submit": summary(uploadSubmitTimes),
@@ -141,6 +149,12 @@ proc main() =
       diagnostics.preparedCachePeakBytes,
     "prepared_cache_byte_budget":
       diagnostics.preparedCacheByteBudget,
+    "managed_gpu_bytes": diagnostics.managedGpuBytes,
+    "managed_gpu_peak_bytes": diagnostics.managedGpuPeakBytes,
+    "managed_gpu_byte_budget": diagnostics.managedGpuByteBudget,
+    "streaming_buffer_bytes": diagnostics.streamingBufferBytes,
+    "target_texture_bytes": diagnostics.targetTextureBytes,
+    "readback_buffer_bytes": diagnostics.readbackBufferBytes,
     "guard": consumed
   }
   echo $report
