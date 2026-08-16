@@ -44,6 +44,11 @@ typedef enum {
   UPLOT_RASTER_BILINEAR = 1,
   UPLOT_RASTER_BOX = 2
 } uplot_raster_filter;
+typedef enum {
+  UPLOT_AXIS_NUMERIC = 0,
+  UPLOT_AXIS_UTC_DATETIME = 1,
+  UPLOT_AXIS_DURATION = 2
+} uplot_axis_labels;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -103,6 +108,10 @@ int uplot_add_points_configured(uplot_plot *, const double *, const double *,
                                 size_t, const char *color, float radius,
                                 int shape, int missing_policy);
 int uplot_set_title(uplot_plot *, const char *title);
+/* Temporal values remain numeric seconds. UTC means POSIX seconds since the
+ * Unix epoch; duration means signed elapsed seconds. */
+int uplot_set_x_axis_labels(uplot_plot *, int labels, int reversed);
+int uplot_set_y_axis_labels(uplot_plot *, int labels, int reversed);
 int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
                           const char *label);
 int uplot_clear_secondary_y(uplot_plot *);

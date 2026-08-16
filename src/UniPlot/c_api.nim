@@ -513,6 +513,33 @@ proc uplot_set_title*(value: pointer; title: cstring): cint {.
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc setAxisLabels(value: pointer; labels, reversed: cint;
+    xAxis: bool): cint =
+  if value.isNil or labels < cint(low(AxisLabelKind).ord) or
+      labels > cint(high(AxisLabelKind).ord) or reversed notin [0.cint, 1.cint]:
+    return UPLOT_ERR_ARGUMENT
+  let hnd = handle(value)
+  let direction = reversed == 1
+  case AxisLabelKind(labels)
+  of alkNumeric:
+    if xAxis: hnd.spec.scaleX(skLinear, direction)
+    else: hnd.spec.scaleY(skLinear, direction)
+  of alkUtcDateTime:
+    if xAxis: hnd.spec.scaleXUtc(direction)
+    else: hnd.spec.scaleYUtc(direction)
+  of alkDuration:
+    if xAxis: hnd.spec.scaleXDuration(direction)
+    else: hnd.spec.scaleYDuration(direction)
+  UPLOT_OK
+
+proc uplot_set_x_axis_labels*(value: pointer; labels, reversed: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  setAxisLabels(value, labels, reversed, true)
+
+proc uplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  setAxisLabels(value, labels, reversed, false)
+
 proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
     label: cstring): cint {.exportc, dynlib, cdecl.} =
   if value.isNil or label.isNil or not scale.isFinite or scale == 0 or
