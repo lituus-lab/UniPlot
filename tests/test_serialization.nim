@@ -81,6 +81,25 @@ suite "PlotSpec JSON schema":
     check encoded["yScale"]["secondary"]["scale"].getFloat == 1.8
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "temporal label kinds round trip as additive scale semantics":
+    var spec = completeSpec()
+    spec.scaleXUtc(reversed = true)
+    spec.scaleYDuration()
+    let encoded = spec.toJsonNode
+    check encoded["xScale"]["labelKind"].getStr == "alkUtcDateTime"
+    check encoded["yScale"]["labelKind"].getStr == "alkDuration"
+    let restored = fromJsonNode(encoded)
+    check restored.xScaleSpec.labelKind == alkUtcDateTime
+    check restored.yScaleSpec.labelKind == alkDuration
+    check restored.toJsonNode == encoded
+
+    var numeric = completeSpec()
+    numeric.scaleX()
+    check not numeric.toJsonNode["xScale"].hasKey("labelKind")
+    var invalid = encoded
+    invalid["xScale"]["kind"] = %"skLog10"
+    expect PlotError: discard fromJsonNode(invalid).compileScene()
+
   test "annotations round trip without changing unannotated schema-v1":
     var spec = completeSpec()
     check not spec.toJsonNode.hasKey("annotations")
