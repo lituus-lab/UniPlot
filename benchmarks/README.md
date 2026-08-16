@@ -376,6 +376,19 @@ resident submission 0.0922 ms and publication 3.0702 ms. The upload mean is
 directions; this small run does not isolate a statistically reliable policy
 cost. Driver-private memory is unavailable and excluded from the byte sum.
 
+The streaming-ring benchmark compares bursts of exactly three direct rectangle
+submissions. Before every timed burst, each backend is explicitly drained;
+drain time is excluded. A one-slot backend must synchronize the first two
+submissions before its slot can be reused, while a three-slot backend enqueues
+the whole burst without reuse. Across three 50-iteration processes, the
+one-slot burst averaged 3.1346 ms and the three-slot burst 0.0987 ms, a measured
+96.85% reduction in CPU-side burst enqueue time. This is not a frame-rate,
+GPU-execution or sustained-throughput speedup: completion is deliberately
+outside the timed boundary, both paths still upload the same geometry, and a
+producer that outruns all three slots must synchronize on later reuse. The
+harness verifies 106 exact slot synchronizations per one-slot process and zero
+inside the drained three-slot bursts.
+
 The optional fourth argument compares the current means with a baseline only
 after adapter, backend, workload, canvas and residency semantics match. Each
 phase carries its own ratio derived from repeated runs, because asynchronous

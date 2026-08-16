@@ -72,7 +72,7 @@ Vertex and index transfers are issued in aligned chunks no larger than 4 MiB
 by default. Pass `uploadChunkBytes` to choose a multiple of four bytes from 4
 bytes through 64 MiB. `WgpuDiagnostics` reports queue-write calls, exact bytes
 submitted and the largest individual write. This is a per-call transfer bound;
-it is not a ring buffer or a bound on total backend memory.
+it is independent of resource residency.
 
 `managedGpuByteBudget` defaults to 512 MiB and must be at least as large as the
 prepared-cache budget. UniPlot accounts allocated prepared and direct buffer
@@ -81,6 +81,14 @@ Resource growth first evicts unprotected LRU entries and otherwise fails before
 allocation. Current, component and peak values are available in diagnostics.
 This is a hard bound for those UniPlot-managed quantities, not a measurement of
 opaque driver padding, metadata, command storage or internal allocations.
+
+Direct mesh submissions rotate through three streaming slots by default;
+`streamingRingCapacity` accepts one through eight. UniPlot submits through
+wgpu-native's indexed-submission extension, stores the returned index on the
+owning slot and calls `wgpuDevicePoll` for that exact submission before reuse.
+Readback completion and `waitWgpuIdle` clear completed ownership explicitly.
+Diagnostics expose allocated slots, rotations and synchronization calls. A
+synchronization count is not a measured stall duration.
 
 ## Typed failures
 

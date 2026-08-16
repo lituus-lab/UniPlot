@@ -141,6 +141,13 @@ Queue uploads are split into aligned writes of at most 4 MiB by default.
 64 MiB; diagnostics expose the call count, transferred bytes and largest
 write. This bounds each native queue write; it is independent of the managed
 resource-capacity budget.
+Direct `submitWgpuMeshTarget` uploads rotate through three streaming slots by
+default (configurable from one through eight). Each slot retains the exact
+submission index returned by wgpu-native and is reused only after
+`wgpuDevicePoll` has synchronized that submission. Readback completion and
+`waitWgpuIdle` release completed slots explicitly. Ring capacity is included
+in the managed byte budget, and diagnostics distinguish selections from
+synchronization calls; they do not infer how long a fence blocked.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
 prepare on each call. `nimble wgpuBenchmark` measures preparation,
 forced LRU misses, alternating resident submission and publication separately.
