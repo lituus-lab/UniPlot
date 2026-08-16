@@ -198,6 +198,29 @@ def test_explicit_break_histograms_render_and_validate_empty_plot_contract():
     with pytest.raises(ValueError):
         uniplot.Plot().histogram([1], [0, 0])
 
+
+def test_automatic_histogram_rules_render_and_validate_contracts():
+    plot = uniplot.Plot().automatic_histogram(
+        [0, 0.5, 1, 2, 3, float("nan")],
+        uniplot.HISTOGRAM_FREEDMAN_DIACONIS, density=True)
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        plot.automatic_histogram([1, 2], uniplot.HISTOGRAM_STURGES)
+    with pytest.raises(ValueError):
+        uniplot.Plot().automatic_histogram([], uniplot.HISTOGRAM_AUTO)
+    with pytest.raises(ValueError):
+        uniplot.Plot().automatic_histogram([1, 2], -1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().automatic_histogram([float("nan"), float("inf")])
+    configured = uniplot.Plot().title("keep")
+    with pytest.raises(ValueError):
+        configured.automatic_histogram([1, 2], uniplot.HISTOGRAM_AUTO)
+    raster = uniplot.Plot().raster(
+        bytes([31, 127, 223, 255]), 1, 1, 4, 0, 1, 0, 1,
+        uniplot.RASTER_NEAREST)
+    with pytest.raises(ValueError):
+        raster.automatic_histogram([1, 2], uniplot.HISTOGRAM_AUTO)
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
