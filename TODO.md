@@ -123,8 +123,11 @@ than introducing competing geometry or text implementations.
   identity remains in the broader item above.
 - [x] Split vertex/index queue uploads into configurable aligned byte-bounded
   writes, with exact call/byte diagnostics and pixel-identity tests.
-- [ ] Add rotating/ring streaming buffers and a total backend memory policy;
-  the prepared-cache and per-write bounds do not cover target/readback storage.
+- [x] Enforce a total configurable bound over UniPlot-managed prepared/direct
+  buffer capacities, readback capacity and logical RGBA8 target bytes, with
+  component/high-water diagnostics and LRU pressure tests. Opaque driver
+  allocations remain explicitly outside this accounting boundary.
+- [ ] Add rotating/ring streaming buffers with submission-lifetime tracking.
 - [ ] Level-of-detail, decimation and visibility culling for large series.
 - [ ] Instanced points, lines and rectangles; indirect draws where supported.
 - [ ] Timestamp-query instrumentation with wall-clock fallback.
