@@ -8,6 +8,15 @@
 #ifndef TEST_FONT
 #define TEST_FONT "../DejaVuSans.ttf"
 #endif
+static int contains_bytes(const uint8_t *haystack, size_t haystack_len,
+                          const char *needle) {
+  const size_t needle_len = strlen(needle);
+  if (needle_len > haystack_len) return 0;
+  for (size_t i = 0; i <= haystack_len - needle_len; ++i) {
+    if (memcmp(haystack + i, needle, needle_len) == 0) return 1;
+  }
+  return 0;
+}
 int main(void) {
   const double x[] = {0.0, 1.0, 2.0}, y[] = {1.0, 3.0, 2.0};
   uint8_t *svg = NULL, *png = NULL;
@@ -38,6 +47,36 @@ int main(void) {
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", -1.0f) ==
          UPLOT_ERR_ARGUMENT);
   assert(uplot_add_line(plot, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
+  uint8_t raster_pixels[] = {255, 0, 0, 255, 0, 0, 255, 128};
+  assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 2, 1, 4,
+                          0.0, 2.0, 1.0, 3.0,
+                          UPLOT_RASTER_NEAREST) == UPLOT_OK);
+  raster_pixels[0] = 0; /* The plot owns a copy. */
+  uint8_t *raster_json = NULL;
+  size_t raster_json_len = 0;
+  assert(uplot_plot_to_json(plot, &raster_json, &raster_json_len) == UPLOT_OK);
+  assert(contains_bytes(raster_json, raster_json_len, "/wAA/wAA/4A="));
+  uplot_buffer_free(raster_json, raster_json_len);
+  assert(uplot_add_raster(plot, raster_pixels, 7, 2, 1, 4, 0.0, 2.0, 1.0,
+                          3.0, UPLOT_RASTER_NEAREST) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(NULL, raster_pixels, sizeof(raster_pixels), 2, 1, 4,
+                          0.0, 2.0, 1.0, 3.0,
+                          UPLOT_RASTER_NEAREST) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(plot, NULL, sizeof(raster_pixels), 2, 1, 4, 0.0,
+                          2.0, 1.0, 3.0, UPLOT_RASTER_NEAREST) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 0, 1, 4,
+                          0.0, 2.0, 1.0, 3.0,
+                          UPLOT_RASTER_NEAREST) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 2, 1, 2,
+                          0.0, 2.0, 1.0, 3.0,
+                          UPLOT_RASTER_NEAREST) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 2, 1, 4,
+                          NAN, 2.0, 1.0, 3.0,
+                          UPLOT_RASTER_NEAREST) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 2, 1, 4,
+                          0.0, 2.0, 1.0, 3.0, 99) == UPLOT_ERR_ARGUMENT);
   const double gap_y[] = {1.0, NAN, 2.0};
   assert(uplot_add_line(plot, x, gap_y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
@@ -138,6 +177,17 @@ int main(void) {
   assert(uplot_plot_from_json(NULL, 0, 320, 240) == NULL);
   assert(uplot_plot_from_json((const uint8_t *)json_source,
                               strlen(json_source), 320, 240) == NULL);
+  uplot_plot *status_plot = (uplot_plot *)1;
+  assert(uplot_plot_from_json_status(NULL, 0, 320, 240, &status_plot) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(status_plot == NULL);
+  assert(uplot_plot_from_json_status((const uint8_t *)json_source,
+                                     strlen(json_source), 320, 240,
+                                     &status_plot) == UPLOT_ERR_ARGUMENT);
+  assert(status_plot == NULL);
+  assert(uplot_plot_from_json_status((const uint8_t *)json_source,
+                                     strlen(json_source), 320, 240,
+                                     NULL) == UPLOT_ERR_ARGUMENT);
 
   plot = uplot_plot_new(320, 240);
   assert(plot != NULL);
@@ -147,7 +197,9 @@ int main(void) {
   assert(uplot_plot_to_json(NULL, &json, &json_len) == UPLOT_ERR_ARGUMENT);
   assert(uplot_plot_to_json(plot, &json, &json_len) == UPLOT_OK);
   assert(json != NULL && json_len > 0);
-  uplot_plot *restored = uplot_plot_from_json(json, json_len, 320, 240);
+  uplot_plot *restored = NULL;
+  assert(uplot_plot_from_json_status(json, json_len, 320, 240, &restored) ==
+         UPLOT_OK);
   assert(restored != NULL);
   uint8_t *roundtrip = NULL;
   size_t roundtrip_len = 0;
