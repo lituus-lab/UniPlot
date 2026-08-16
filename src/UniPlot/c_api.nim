@@ -18,6 +18,23 @@ type PlotHandle = ref object
   size: Size
   nextColumn: int
 
+proc isBlankRecipeTarget(spec: PlotSpec): bool =
+  let blank = plot(initDataFrame())
+  spec.data.order.len == 0 and spec.data.rowCount == 0 and
+    spec.layers.len == 0 and
+    spec.title.len == 0 and spec.xLabel.len == 0 and spec.yLabel.len == 0 and
+    spec.theme == blank.theme and
+    spec.legendSpec == blank.legendSpec and
+    spec.categoricalColors == blank.categoricalColors and
+    spec.continuousColors == blank.continuousColors and
+    spec.mappedSizeRange == blank.mappedSizeRange and
+    spec.mappedAlphaRange == blank.mappedAlphaRange and
+    spec.xScaleSpec == blank.xScaleSpec and
+    spec.yScaleSpec == blank.yScaleSpec and
+    spec.secondaryYSpec == blank.secondaryYSpec and
+    spec.references.len == 0 and spec.annotations.len == 0 and
+    spec.rasters.len == 0 and spec.imageResources.len == 0
+
 var initLock: Lock
 var runtimeStarted = false
 initLock(initLock)
@@ -350,6 +367,33 @@ proc uplot_add_numeric_histogram*(value: pointer; values: ptr float64;
   if density notin [cint(0), cint(1)]: return UPLOT_ERR_ARGUMENT
   addHistogram(value, values, valueCount, breaks, breakCount, color,
     numeric = true, density = density == 1)
+
+proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
+    valueCount: csize_t; rule, density: cint; color: cstring): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or values.isNil or valueCount == 0 or
+      valueCount > csize_t(high(int)) or color.isNil or
+      rule < cint(low(HistogramRule).ord) or
+      rule > cint(high(HistogramRule).ord) or
+      density notin [cint(0), cint(1)]:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let inputValues = cast[ptr UncheckedArray[float64]](values)
+    var copiedValues = newSeqUninit[float64](int(valueCount))
+    for index in 0 ..< copiedValues.len:
+      copiedValues[index] = inputValues[index]
+    let candidate = histogramPlot(copiedValues, HistogramRule(rule),
+      density == 1, $color)
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
 
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;

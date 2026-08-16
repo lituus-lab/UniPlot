@@ -49,6 +49,14 @@ typedef enum {
   UPLOT_AXIS_UTC_DATETIME = 1,
   UPLOT_AXIS_DURATION = 2
 } uplot_axis_labels;
+typedef enum {
+  UPLOT_HISTOGRAM_AUTO = 0,
+  UPLOT_HISTOGRAM_SQUARE_ROOT = 1,
+  UPLOT_HISTOGRAM_STURGES = 2,
+  UPLOT_HISTOGRAM_RICE = 3,
+  UPLOT_HISTOGRAM_SCOTT = 4,
+  UPLOT_HISTOGRAM_FREEDMAN_DIACONIS = 5
+} uplot_histogram_rule;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -85,6 +93,9 @@ int uplot_add_numeric_histogram(uplot_plot *, const double *values,
                                 size_t value_count, const double *breaks,
                                 size_t break_count, int density,
                                 const char *color);
+int uplot_add_automatic_histogram(uplot_plot *, const double *values,
+                                  size_t value_count, int rule, int density,
+                                  const char *color);
 int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
                                 const double *values, size_t count,
                                 int aggregation, const char *color);
