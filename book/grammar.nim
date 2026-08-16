@@ -19,6 +19,7 @@ nbCode:
   import UniPlot
   import UniGlyph
   import UniColor
+  import UniImage/core as uimg
 
   let font = loadTtf("../../tests/DejaVuSans.ttf")
 
@@ -84,6 +85,38 @@ nbCode:
 
 nbRawHtml svgFigure(layeredSvg,
   "Four geometries share numeric scales; geomBar appears in the recipe gallery.")
+
+nbText: """
+## Retained raster layers
+
+`raster` places a Gray, RGB or straight-alpha RGBA8 `UniImage` in numeric data
+coordinates. UniPlot snapshots the pixels, trains both axes on the requested
+extent and renders the image behind grid lines and vector marks. `RasterNearest`
+preserves pixel cells; `RasterBilinear` and `RasterBox` use UniImage's
+alpha-correct premultiplied filtering. The same retained image reaches CPU,
+SVG and WGPU renderers. Reversed linear axes mirror the pixels with the data
+coordinates. Nonlinear axes are rejected until an explicit raster-warp
+primitive is available, avoiding a silently incorrect uniform resize.
+"""
+
+nbCode:
+  var rasterImage = uimg.newImage[uint8](4, 3, uimg.csRgba)
+  for y in 0 ..< rasterImage.height:
+    for x in 0 ..< rasterImage.width:
+      let offset = (y * rasterImage.width + x) * 4
+      rasterImage.data[offset] = uint8(40 + x * 55)
+      rasterImage.data[offset + 1] = uint8(45 + y * 75)
+      rasterImage.data[offset + 2] = uint8(220 - x * 35)
+      rasterImage.data[offset + 3] = uint8(100 + (x + y) * 25)
+  var rasterPlot = plot(initDataFrame())
+  rasterPlot.raster(rasterImage, 0.0, 4.0, 0.0, 3.0, RasterNearest)
+  rasterPlot.labels(title = "Retained RGBA raster", x = "x", y = "y")
+  let rasterPng = rasterPlot.compileScene(
+    Size(width: 640, height: 400)).encodePng(font)
+
+nbRawHtml pngFigure(pngDataUri(rasterPng),
+  "A raster-only PlotSpec rendered to an embedded PNG.",
+  "RGBA raster layer rendered by UniPlot")
 
 nbText: """
 Layer order is rendering order. A zero line width or point radius selects the

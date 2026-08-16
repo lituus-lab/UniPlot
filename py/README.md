@@ -26,6 +26,11 @@ are rendered by the same UniVector geometry as the Nim API.
 `MISSING_BREAK`, `MISSING_DROP` and `MISSING_REJECT` select explicit handling
 for `NaN` and infinite mapped values. Lines break by default; points drop them.
 
+Packed UniImage-compatible rasters use `Plot.raster`. The binding copies the
+buffer and accepts 1-channel Gray, 3-channel RGB or 4-channel straight-alpha
+RGBA8 pixels. `RASTER_NEAREST`, `RASTER_BILINEAR` and `RASTER_BOX` select the
+same alpha-correct filters as the Nim API.
+
 `Plot.to_json()` exports the complete versioned Nim `PlotSpec`; `Plot.from_json`
 restores it with explicit output dimensions. This bridge preserves features
 that do not yet have individual Python builder methods without maintaining a

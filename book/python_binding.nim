@@ -126,8 +126,10 @@ The sdist carries the Nim sources needed to rebuild it, but excludes prebuilt
 native binaries. Linux, macOS and Windows wheels use their platform loader and
 ABI conventions.
 
-The direct Python builders intentionally expose the stable styled line/point
-subset. The JSON bridge gives Python lossless transport of every valid Nim
+`Plot.raster(pixels, width, height, channels, x_min, x_max, y_min, y_max)`
+copies packed Gray/RGB/RGBA8 bytes into the retained plot. The `RASTER_*`
+constants select nearest, bilinear or box filtering. The JSON bridge gives
+Python lossless transport of every valid Nim
 grammar feature without reimplementing its validation or rendering semantics
 in Cython. More ergonomic builders can grow additively over that foundation.
 

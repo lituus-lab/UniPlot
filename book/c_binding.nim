@@ -142,11 +142,12 @@ int main(void) {
 compatibility. `UNIPLOT_ABI_VERSION` is 1. Adding functions may preserve this
 version; changing an existing signature or ownership rule may not.
 
-The direct C builders deliberately remain narrower than the Nim grammar: line
-and point series, categorical facet columns, their UniVector styles and titles are the stable 1.0
-construction primitives. The versioned JSON bridge transports the complete
+The direct C builders include numeric/categorical plots and retained rasters.
+`uplot_add_raster` copies a caller-owned packed Gray/RGB/RGBA8 buffer and
+positions it with numeric extents; `UPLOT_RASTER_NEAREST`, `BILINEAR` and `BOX`
+select UniImage filtering. The versioned JSON bridge transports the complete
 valid Nim `PlotSpec`, including layers, mappings, references, scales, themes
-and palettes, without duplicating the grammar in C. The original solid-line
+palettes and rasters, without duplicating the grammar in C. The original solid-line
 and circle-point functions remain ABI-compatible convenience entry points.
 
 Next: [Python binding](python_binding.html).

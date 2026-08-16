@@ -28,17 +28,21 @@ nbCode:
 
   var pathNodes = 0
   var textNodes = 0
+  var imageNodes = 0
   var semanticIds: seq[uint64]
   for node in scene.nodes:
     case node.kind
     of snPath: inc pathNodes
     of snText: inc textNodes
+    of snImage: inc imageNodes
     if node.id != 0: semanticIds.add node.id
-  echo "paths: ", pathNodes, ", text: ", textNodes
+  echo "paths: ", pathNodes, ", text: ", textNodes,
+    ", images: ", imageNodes
   echo "stable mark ids: ", semanticIds
 
 nbText: """
-`SceneNodeKind` distinguishes `snPath` and `snText`. Non-zero IDs identify data
+`SceneNodeKind` distinguishes `snPath`, `snText` and retained `snImage` nodes.
+Non-zero IDs identify data
 marks and survive into SVG as `data-uplot-id`, providing a future picking key.
 Text nodes also retain `textStart`, `textMiddle` or `textEnd` anchoring.
 The renderer resolves the anchor from UniGlyph's shaped advance, so CPU, SVG
