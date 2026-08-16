@@ -56,15 +56,28 @@ proc main() =
       result.addImageResource("resource-" & $index, resource)
     result.geomImage(aes("", "", xMin = "left", xMax = "right",
       yMin = "bottom", yMax = "top", image = "resource"), RasterBilinear)
+  var temporalX, temporalY: seq[float64]
+  for point in 0 ..< 1_000:
+    temporalX.add 1_704_067_200.0 + float64(point * 60)
+    temporalY.add float64((point * 37) mod 7_200)
+  proc makeTemporalSpec(): PlotSpec =
+    result = linePlot(temporalX, temporalY, color = "#2457c5")
+    result.scaleXUtc()
+    result.scaleYDuration()
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
     let warmMarks = makeImageMarkSpec().compileScene(
       Size(width: 800, height: 600))
     discard warmMarks.renderImage(font)
+    let warmTemporal = makeTemporalSpec().compileScene(
+      Size(width: 800, height: 600))
+    discard warmTemporal.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
+  var temporalConstructionStats, temporalCompileStats,
+    temporalPublicationStats: RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
     var started = getMonoTime()
@@ -88,17 +101,32 @@ proc main() =
     markPublicationStats.push elapsedMs(started)
     guard = guard xor int(markPixels.data[
       (iteration * 1597) mod markPixels.data.len])
+    started = getMonoTime()
+    let temporalSpec = makeTemporalSpec()
+    temporalConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let temporalScene = temporalSpec.compileScene(Size(width: 800, height: 600))
+    temporalCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let temporalPixels = temporalScene.renderImage(font)
+    temporalPublicationStats.push elapsedMs(started)
+    guard = guard xor int(temporalPixels.data[
+      (iteration * 1999) mod temporalPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
     "image_mark_count": 64, "image_resource_count": resources.len,
-    "semantics": "PlotSpec construction plus snapshot; compile includes alpha-correct resize; publication includes CPU render",
+    "temporal_point_count": temporalX.len,
+    "semantics": "PlotSpec construction; raster snapshots and temporal labels compile through retained scenes; publication includes CPU render",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
     "publication_mean_ms": publicationStats.mean,
     "image_mark_construction_mean_ms": markConstructionStats.mean,
     "image_mark_compile_mean_ms": markCompileStats.mean,
     "image_mark_publication_mean_ms": markPublicationStats.mean,
+    "temporal_construction_mean_ms": temporalConstructionStats.mean,
+    "temporal_compile_mean_ms": temporalCompileStats.mean,
+    "temporal_publication_mean_ms": temporalPublicationStats.mean,
     "guard": guard})
 
 main()
