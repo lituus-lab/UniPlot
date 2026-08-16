@@ -356,6 +356,53 @@ int main(void) {
   assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
   uplot_buffer_free(svg, svg_len);
   uplot_plot_free(numeric_histogram);
+  uplot_plot *automatic_histogram = uplot_plot_new(320, 240);
+  assert(automatic_histogram != NULL);
+  assert(uplot_add_automatic_histogram(
+           automatic_histogram, histogram_values, 7,
+           UPLOT_HISTOGRAM_FREEDMAN_DIACONIS, 1, "#267a5e") == UPLOT_OK);
+  assert(uplot_render_svg(automatic_histogram, TEST_FONT, &svg, &svg_len) ==
+         UPLOT_OK);
+  assert(svg_len > 100);
+  uplot_buffer_free(svg, svg_len);
+  uplot_plot_free(automatic_histogram);
+
+  uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
+  assert(invalid_automatic != NULL);
+  assert(uplot_add_automatic_histogram(
+           invalid_automatic, histogram_values, 7, -1, 0, "#267a5e") ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_automatic_histogram(
+           invalid_automatic, histogram_values, 7,
+           UPLOT_HISTOGRAM_AUTO, 2, "#267a5e") == UPLOT_ERR_ARGUMENT);
+  const double nonfinite_histogram[] = {NAN, INFINITY};
+  assert(uplot_add_automatic_histogram(
+           invalid_automatic, nonfinite_histogram, 2,
+           UPLOT_HISTOGRAM_AUTO, 0, "#267a5e") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_automatic_histogram(
+           invalid_automatic, NULL, 7, UPLOT_HISTOGRAM_AUTO, 0,
+           "#267a5e") == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_automatic_histogram(
+           NULL, histogram_values, 7, UPLOT_HISTOGRAM_AUTO, 0,
+           "#267a5e") == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(invalid_automatic);
+  uplot_plot *configured_automatic = uplot_plot_new(320, 240);
+  assert(configured_automatic != NULL);
+  assert(uplot_set_title(configured_automatic, "keep") == UPLOT_OK);
+  assert(uplot_add_automatic_histogram(
+           configured_automatic, histogram_values, 7,
+           UPLOT_HISTOGRAM_AUTO, 0, "#267a5e") == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(configured_automatic);
+  uplot_plot *raster_automatic = uplot_plot_new(320, 240);
+  assert(raster_automatic != NULL);
+  const uint8_t recipe_raster[] = {31, 127, 223, 255};
+  assert(uplot_add_raster(raster_automatic, recipe_raster,
+                          sizeof(recipe_raster), 1, 1, 4, 0.0, 1.0, 0.0,
+                          1.0, UPLOT_RASTER_NEAREST) == UPLOT_OK);
+  assert(uplot_add_automatic_histogram(
+           raster_automatic, histogram_values, 7,
+           UPLOT_HISTOGRAM_AUTO, 0, "#267a5e") == UPLOT_ERR_ARGUMENT);
+  uplot_plot_free(raster_automatic);
   uplot_plot *invalid_numeric_histogram = uplot_plot_new(320, 240);
   assert(invalid_numeric_histogram != NULL);
   assert(uplot_add_numeric_histogram(
