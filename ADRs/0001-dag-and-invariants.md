@@ -9,8 +9,9 @@
 ## Decision
 
 UniPlot consumes only lower-level engines: UniMath, UniLinalg, UniColor,
-UniImage, UniVector and UniGlyph. It imports no domain engine. Adapters for
-UniGeom, UniGraph, UniMusic or application data live with those consumers.
+UniImage, UniVector, UniGlyph and UniCrypto. It imports no domain engine.
+Adapters for UniGeom, UniGraph, UniMusic or application data live with those
+consumers.
 
 ## Internal order
 
@@ -29,3 +30,4 @@ they cannot train scales, run statistics or mutate plot specifications.
 4. UniVector owns vector paths and CPU rasterisation.
 5. UniImage owns pixel storage and image encoding.
 6. WGPU is optional runtime infrastructure and never a core dependency.
+7. UniCrypto owns stable digests; UniPlot does not implement hashing.

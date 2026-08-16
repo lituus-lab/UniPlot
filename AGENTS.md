@@ -14,8 +14,8 @@ same scene and must never enter the default import graph.
 common < data < scales < stats < grammar < scene < guides < render < c_api
 ```
 
-Allowed engines are UniMath, UniLinalg, UniColor, UniImage, UniVector and
-UniGlyph. Domain engines are forbidden dependencies.
+Allowed engines are UniMath, UniLinalg, UniColor, UniImage, UniVector,
+UniGlyph and UniCrypto. Domain engines are forbidden dependencies.
 
 ## Build and gates
 

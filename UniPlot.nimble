@@ -17,6 +17,7 @@ requires "https://github.com/lituus-lab/UniColor#main"
 requires "https://github.com/lituus-lab/UniImage#main"
 requires "https://github.com/lituus-lab/UniVector#main"
 requires "https://github.com/lituus-lab/UniGlyph#main"
+requires "https://github.com/lituus-lab/UniCrypto#main"
 
 # Book-only dependencies, pinned to the compatible upstream releases used by
 # UniGraph. They never enter the library core dependency graph.
