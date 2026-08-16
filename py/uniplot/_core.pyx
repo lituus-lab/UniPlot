@@ -54,6 +54,8 @@ cdef extern from "UniPlot.h":
                                     const double *, size_t, const char *,
                                     float, int, int)
     int uplot_set_title(uplot_plot *, const char *)
+    int uplot_set_x_axis_labels(uplot_plot *, int, int)
+    int uplot_set_y_axis_labels(uplot_plot *, int, int)
     int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
     int uplot_clear_secondary_y(uplot_plot *)
     int uplot_annotate_text(uplot_plot *, double, double, const char *,
@@ -112,6 +114,9 @@ AGG_MAXIMUM = 4
 RASTER_NEAREST = 0
 RASTER_BILINEAR = 1
 RASTER_BOX = 2
+AXIS_NUMERIC = 0
+AXIS_UTC_DATETIME = 1
+AXIS_DURATION = 2
 
 cdef class Plot:
     cdef uplot_plot *_handle
@@ -421,6 +426,28 @@ cdef class Plot:
         cdef bytes encoded = str(value).encode("utf-8")
         if uplot_set_title(self._handle, encoded) != 0: raise ValueError("invalid title")
         return self
+
+    def x_axis_labels(self, int labels=AXIS_NUMERIC, bint reversed=False):
+        if uplot_set_x_axis_labels(self._handle, labels, int(reversed)) != 0:
+            raise ValueError("invalid x axis label semantics")
+        return self
+
+    def y_axis_labels(self, int labels=AXIS_NUMERIC, bint reversed=False):
+        if uplot_set_y_axis_labels(self._handle, labels, int(reversed)) != 0:
+            raise ValueError("invalid y axis label semantics")
+        return self
+
+    def scale_x_utc(self, bint reversed=False):
+        return self.x_axis_labels(AXIS_UTC_DATETIME, reversed)
+
+    def scale_y_utc(self, bint reversed=False):
+        return self.y_axis_labels(AXIS_UTC_DATETIME, reversed)
+
+    def scale_x_duration(self, bint reversed=False):
+        return self.x_axis_labels(AXIS_DURATION, reversed)
+
+    def scale_y_duration(self, bint reversed=False):
+        return self.y_axis_labels(AXIS_DURATION, reversed)
 
     def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
         cdef bytes encoded = str(label).encode("utf-8")
