@@ -7,15 +7,16 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 14:
+    if len(sys.argv) != 16:
         raise SystemExit(
             "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
             "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png "
-            "NUMHEAT.svg NUMHEAT.png")
+            "NUMHEAT.svg NUMHEAT.png IMAGE.svg IMAGE.png")
     (font, svg_path, png_path, box_svg_path, box_png_path,
      heat_svg_path, heat_png_path, histogram_svg_path,
      histogram_png_path, grouped_svg_path, grouped_png_path,
-     numeric_heat_svg_path, numeric_heat_png_path) = map(
+     numeric_heat_svg_path, numeric_heat_png_path, image_svg_path,
+     image_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -80,6 +81,15 @@ def main() -> int:
                        .title("Python numeric cell grid"))
     numeric_heat_svg_path.write_bytes(numeric_heatmap.svg(font))
     numeric_heat_png_path.write_bytes(numeric_heatmap.png(font))
+    pixels = bytes([
+        45, 120, 220, 255, 85, 210, 220, 220,
+        35, 65, 155, 220, 170, 235, 245, 255])
+    image_plot = (uniplot.Plot(760, 440)
+                  .image(pixels, 2, 2, 4, 0.5, 2.5, 0.5, 2.5,
+                         uniplot.RASTER_NEAREST)
+                  .title("Python data-mapped image mark"))
+    image_svg_path.write_bytes(image_plot.svg(font))
+    image_png_path.write_bytes(image_plot.png(font))
     return 0
 
 

@@ -65,7 +65,9 @@ task bindingBookDemos, "Regenerate book plots through the C and Python bindings"
        " book/assets/generated/c_grouped.svg" &
        " book/assets/generated/c_grouped.png" &
        " book/assets/generated/c_numeric_heatmap.svg" &
-       " book/assets/generated/c_numeric_heatmap.png"
+       " book/assets/generated/c_numeric_heatmap.png" &
+       " book/assets/generated/c_image_mark.svg" &
+       " book/assets/generated/c_image_mark.png"
   exec "nimble buildCython"
   withDir "py":
     exec "python3 -m examples.book_demo ../tests/DejaVuSans.ttf" &
@@ -80,7 +82,9 @@ task bindingBookDemos, "Regenerate book plots through the C and Python bindings"
          " ../book/assets/generated/python_grouped.svg" &
          " ../book/assets/generated/python_grouped.png" &
          " ../book/assets/generated/python_numeric_heatmap.svg" &
-         " ../book/assets/generated/python_numeric_heatmap.png"
+         " ../book/assets/generated/python_numeric_heatmap.png" &
+         " ../book/assets/generated/python_image_mark.svg" &
+         " ../book/assets/generated/python_image_mark.png"
 
 task docs, "API reference + book into pages/ — what CI publishes":
   rmDir "pages"

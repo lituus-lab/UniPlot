@@ -13,10 +13,11 @@ static int write_bytes(const char *path, const uint8_t *data, size_t length) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 14) {
+  if (argc != 16) {
     fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg "
                     "BOX.png HEAT.svg HEAT.png HIST.svg HIST.png "
-                    "GROUPED.svg GROUPED.png NUMHEAT.svg NUMHEAT.png\n");
+                    "GROUPED.svg GROUPED.png NUMHEAT.svg NUMHEAT.png "
+                    "IMAGE.svg IMAGE.png\n");
     return EXIT_FAILURE;
   }
   const double x[] = {0, 1, 2, 3, 4, 5};
@@ -36,6 +37,8 @@ int main(int argc, char **argv) {
   uint8_t *grouped_png = NULL;
   uint8_t *numeric_heat_svg = NULL;
   uint8_t *numeric_heat_png = NULL;
+  uint8_t *image_svg = NULL;
+  uint8_t *image_png = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
   size_t json_length = 0;
@@ -49,10 +52,13 @@ int main(int argc, char **argv) {
   size_t grouped_png_length = 0;
   size_t numeric_heat_svg_length = 0;
   size_t numeric_heat_png_length = 0;
+  size_t image_svg_length = 0;
+  size_t image_png_length = 0;
   uplot_plot *heatmap = NULL;
   uplot_plot *histogram = NULL;
   uplot_plot *grouped = NULL;
   uplot_plot *numeric_heatmap = NULL;
+  uplot_plot *image_plot = NULL;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -170,6 +176,22 @@ int main(int argc, char **argv) {
       !write_bytes(argv[12], numeric_heat_svg, numeric_heat_svg_length) ||
       !write_bytes(argv[13], numeric_heat_png, numeric_heat_png_length))
     goto cleanup;
+  const uint8_t image_pixels[] = {
+      245, 100, 70, 255, 255, 190, 70, 220,
+      190, 45, 80, 220, 255, 235, 150, 255};
+  image_plot = uplot_plot_new(760, 440);
+  if (image_plot == NULL ||
+      uplot_add_image_mark(image_plot, image_pixels, sizeof(image_pixels),
+                           2, 2, 4, 0.5, 2.5, 0.5, 2.5,
+                           UPLOT_RASTER_NEAREST) != UPLOT_OK ||
+      uplot_set_title(image_plot, "C data-mapped image mark") != UPLOT_OK ||
+      uplot_render_svg(image_plot, argv[1], &image_svg,
+                       &image_svg_length) != UPLOT_OK ||
+      uplot_render_png(image_plot, argv[1], &image_png,
+                       &image_png_length) != UPLOT_OK ||
+      !write_bytes(argv[14], image_svg, image_svg_length) ||
+      !write_bytes(argv[15], image_png, image_png_length))
+    goto cleanup;
   result = EXIT_SUCCESS;
 
 cleanup:
@@ -186,10 +208,13 @@ cleanup:
   uplot_buffer_free(grouped_png, grouped_png_length);
   uplot_buffer_free(numeric_heat_svg, numeric_heat_svg_length);
   uplot_buffer_free(numeric_heat_png, numeric_heat_png_length);
+  uplot_buffer_free(image_svg, image_svg_length);
+  uplot_buffer_free(image_png, image_png_length);
   uplot_plot_free(heatmap);
   uplot_plot_free(histogram);
   uplot_plot_free(grouped);
   uplot_plot_free(numeric_heatmap);
+  uplot_plot_free(image_plot);
   uplot_plot_free(plot);
   return result;
 }
