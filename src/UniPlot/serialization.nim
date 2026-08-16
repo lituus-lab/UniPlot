@@ -196,6 +196,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
       "label": reference.label}
   var xScale = %*{"kind": $spec.xScaleSpec.kind,
     "reversed": spec.xScaleSpec.reversed}
+  if spec.xScaleSpec.labelKind != alkNumeric:
+    xScale["labelKind"] = %($spec.xScaleSpec.labelKind)
   if spec.xScaleSpec.domain.configured:
     xScale["domain"] = %*{"minimum": spec.xScaleSpec.domain.minimum,
       "maximum": spec.xScaleSpec.domain.maximum}
@@ -203,6 +205,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
     xScale["categories"] = %spec.xScaleSpec.categories.values
   var yScale = %*{"kind": $spec.yScaleSpec.kind,
     "reversed": spec.yScaleSpec.reversed}
+  if spec.yScaleSpec.labelKind != alkNumeric:
+    yScale["labelKind"] = %($spec.yScaleSpec.labelKind)
   if spec.yScaleSpec.domain.configured:
     yScale["domain"] = %*{"minimum": spec.yScaleSpec.domain.minimum,
       "maximum": spec.yScaleSpec.domain.maximum}
@@ -352,6 +356,8 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
   let xScale = root.field("xScale", JObject)
   result.xScaleSpec = AxisScaleSpec(kind: enumValue[ScaleKind](xScale, "kind"),
     reversed: xScale.field("reversed", JBool).getBool)
+  if xScale.hasKey("labelKind"):
+    result.xScaleSpec.labelKind = enumValue[AxisLabelKind](xScale, "labelKind")
   if xScale.hasKey("domain"):
     let domain = xScale.field("domain", JObject)
     result.xScaleSpec.domain = AxisDomainSpec(configured: true,
@@ -367,6 +373,8 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
   let yScale = root.field("yScale", JObject)
   result.yScaleSpec = AxisScaleSpec(kind: enumValue[ScaleKind](yScale, "kind"),
     reversed: yScale.field("reversed", JBool).getBool)
+  if yScale.hasKey("labelKind"):
+    result.yScaleSpec.labelKind = enumValue[AxisLabelKind](yScale, "labelKind")
   if yScale.hasKey("domain"):
     let domain = yScale.field("domain", JObject)
     result.yScaleSpec.domain = AxisDomainSpec(configured: true,
