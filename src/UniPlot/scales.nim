@@ -92,6 +92,25 @@ proc train*(domain: ContinuousDomain; rangeMin, rangeMax: float32;
       "explicit scale domain must contain every rendered value")
   continuousScale(domainMin, domainMax, rangeMin, rangeMax, domain.kind)
 
+proc interpolationRatio(value, first, last: float64): float64 =
+  let
+    numerator = value - first
+    span = last - first
+  if numerator.isFinite and span.isFinite:
+    result = numerator / span
+  else:
+    result = (value * 0.5 - first * 0.5) /
+      (last * 0.5 - first * 0.5)
+  if not result.isFinite:
+    raise newException(PlotError, "scale interpolation is not finite")
+
+proc interpolate(first, last, ratio: float64): float64 =
+  if ratio == 0: return first
+  if ratio == 1: return last
+  result = first * (1.0 - ratio) + last * ratio
+  if not result.isFinite:
+    raise newException(PlotError, "scale interpolation is not finite")
+
 proc map*(scale: ContinuousScale; value: float64): float32 =
   if not value.isFinite or (scale.kind == skLog10 and value <= 0):
     raise newException(PlotError, "value is outside the scale domain")
@@ -99,8 +118,11 @@ proc map*(scale: ContinuousScale; value: float64): float32 =
     a = if scale.kind == skLog10: log10(scale.domainMin) else: scale.domainMin
     b = if scale.kind == skLog10: log10(scale.domainMax) else: scale.domainMax
     v = if scale.kind == skLog10: log10(value) else: value
-    t = (v - a) / (b - a)
-  scale.rangeMin + float32(t) * (scale.rangeMax - scale.rangeMin)
+    t = interpolationRatio(v, a, b)
+    mapped = interpolate(float64(scale.rangeMin), float64(scale.rangeMax), t)
+  result = float32(mapped)
+  if not result.isFinite:
+    raise newException(PlotError, "mapped coordinate is not finite")
 
 proc trainContinuous*(values: openArray[float64]; rangeMin, rangeMax: float32;
     kind = skLinear): ContinuousScale =
@@ -113,7 +135,7 @@ proc ticks*(scale: ContinuousScale; count = 5): seq[float64] =
   for i in 0 ..< count:
     let t = float64(i) / float64(count - 1)
     let value = if scale.kind == skLinear:
-        scale.domainMin + t * (scale.domainMax - scale.domainMin)
+        interpolate(scale.domainMin, scale.domainMax, t)
       else:
         pow(10.0, log10(scale.domainMin) + t *
           (log10(scale.domainMax) - log10(scale.domainMin)))
