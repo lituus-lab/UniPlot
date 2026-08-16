@@ -199,6 +199,40 @@ suite "plot compilation":
     check abs((positions[0].x - positions[1].x) -
       (positions[1].x - positions[2].x)) < 0.01
 
+  test "temporal axes retain numeric geometry with semantic labels":
+    var frame = initDataFrame()
+    frame.addColumn("when", [1_704_067_200.0, 1_704_067_260.0])
+    frame.addColumn("elapsed", [-90.0, 3690.0])
+    var spec = plot(frame)
+    spec.geomLine(aes("when", "elapsed"))
+    spec.scaleXUtc()
+    spec.scaleYDuration(reversed = true)
+    let scene = spec.compileScene(Size(width: 480, height: 320))
+    let labels = scene.nodes.filterIt(it.kind == snText).mapIt(it.text)
+    check "2024-01-01 00:00:00" in labels
+    check "30:00" in labels
+    check not spec.xScaleSpec.reversed
+    check spec.yScaleSpec.reversed
+
+    var invalid = spec
+    invalid.xScaleSpec.kind = skLog10
+    expect PlotError: discard invalid.compileScene()
+    invalid = spec
+    invalid.xScaleSpec.domain = AxisDomainSpec(configured: true,
+      minimum: MinimumUtcSecond - 1, maximum: 1_704_067_260)
+    expect PlotError: discard invalid.compileScene()
+    invalid = spec
+    invalid.secondaryY()
+    expect PlotError: discard invalid.compileScene()
+
+    var categorical = initDataFrame()
+    categorical.addColumn("x", ["a", "b"])
+    categorical.addColumn("y", [1.0, 2.0])
+    var categoricalSpec = plot(categorical)
+    categoricalSpec.geomLine(aes("x", "y"))
+    categoricalSpec.scaleXUtc()
+    expect PlotError: discard categoricalSpec.compileScene()
+
   test "explicit numeric limits are strict and safe":
     var spec = sample()
     spec.xLimits(-1.0, 4.0)

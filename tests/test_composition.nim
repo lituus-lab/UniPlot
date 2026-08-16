@@ -130,6 +130,14 @@ suite "plot composition":
     clipped.xLimits(0.5, 2.0)
     expect PlotError:
       discard compileGrid([clipped, numeric], 2, sharedX = true)
+    var firstUtc = numeric
+    var secondUtc = numeric
+    firstUtc.scaleXUtc()
+    secondUtc.scaleXUtc()
+    check compileGrid([firstUtc, secondUtc], 2, sharedX = true).nodes.len > 0
+    secondUtc.scaleXDuration()
+    expect PlotError:
+      discard compileGrid([firstUtc, secondUtc], 2, sharedX = true)
 
   test "share categorical x domains in first-seen panel order":
     let
