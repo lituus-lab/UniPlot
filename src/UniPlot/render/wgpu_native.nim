@@ -109,6 +109,29 @@ type
     nextInChain: ptr WgpuChainedStruct
     label: WgpuStringView
 
+  WgpuSamplerDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+    addressModeU, addressModeV, addressModeW: uint32
+    magFilter, minFilter, mipmapFilter: uint32
+    lodMinClamp, lodMaxClamp: float32
+    compare: uint32
+    maxAnisotropy: uint16
+
+  WgpuBindGroupEntry {.bycopy.} = object
+    nextInChain: pointer
+    binding: uint32
+    buffer: pointer
+    offset, size: uint64
+    sampler, textureView: pointer
+
+  WgpuBindGroupDescriptor {.bycopy.} = object
+    nextInChain: pointer
+    label: WgpuStringView
+    layout: pointer
+    entryCount: csize_t
+    entries: ptr WgpuBindGroupEntry
+
   WgpuVertexAttribute {.bycopy.} = object
     nextInChain: pointer
     format: uint32
@@ -267,6 +290,21 @@ type
       offset, size: uint64) {.cdecl.}
   DrawIndexedProc = proc(renderPass: pointer; indexCount, instanceCount,
       firstIndex: uint32; baseVertex: int32; firstInstance: uint32) {.cdecl.}
+  DrawProc = proc(renderPass: pointer; vertexCount, instanceCount,
+      firstVertex, firstInstance: uint32) {.cdecl.}
+  CreateSamplerProc = proc(device: pointer;
+      descriptor: ptr WgpuSamplerDescriptor): pointer {.cdecl.}
+  GetBindGroupLayoutProc = proc(pipeline: pointer; index: uint32): pointer {.
+      cdecl.}
+  CreateBindGroupProc = proc(device: pointer;
+      descriptor: ptr WgpuBindGroupDescriptor): pointer {.cdecl.}
+  SetBindGroupProc = proc(renderPass: pointer; groupIndex: uint32;
+      bindGroup: pointer; dynamicOffsetCount: csize_t;
+      dynamicOffsets: ptr uint32) {.cdecl.}
+  WriteTextureProc = proc(queue: pointer;
+      destination: ptr WgpuTexelCopyTextureInfo; data: pointer;
+      dataSize: csize_t; layout: ptr WgpuTexelCopyBufferLayout;
+      writeSize: ptr WgpuExtent3D) {.cdecl.}
   PollDeviceProc = proc(device: pointer; wait: uint32;
       submissionIndex: pointer): uint32 {.cdecl.}
 
@@ -291,6 +329,7 @@ type
     library: LibHandle
     instance, adapter, device, queue: pointer
     meshShader, meshPipeline: pointer
+    imageShader, imagePipeline, imageSampler: pointer
     targetTexture, targetView: pointer
     readbackBuffer: pointer
     targetWidth, targetHeight: uint32
@@ -301,12 +340,14 @@ type
     uploadChunkBytes, uploadWriteCalls, uploadBytes: uint64
     largestUploadWrite: uint64
     managedGpuByteBudget, managedGpuPeakBytes, targetTextureBytes: uint64
+    transientRasterBytes, transientRasterPeakBytes: uint64
     streamingRingCapacity, streamingRingCursor: int
     streamingRing: seq[StreamingMeshBuffers]
     streamingRingRotations, streamingRingSyncs: uint64
     preparedMeshes: seq[PreparedMeshBuffers]
     preparedUseClock: uint64
-    meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
+    meshUploadCount, textureUploadCount, textureUploadBytes: uint64
+    preparedCacheHits, preparedCacheMisses: uint64
     preparedCacheEvictions: uint64
     events: ptr DeviceEvents
     getVersion: GetVersionProc
@@ -315,15 +356,31 @@ type
     pollDevice: PollDeviceProc
     destroyDevice: ReleaseProc
     releaseInstance, releaseAdapter, releaseDevice, releaseQueue: ReleaseProc
-    releaseShader, releasePipeline: ReleaseProc
+    releaseShader, releasePipeline, releaseSampler: ReleaseProc
+    releaseBindGroup, releaseBindGroupLayout: ReleaseProc
     releaseTexture, releaseView, releaseBuffer: ReleaseProc
     adapterCapabilities: NativeAdapterCapabilities
+
+  NativeDrawKind* = enum
+    ndMesh
+    ndImage
+
+  NativeDrawCommand* = object
+    kind*: NativeDrawKind
+    first*, count*: uint32
+    imageIndex*: int
+
+  NativeImageData* = object
+    width*, height*: uint32
+    pixels*: seq[byte]
 
 const
   CallbackAllowProcessEvents = 2'u32
   RequestDeviceSuccess = 1'u32
   FeatureTimestampQuery = 9'u32
   TextureUsageCopySrc = 0x1'u64
+  TextureUsageCopyDst = 0x2'u64
+  TextureUsageBinding = 0x4'u64
   TextureUsageRenderAttachment = 0x10'u64
   TextureDimension2D = 2'u32
   TextureFormatRgba8Unorm = 0x16'u32
@@ -349,6 +406,9 @@ const
   BlendFactorSrcAlpha = 5'u32
   BlendFactorOneMinusSrcAlpha = 6'u32
   ColorWriteMaskAll = 0xF'u64
+  AddressModeClampToEdge = 1'u32
+  FilterModeLinear = 2'u32
+  MipmapFilterModeNearest = 1'u32
   StatusSuccess = 1'u32
 
 proc loadSymbol[T](library: LibHandle; name: string): T =
@@ -433,6 +493,15 @@ proc close*(runtime: NativeWgpuRuntime) =
   if runtime.meshShader != nil and runtime.releaseShader != nil:
     runtime.releaseShader(runtime.meshShader)
     runtime.meshShader = nil
+  if runtime.imageSampler != nil and runtime.releaseSampler != nil:
+    runtime.releaseSampler(runtime.imageSampler)
+    runtime.imageSampler = nil
+  if runtime.imagePipeline != nil and runtime.releasePipeline != nil:
+    runtime.releasePipeline(runtime.imagePipeline)
+    runtime.imagePipeline = nil
+  if runtime.imageShader != nil and runtime.releaseShader != nil:
+    runtime.releaseShader(runtime.imageShader)
+    runtime.imageShader = nil
   if runtime.queue != nil and runtime.releaseQueue != nil:
     runtime.releaseQueue(runtime.queue)
     runtime.queue = nil
@@ -649,6 +718,11 @@ proc meshUploadCount*(runtime: NativeWgpuRuntime): uint64 =
   ## Return vertex/index upload pairs issued through the queue.
   if runtime.isNil: 0'u64 else: runtime.meshUploadCount
 
+proc textureUploadStats*(runtime: NativeWgpuRuntime): tuple[
+    uploads, bytes: uint64] =
+  if runtime.isNil: (0'u64, 0'u64)
+  else: (runtime.textureUploadCount, runtime.textureUploadBytes)
+
 proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
     hits, misses, evictions, bytes, peakBytes, byteBudget: uint64;
     entries, capacity: int] =
@@ -663,10 +737,11 @@ proc uploadStats*(runtime: NativeWgpuRuntime): tuple[
     writeCalls, bytes, largestWrite, chunkBytes: uint64;
     managedBytes, managedPeakBytes, managedBudget: uint64;
     streamingBytes, targetBytes, readbackBytes: uint64;
+    rasterPeakBytes: uint64;
     ringRotations, ringSyncs: uint64; ringEntries, ringCapacity: int] =
   if runtime.isNil:
     return (0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64,
-      0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0, 0)
+      0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0, 0)
   var streamingBytes = 0'u64
   var ringEntries = 0
   for slot in runtime.streamingRing:
@@ -677,6 +752,7 @@ proc uploadStats*(runtime: NativeWgpuRuntime): tuple[
       streamingBytes + runtime.targetTextureBytes + runtime.readbackCapacity,
     runtime.managedGpuPeakBytes, runtime.managedGpuByteBudget,
     streamingBytes, runtime.targetTextureBytes, runtime.readbackCapacity,
+    runtime.transientRasterPeakBytes,
     runtime.streamingRingRotations, runtime.streamingRingSyncs, ringEntries,
     runtime.streamingRingCapacity)
 
@@ -708,7 +784,7 @@ proc makeManagedRoom(runtime: NativeWgpuRuntime;
                      readbackBytes: uint64; incomingPrepared = 0'u64;
                      protectedToken = 0'u64) =
   var base = streamingBytes
-  for value in [targetBytes, readbackBytes]:
+  for value in [targetBytes, readbackBytes, runtime.transientRasterBytes]:
     if base > high(uint64) - value:
       raise newException(LibraryError,
         "managed WGPU resource capacities overflow uint64")
@@ -725,7 +801,8 @@ proc makeManagedRoom(runtime: NativeWgpuRuntime;
 
 proc recordManagedPeak(runtime: NativeWgpuRuntime) =
   let current = runtime.preparedCacheBytes + runtime.streamingBytes() +
-    runtime.targetTextureBytes + runtime.readbackCapacity
+    runtime.targetTextureBytes + runtime.readbackCapacity +
+    runtime.transientRasterBytes
   runtime.managedGpuPeakBytes = max(runtime.managedGpuPeakBytes, current)
 
 proc writeBufferChunked(runtime: NativeWgpuRuntime;
@@ -746,6 +823,9 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
                   red, green, blue, alpha: float64;
                   meshVertices: openArray[float32];
                   meshIndices: openArray[uint32];
+                  imageVertices: openArray[float32];
+                  images: openArray[NativeImageData];
+                  commands: openArray[NativeDrawCommand];
                   readback: bool; uploadToken: uint64): seq[byte] =
   ## Render, read back, and remove WebGPU's per-row copy padding.
   if runtime.isNil or runtime.device == nil or runtime.queue == nil:
@@ -757,6 +837,40 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     raise newException(LibraryError, "invalid WGPU mesh vertex layout")
   if uint64(meshIndices.len) > uint64(high(uint32)):
     raise newException(LibraryError, "WGPU mesh index count exceeds uint32")
+  if imageVertices.len mod 4 != 0:
+    raise newException(LibraryError, "invalid WGPU image vertex layout")
+  for image in images:
+    if image.width == 0 or image.height == 0 or
+        uint64(image.width) * uint64(image.height) * 4'u64 !=
+          uint64(image.pixels.len):
+      raise newException(LibraryError, "invalid WGPU RGBA image payload")
+    if image.width > runtime.adapterCapabilities.maxTextureDimension2D or
+        image.height > runtime.adapterCapabilities.maxTextureDimension2D:
+      raise newException(LibraryError,
+        "WGPU image dimensions exceed the adapter limit")
+  for command in commands:
+    case command.kind
+    of ndMesh:
+      if uint64(command.first) + uint64(command.count) >
+          uint64(meshIndices.len):
+        raise newException(LibraryError, "WGPU mesh command exceeds indices")
+    of ndImage:
+      if command.imageIndex notin 0 ..< images.len or
+          uint64(command.first) + uint64(command.count) >
+            uint64(imageVertices.len div 4):
+        raise newException(LibraryError, "WGPU image command is invalid")
+  if uint64(imageVertices.len) > high(uint64) div uint64(sizeof(float32)):
+    raise newException(LibraryError, "WGPU raster working set overflows uint64")
+  var rasterBytes = uint64(imageVertices.len) * uint64(sizeof(float32))
+  for image in images:
+    if uint64(image.pixels.len) > high(uint64) - rasterBytes:
+      raise newException(LibraryError,
+        "WGPU raster working set overflows uint64")
+    rasterBytes += uint64(image.pixels.len)
+  runtime.transientRasterBytes = rasterBytes
+  runtime.transientRasterPeakBytes = max(runtime.transientRasterPeakBytes,
+    rasterBytes)
+  defer: runtime.transientRasterBytes = 0
   if runtime.deviceLostReason() != 0'u32:
     raise newException(LibraryError, "wgpu-native device was lost")
   if runtime.takeUncapturedError() != 0'u32:
@@ -814,10 +928,28 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
         "wgpuRenderPassEncoderSetIndexBuffer")
     drawIndexed = loadSymbol[DrawIndexedProc](runtime.library,
         "wgpuRenderPassEncoderDrawIndexed")
+    draw = loadSymbol[DrawProc](runtime.library,
+        "wgpuRenderPassEncoderDraw")
+    createSampler = loadSymbol[CreateSamplerProc](runtime.library,
+        "wgpuDeviceCreateSampler")
+    getBindGroupLayout = loadSymbol[GetBindGroupLayoutProc](runtime.library,
+        "wgpuRenderPipelineGetBindGroupLayout")
+    createBindGroup = loadSymbol[CreateBindGroupProc](runtime.library,
+        "wgpuDeviceCreateBindGroup")
+    setBindGroup = loadSymbol[SetBindGroupProc](runtime.library,
+        "wgpuRenderPassEncoderSetBindGroup")
+    writeTexture = loadSymbol[WriteTextureProc](runtime.library,
+        "wgpuQueueWriteTexture")
   let emptyLabel = WgpuStringView(data: "".cstring, length: 0)
   runtime.releaseTexture = releaseTexture
   runtime.releaseView = releaseView
   runtime.releaseBuffer = releaseBuffer
+  runtime.releaseSampler = loadSymbol[ReleaseProc](runtime.library,
+    "wgpuSamplerRelease")
+  runtime.releaseBindGroup = loadSymbol[ReleaseProc](runtime.library,
+    "wgpuBindGroupRelease")
+  runtime.releaseBindGroupLayout = loadSymbol[ReleaseProc](runtime.library,
+    "wgpuBindGroupLayoutRelease")
   var streamingIndex = -1
   if width > runtime.adapterCapabilities.maxTextureDimension2D or
       height > runtime.adapterCapabilities.maxTextureDimension2D:
@@ -880,7 +1012,8 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     depthSlice: high(uint32),
     loadOp: LoadOpClear,
     storeOp: StoreOpStore,
-    clearValue: WgpuColor(r: red, g: green, b: blue, a: alpha))
+    clearValue: WgpuColor(r: red * alpha, g: green * alpha,
+      b: blue * alpha, a: alpha))
   var passDescriptor = WgpuRenderPassDescriptor(
     label: emptyLabel,
     colorAttachmentCount: 1,
@@ -893,6 +1026,7 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
     if renderPassOpen:
       endPass(renderPass)
       releasePass(renderPass)
+  var activeVertexBuffer, activeIndexBuffer: pointer
   if meshIndices.len > 0:
     const shaderCode = """
 struct VertexOut {
@@ -981,7 +1115,6 @@ struct VertexOut {
           raise newException(LibraryError,
             "wgpu-native did not create a " & description & " buffer")
 
-    var activeVertexBuffer, activeIndexBuffer: pointer
     if uploadToken == 0:
       var slot = addr runtime.streamingRing[streamingIndex]
       let
@@ -1072,11 +1205,171 @@ struct VertexOut {
       runtime.preparedMeshes[entryIndex].lastUse = runtime.preparedUseClock
       activeVertexBuffer = runtime.preparedMeshes[entryIndex].vertexBuffer
       activeIndexBuffer = runtime.preparedMeshes[entryIndex].indexBuffer
-    setPipeline(renderPass, runtime.meshPipeline)
-    setVertexBuffer(renderPass, 0, activeVertexBuffer, 0, vertexSize)
-    setIndexBuffer(renderPass, activeIndexBuffer, IndexFormatUint32, 0,
-      indexSize)
-    drawIndexed(renderPass, uint32(meshIndices.len), 1, 0, 0, 0)
+    discard
+
+  var imageVertexBuffer: pointer
+  var imageTextures, imageViews, imageBindGroups: seq[pointer]
+  defer:
+    for bindGroup in imageBindGroups:
+      if bindGroup != nil: runtime.releaseBindGroup(bindGroup)
+    for view in imageViews:
+      if view != nil: releaseView(view)
+    for texture in imageTextures:
+      if texture != nil: releaseTexture(texture)
+    if imageVertexBuffer != nil: releaseBuffer(imageVertexBuffer)
+  if images.len > 0:
+    const imageShaderCode = """
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+@group(0) @binding(0) var image_sampler: sampler;
+@group(0) @binding(1) var image_texture: texture_2d<f32>;
+@vertex fn vs_image(@location(0) packed: vec4f) -> VertexOut {
+  var out: VertexOut;
+  out.position = vec4f(packed.xy, 0.0, 1.0);
+  out.uv = packed.zw;
+  return out;
+}
+@fragment fn fs_image(input: VertexOut) -> @location(0) vec4f {
+  return textureSample(image_texture, image_sampler, input.uv);
+}
+"""
+    if runtime.imagePipeline == nil:
+      runtime.releaseShader = loadSymbol[ReleaseProc](runtime.library,
+        "wgpuShaderModuleRelease")
+      runtime.releasePipeline = loadSymbol[ReleaseProc](runtime.library,
+        "wgpuRenderPipelineRelease")
+      var shaderSource = WgpuShaderSourceWgsl(
+        chain: WgpuChainedStruct(sType: STypeShaderSourceWgsl),
+        code: WgpuStringView(data: imageShaderCode.cstring,
+          length: csize_t(imageShaderCode.len)))
+      var shaderDescriptor = WgpuShaderModuleDescriptor(
+        nextInChain: addr shaderSource.chain, label: emptyLabel)
+      runtime.imageShader = createShader(runtime.device, addr shaderDescriptor)
+      if runtime.imageShader == nil:
+        raise newException(LibraryError,
+          "wgpu-native did not create the image shader")
+      var attribute = WgpuVertexAttribute(format: VertexFormatFloat32x4,
+        shaderLocation: 0)
+      var vertexLayout = WgpuVertexBufferLayout(
+        stepMode: VertexStepModeVertex, arrayStride: 16,
+        attributeCount: 1, attributes: addr attribute)
+      let vertexEntry = "vs_image"
+      let fragmentEntry = "fs_image"
+      var blend = WgpuBlendState(
+        color: WgpuBlendComponent(operation: BlendOperationAdd,
+          srcFactor: BlendFactorSrcAlpha,
+          dstFactor: BlendFactorOneMinusSrcAlpha),
+        alpha: WgpuBlendComponent(operation: BlendOperationAdd,
+          srcFactor: BlendFactorOne,
+          dstFactor: BlendFactorOneMinusSrcAlpha))
+      var target = WgpuColorTargetState(format: TextureFormatRgba8Unorm,
+        blend: addr blend, writeMask: ColorWriteMaskAll)
+      var fragment = WgpuFragmentState(module: runtime.imageShader,
+        entryPoint: WgpuStringView(data: fragmentEntry.cstring,
+          length: csize_t(fragmentEntry.len)), targetCount: 1,
+        targets: addr target)
+      var descriptor = WgpuRenderPipelineDescriptor(label: emptyLabel,
+        vertex: WgpuVertexState(module: runtime.imageShader,
+          entryPoint: WgpuStringView(data: vertexEntry.cstring,
+            length: csize_t(vertexEntry.len)), bufferCount: 1,
+          buffers: addr vertexLayout),
+        primitive: WgpuPrimitiveState(
+          topology: PrimitiveTopologyTriangleList,
+          frontFace: FrontFaceCcw, cullMode: CullModeNone),
+        multisample: WgpuMultisampleState(count: 1, mask: high(uint32)),
+        fragment: addr fragment)
+      runtime.imagePipeline = createPipeline(runtime.device, addr descriptor)
+      if runtime.imagePipeline == nil:
+        runtime.releaseShader(runtime.imageShader)
+        runtime.imageShader = nil
+        raise newException(LibraryError,
+          "wgpu-native did not create the image pipeline")
+    if runtime.imageSampler == nil:
+      var descriptor = WgpuSamplerDescriptor(label: emptyLabel,
+        addressModeU: AddressModeClampToEdge,
+        addressModeV: AddressModeClampToEdge,
+        addressModeW: AddressModeClampToEdge,
+        magFilter: FilterModeLinear, minFilter: FilterModeLinear,
+        mipmapFilter: MipmapFilterModeNearest, lodMaxClamp: 32,
+        maxAnisotropy: 1)
+      runtime.imageSampler = createSampler(runtime.device, addr descriptor)
+      if runtime.imageSampler == nil:
+        raise newException(LibraryError,
+          "wgpu-native did not create the image sampler")
+    let imageVertexSize = uint64(imageVertices.len) * uint64(sizeof(float32))
+    var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+      usage: BufferUsageCopyDst or BufferUsageVertex, size: imageVertexSize)
+    imageVertexBuffer = createBuffer(runtime.device, addr descriptor)
+    if imageVertexBuffer == nil:
+      raise newException(LibraryError,
+        "wgpu-native did not create the image vertex buffer")
+    runtime.writeBufferChunked(writeBuffer, imageVertexBuffer,
+      unsafeAddr imageVertices[0], imageVertexSize)
+    let layout = getBindGroupLayout(runtime.imagePipeline, 0)
+    if layout == nil:
+      raise newException(LibraryError,
+        "wgpu-native did not expose the image bind-group layout")
+    defer: runtime.releaseBindGroupLayout(layout)
+    imageTextures.setLen(images.len)
+    imageViews.setLen(images.len)
+    imageBindGroups.setLen(images.len)
+    for index, image in images:
+      var textureDescriptor = WgpuTextureDescriptor(label: emptyLabel,
+        usage: TextureUsageCopyDst or TextureUsageBinding,
+        dimension: TextureDimension2D,
+        size: WgpuExtent3D(width: image.width, height: image.height,
+          depthOrArrayLayers: 1), format: TextureFormatRgba8Unorm,
+        mipLevelCount: 1, sampleCount: 1)
+      imageTextures[index] = createTexture(runtime.device,
+        addr textureDescriptor)
+      if imageTextures[index] == nil:
+        raise newException(LibraryError,
+          "wgpu-native did not create an image texture")
+      imageViews[index] = createView(imageTextures[index], nil)
+      if imageViews[index] == nil:
+        raise newException(LibraryError,
+          "wgpu-native did not create an image texture view")
+      var destination = WgpuTexelCopyTextureInfo(
+        texture: imageTextures[index], aspect: TextureAspectAll)
+      var copyLayout = WgpuTexelCopyBufferLayout(
+        bytesPerRow: image.width * 4, rowsPerImage: image.height)
+      var copySize = WgpuExtent3D(width: image.width, height: image.height,
+        depthOrArrayLayers: 1)
+      writeTexture(runtime.queue, addr destination,
+        unsafeAddr image.pixels[0], csize_t(image.pixels.len),
+        addr copyLayout, addr copySize)
+      inc runtime.textureUploadCount
+      runtime.textureUploadBytes += uint64(image.pixels.len)
+      var entries = [
+        WgpuBindGroupEntry(binding: 0, sampler: runtime.imageSampler),
+        WgpuBindGroupEntry(binding: 1, textureView: imageViews[index])]
+      var bindDescriptor = WgpuBindGroupDescriptor(label: emptyLabel,
+        layout: layout, entryCount: 2, entries: addr entries[0])
+      imageBindGroups[index] = createBindGroup(runtime.device,
+        addr bindDescriptor)
+      if imageBindGroups[index] == nil:
+        raise newException(LibraryError,
+          "wgpu-native did not create an image bind group")
+
+  for command in commands:
+    case command.kind
+    of ndMesh:
+      setPipeline(renderPass, runtime.meshPipeline)
+      let
+        vertexSize = uint64(meshVertices.len) * uint64(sizeof(float32))
+        indexSize = uint64(meshIndices.len) * uint64(sizeof(uint32))
+      setVertexBuffer(renderPass, 0, activeVertexBuffer, 0, vertexSize)
+      setIndexBuffer(renderPass, activeIndexBuffer, IndexFormatUint32, 0,
+        indexSize)
+      drawIndexed(renderPass, command.count, 1, command.first, 0, 0)
+    of ndImage:
+      setPipeline(renderPass, runtime.imagePipeline)
+      setVertexBuffer(renderPass, 0, imageVertexBuffer, 0,
+        uint64(imageVertices.len) * uint64(sizeof(float32)))
+      setBindGroup(renderPass, 0, imageBindGroups[command.imageIndex], 0, nil)
+      draw(renderPass, command.count, 1, command.first, 0)
   endPass(renderPass)
   releasePass(renderPass)
   renderPassOpen = false
@@ -1162,6 +1455,17 @@ struct VertexOut {
   for row in 0 ..< int(height):
     copyMem(addr result[row * int(unpaddedRow)],
       unsafeAddr sourceBytes[row * int(paddedRow)], int(unpaddedRow))
+  for offset in countup(0, result.high, 4):
+    let outputAlpha = uint32(result[offset + 3])
+    if outputAlpha == 0:
+      result[offset] = 0
+      result[offset + 1] = 0
+      result[offset + 2] = 0
+    elif outputAlpha < 255:
+      for channel in 0 ..< 3:
+        result[offset + channel] = byte(min(255'u32,
+          (uint32(result[offset + channel]) * 255'u32 + outputAlpha div 2) div
+            outputAlpha))
   if runtime.deviceLostReason() != 0'u32:
     raise newException(LibraryError, "wgpu-native device was lost")
   if runtime.takeUncapturedError() != 0'u32:
@@ -1169,14 +1473,45 @@ struct VertexOut {
 
 proc renderClearPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                         red, green, blue, alpha: float64): seq[byte] =
-  runtime.renderPixels(width, height, red, green, blue, alpha, [], [], true, 0)
+  runtime.renderPixels(width, height, red, green, blue, alpha, [], [], [], [],
+    [], true, 0)
+
+proc renderPreparedScenePixels*(runtime: NativeWgpuRuntime;
+                                width, height: uint32;
+                                red, green, blue, alpha: float64;
+                                meshVertices: openArray[float32];
+                                meshIndices: openArray[uint32];
+                                imageVertices: openArray[float32];
+                                images: openArray[NativeImageData];
+                                commands: openArray[NativeDrawCommand];
+                                uploadToken: uint64): seq[byte] =
+  if uploadToken == 0:
+    raise newException(LibraryError, "prepared WGPU upload token is zero")
+  runtime.renderPixels(width, height, red, green, blue, alpha, meshVertices,
+    meshIndices, imageVertices, images, commands, true, uploadToken)
+
+proc submitPreparedScene*(runtime: NativeWgpuRuntime; width, height: uint32;
+                          red, green, blue, alpha: float64;
+                          meshVertices: openArray[float32];
+                          meshIndices: openArray[uint32];
+                          imageVertices: openArray[float32];
+                          images: openArray[NativeImageData];
+                          commands: openArray[NativeDrawCommand];
+                          uploadToken: uint64) =
+  if uploadToken == 0:
+    raise newException(LibraryError, "prepared WGPU upload token is zero")
+  discard runtime.renderPixels(width, height, red, green, blue, alpha,
+    meshVertices, meshIndices, imageVertices, images, commands, false,
+    uploadToken)
 
 proc renderMeshPixels*(runtime: NativeWgpuRuntime; width, height: uint32;
                        red, green, blue, alpha: float64;
                        vertices: openArray[float32];
                        indices: openArray[uint32]): seq[byte] =
+  let commands = if indices.len == 0: newSeq[NativeDrawCommand]() else:
+    @[NativeDrawCommand(kind: ndMesh, count: uint32(indices.len))]
   runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, true, 0)
+    vertices, indices, [], [], commands, true, 0)
 
 proc renderPreparedMeshPixels*(runtime: NativeWgpuRuntime;
                                width, height: uint32;
@@ -1186,14 +1521,18 @@ proc renderPreparedMeshPixels*(runtime: NativeWgpuRuntime;
                                uploadToken: uint64): seq[byte] =
   if uploadToken == 0:
     raise newException(LibraryError, "prepared WGPU upload token is zero")
+  let commands = if indices.len == 0: newSeq[NativeDrawCommand]() else:
+    @[NativeDrawCommand(kind: ndMesh, count: uint32(indices.len))]
   runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, true, uploadToken)
+    vertices, indices, [], [], commands, true, uploadToken)
 
 proc submitMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
                  red, green, blue, alpha: float64;
                  vertices: openArray[float32]; indices: openArray[uint32]) =
+  let commands = if indices.len == 0: newSeq[NativeDrawCommand]() else:
+    @[NativeDrawCommand(kind: ndMesh, count: uint32(indices.len))]
   discard runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, false, 0)
+    vertices, indices, [], [], commands, false, 0)
 
 proc submitPreparedMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
                          red, green, blue, alpha: float64;
@@ -1201,5 +1540,7 @@ proc submitPreparedMesh*(runtime: NativeWgpuRuntime; width, height: uint32;
                          indices: openArray[uint32]; uploadToken: uint64) =
   if uploadToken == 0:
     raise newException(LibraryError, "prepared WGPU upload token is zero")
+  let commands = if indices.len == 0: newSeq[NativeDrawCommand]() else:
+    @[NativeDrawCommand(kind: ndMesh, count: uint32(indices.len))]
   discard runtime.renderPixels(width, height, red, green, blue, alpha,
-    vertices, indices, false, uploadToken)
+    vertices, indices, [], [], commands, false, uploadToken)

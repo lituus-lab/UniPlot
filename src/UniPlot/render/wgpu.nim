@@ -6,6 +6,7 @@ import std/atomics
 import contracts
 import UniColor
 import UniGlyph
+import UniImage/core as uimg
 import UniVector
 import UniPlot/[common, scene]
 import UniPlot/render/wgpu_native
@@ -62,6 +63,7 @@ type
 
   WgpuDiagnostics* = object
     meshUploads*: uint64
+    textureUploads*, textureUploadBytes*: uint64
     uploadWriteCalls*, uploadBytes*, largestUploadWrite*: uint64
     uploadChunkBytes*: uint64
     preparedCacheHits*, preparedCacheMisses*: uint64
@@ -71,6 +73,7 @@ type
     preparedCacheEntries*, preparedCacheCapacity*: int
     managedGpuBytes*, managedGpuPeakBytes*, managedGpuByteBudget*: uint64
     streamingBufferBytes*, targetTextureBytes*, readbackBufferBytes*: uint64
+    rasterWorkingSetPeakBytes*: uint64
     streamingRingEntries*, streamingRingCapacity*: int
     streamingRingRotations*, streamingRingSyncs*: uint64
     sceneCacheHits*, sceneCacheMisses*, sceneCacheEvictions*: uint64
@@ -82,6 +85,9 @@ type
     clear: array[4, float32]
     vertices: seq[float32]
     indices: seq[uint32]
+    imageVertices: seq[float32]
+    images: seq[NativeImageData]
+    commands: seq[NativeDrawCommand]
     uploadToken: uint64
 
   SceneCacheEntry = object
@@ -277,7 +283,10 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
     let
       cache = backend.runtime.preparedCacheStats()
       uploads = backend.runtime.uploadStats()
+      textures = backend.runtime.textureUploadStats()
     WgpuDiagnostics(meshUploads: backend.runtime.meshUploadCount(),
+      textureUploads: textures.uploads,
+      textureUploadBytes: textures.bytes,
       uploadWriteCalls: uploads.writeCalls,
       uploadBytes: uploads.bytes,
       largestUploadWrite: uploads.largestWrite,
@@ -296,6 +305,7 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
       streamingBufferBytes: uploads.streamingBytes,
       targetTextureBytes: uploads.targetBytes,
       readbackBufferBytes: uploads.readbackBytes,
+      rasterWorkingSetPeakBytes: uploads.rasterPeakBytes,
       streamingRingEntries: uploads.ringEntries,
       streamingRingCapacity: uploads.ringCapacity,
       streamingRingRotations: uploads.ringRotations,
@@ -440,6 +450,7 @@ proc prepareWgpuScene*(scene: Scene;
     result.size == scene.size
     result.vertices.len mod 6 == 0
     result.indices.len mod 3 == 0
+    result.imageVertices.len mod 24 == 0
   body:
     if font.isNil:
       raise newException(WgpuError, "WGPU scene preparation requires a font")
@@ -455,10 +466,79 @@ proc prepareWgpuScene*(scene: Scene;
       uploadToken: newPreparedToken(),
       clear: [clear.comp(0), clear.comp(1), clear.comp(2), clear.alpha])
     for node in scene.nodes:
-      if node.kind == snImage:
-        raise newException(WgpuError,
-          "WGPU image textures require the raster pipeline")
-      let path = case node.kind
+      case node.kind
+      of snImage:
+        if not node.image.validLayerImage:
+          raise newException(WgpuError,
+            "WGPU image must contain valid Gray, RGB, or RGBA pixels")
+        var sourceX, sourceY, destinationX, destinationY: int
+        if node.imageX < 0:
+          if node.imageX <= -node.image.width: continue
+          sourceX = -node.imageX
+        else:
+          if node.imageX >= scene.size.width: continue
+          destinationX = node.imageX
+        if node.imageY < 0:
+          if node.imageY <= -node.image.height: continue
+          sourceY = -node.imageY
+        else:
+          if node.imageY >= scene.size.height: continue
+          destinationY = node.imageY
+        let
+          visibleWidth = min(node.image.width - sourceX,
+            scene.size.width - destinationX)
+          visibleHeight = min(node.image.height - sourceY,
+            scene.size.height - destinationY)
+        if visibleWidth <= 0 or visibleHeight <= 0: continue
+        if uint64(result.imageVertices.len div 4) >
+            uint64(high(uint32)) - 6'u64:
+          raise newException(WgpuError,
+            "WGPU scene exceeds uint32 image vertices")
+        let
+          x0 = float32(destinationX) * 2'f32 /
+            float32(scene.size.width) - 1'f32
+          y0 = 1'f32 - float32(destinationY) * 2'f32 /
+            float32(scene.size.height)
+          x1 = float32(destinationX + visibleWidth) * 2'f32 /
+            float32(scene.size.width) - 1'f32
+          y1 = 1'f32 - float32(destinationY + visibleHeight) * 2'f32 /
+            float32(scene.size.height)
+          first = uint32(result.imageVertices.len div 4)
+        result.imageVertices.add [
+          x0, y0, 0'f32, 0'f32, x1, y0, 1'f32, 0'f32,
+          x1, y1, 1'f32, 1'f32, x0, y0, 0'f32, 0'f32,
+          x1, y1, 1'f32, 1'f32, x0, y1, 0'f32, 1'f32]
+        var pixels = newSeq[byte](visibleWidth * visibleHeight * 4)
+        for row in 0 ..< visibleHeight:
+          for column in 0 ..< visibleWidth:
+            let
+              pixel = row * visibleWidth + column
+              source = ((sourceY + row) * node.image.width + sourceX +
+                column) * node.image.channels
+            case node.image.colorspace
+            of uimg.csGray:
+              for channel in 0 ..< 3:
+                pixels[pixel * 4 + channel] = node.image.data[source]
+              pixels[pixel * 4 + 3] = node.opacity
+            of uimg.csRgb:
+              for channel in 0 ..< 3:
+                pixels[pixel * 4 + channel] = node.image.data[source + channel]
+              pixels[pixel * 4 + 3] = node.opacity
+            of uimg.csRgba:
+              for channel in 0 ..< 3:
+                pixels[pixel * 4 + channel] = node.image.data[source + channel]
+              pixels[pixel * 4 + 3] = byte(
+                (uint16(node.image.data[source + 3]) * uint16(node.opacity) +
+                  127'u16) div 255'u16)
+            else:
+              raise newException(WgpuError,
+                "WGPU image must use Gray, RGB, or RGBA pixels")
+        result.images.add NativeImageData(width: uint32(visibleWidth),
+          height: uint32(visibleHeight), pixels: pixels)
+        result.commands.add NativeDrawCommand(kind: ndImage, first: first,
+          count: 6, imageIndex: result.images.high)
+      of snPath, snText:
+        let path = case node.kind
         of snPath: node.path
         of snText:
           let layout = layoutText(textStyle(font, node.fontSize), node.text)
@@ -466,23 +546,30 @@ proc prepareWgpuScene*(scene: Scene;
             layout.width), node.position.y))
         of snImage:
           newPath()
-      let mesh = path.preparePath().tessellateFill()
-      let converted = node.color.to(tagSRGB)
-      if converted.isErr:
-        raise newException(WgpuError, "cannot convert WGPU node color to sRGB")
-      let color = converted.get
-      if result.vertices.len div 6 > int(high(uint32)) - mesh.vertexCount:
-        raise newException(WgpuError, "WGPU scene exceeds uint32 vertex indices")
-      let base = uint32(result.vertices.len div 6)
-      for i in 0 ..< mesh.vertexCount:
-        let vertex = mesh.vertex(i)
-        result.vertices.add(vertex.position.x * 2'f32 /
-          float32(scene.size.width) - 1'f32)
-        result.vertices.add(1'f32 - vertex.position.y * 2'f32 /
-          float32(scene.size.height))
-        result.vertices.add([color.comp(0), color.comp(1), color.comp(2),
-          color.alpha * vertex.coverage])
-      for index in mesh.indices: result.indices.add(base + index)
+        let mesh = path.preparePath().tessellateFill()
+        let converted = node.color.to(tagSRGB)
+        if converted.isErr:
+          raise newException(WgpuError,
+            "cannot convert WGPU node color to sRGB")
+        let color = converted.get
+        if result.vertices.len div 6 > int(high(uint32)) - mesh.vertexCount:
+          raise newException(WgpuError,
+            "WGPU scene exceeds uint32 vertex indices")
+        let
+          base = uint32(result.vertices.len div 6)
+          first = uint32(result.indices.len)
+        for i in 0 ..< mesh.vertexCount:
+          let vertex = mesh.vertex(i)
+          result.vertices.add(vertex.position.x * 2'f32 /
+            float32(scene.size.width) - 1'f32)
+          result.vertices.add(1'f32 - vertex.position.y * 2'f32 /
+            float32(scene.size.height))
+          result.vertices.add([color.comp(0), color.comp(1), color.comp(2),
+            color.alpha * vertex.coverage])
+        for index in mesh.indices: result.indices.add(base + index)
+        if mesh.indices.len > 0:
+          result.commands.add NativeDrawCommand(kind: ndMesh, first: first,
+            count: uint32(mesh.indices.len))
 
 proc validateSceneTarget(backend: WgpuBackend; scene: Scene; font: Font) =
   backend.validateBackendOwner()
@@ -500,13 +587,25 @@ proc scenePayloadBytes(prepared: WgpuPreparedScene): uint64 =
     VertexBytes = uint64(sizeof(float32))
     IndexBytes = uint64(sizeof(uint32))
   if uint64(prepared.vertices.len) > high(uint64) div VertexBytes or
+      uint64(prepared.imageVertices.len) > high(uint64) div VertexBytes or
       uint64(prepared.indices.len) > high(uint64) div IndexBytes:
     raise newException(WgpuError, "prepared WGPU scene byte size overflow")
-  let vertexBytes = uint64(prepared.vertices.len) * VertexBytes
-  let indexBytes = uint64(prepared.indices.len) * IndexBytes
-  if vertexBytes > high(uint64) - indexBytes:
+  let
+    meshVertexBytes = uint64(prepared.vertices.len) * VertexBytes
+    imageVertexBytes = uint64(prepared.imageVertices.len) * VertexBytes
+  if meshVertexBytes > high(uint64) - imageVertexBytes:
     raise newException(WgpuError, "prepared WGPU scene byte size overflow")
-  vertexBytes + indexBytes
+  let vertexBytes = meshVertexBytes + imageVertexBytes
+  let indexBytes = uint64(prepared.indices.len) * IndexBytes
+  var imageBytes = 0'u64
+  for image in prepared.images:
+    if uint64(image.pixels.len) > high(uint64) - imageBytes:
+      raise newException(WgpuError, "prepared WGPU scene byte size overflow")
+    imageBytes += uint64(image.pixels.len)
+  if vertexBytes > high(uint64) - indexBytes or
+      vertexBytes + indexBytes > high(uint64) - imageBytes:
+    raise newException(WgpuError, "prepared WGPU scene byte size overflow")
+  vertexBytes + indexBytes + imageBytes
 
 proc nextSceneCacheStamp(backend: WgpuBackend): uint64 =
   if backend.sceneCacheClock == high(uint64):
@@ -588,11 +687,12 @@ proc renderWgpuPrepared*(backend: WgpuBackend;
     if prepared.isNil:
       raise newException(WgpuError, "prepared WGPU scene is nil")
     try:
-      result = backend.runtime.renderPreparedMeshPixels(
+      result = backend.runtime.renderPreparedScenePixels(
         uint32(prepared.size.width),
         uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
         prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices, prepared.uploadToken)
+        prepared.indices, prepared.imageVertices, prepared.images,
+        prepared.commands, prepared.uploadToken)
     except LibraryError as error:
       if backend.runtime.deviceLostReason() != 0'u32:
         backend.state = wbsDeviceLost
@@ -612,10 +712,11 @@ proc submitWgpuPrepared*(backend: WgpuBackend;
     if prepared.isNil:
       raise newException(WgpuError, "prepared WGPU scene is nil")
     try:
-      backend.runtime.submitPreparedMesh(uint32(prepared.size.width),
+      backend.runtime.submitPreparedScene(uint32(prepared.size.width),
         uint32(prepared.size.height), prepared.clear[0], prepared.clear[1],
         prepared.clear[2], prepared.clear[3], prepared.vertices,
-        prepared.indices, prepared.uploadToken)
+        prepared.indices, prepared.imageVertices, prepared.images,
+        prepared.commands, prepared.uploadToken)
     except LibraryError as error:
       if backend.runtime.deviceLostReason() != 0'u32:
         backend.state = wbsDeviceLost
