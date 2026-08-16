@@ -96,6 +96,11 @@ suite "WGPU boundary":
           DefaultPreparedCacheByteBudget - 1)
       expect WgpuError:
         discard openWgpuBackend("/unused", streamingRingCapacity = 0)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", sceneCacheCapacity = 0)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", sceneCacheByteBudget =
+          MinSceneCacheByteBudget - 1)
     else:
       expect PreConditionDefect: discard openWgpuBackend("/unused", 0)
       expect PreConditionDefect:
@@ -110,6 +115,11 @@ suite "WGPU boundary":
           DefaultPreparedCacheByteBudget - 1)
       expect PreConditionDefect:
         discard openWgpuBackend("/unused", streamingRingCapacity = 0)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", sceneCacheCapacity = 0)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", sceneCacheByteBudget =
+          MinSceneCacheByteBudget - 1)
 
   test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
@@ -127,6 +137,11 @@ suite "WGPU boundary":
         DefaultManagedGpuByteBudget
       check backend.wgpuDiagnostics.streamingRingCapacity ==
         DefaultStreamingRingEntries
+      check backend.wgpuDiagnostics.sceneCacheCapacity ==
+        DefaultSceneCacheEntries
+      check backend.wgpuDiagnostics.sceneCacheByteBudget ==
+        DefaultSceneCacheByteBudget
+      check backend.wgpuDiagnostics.sceneCacheEntries == 0
       let capabilities = wgpuCapabilities(backend)
       check capabilities.available
       check capabilities.storageBuffers
@@ -240,6 +255,54 @@ suite "WGPU boundary":
       check managed.managedGpuPeakBytes <= managed.managedGpuByteBudget
       backend.close()
       check backend.state == wbsUnavailable
+
+      let automatic = openWgpuBackend(libraryPath,
+        sceneCacheCapacity = 2, preparedCacheCapacity = 4)
+      automatic.submitWgpuScene(scene, font)
+      var automaticDiagnostics = automatic.wgpuDiagnostics
+      check automaticDiagnostics.sceneCacheMisses == 1
+      check automaticDiagnostics.sceneCacheHits == 0
+      check automaticDiagnostics.sceneCacheEntries == 1
+      check automaticDiagnostics.sceneCacheBytes > 0
+      check automaticDiagnostics.meshUploads == 1
+      automatic.submitWgpuScene(scene, font)
+      var metadataScene = scene
+      metadataScene.nodes = scene.nodes.mapIt(it)
+      metadataScene.nodes[0].id = 1234
+      automatic.submitWgpuScene(metadataScene, font)
+      automaticDiagnostics = automatic.wgpuDiagnostics
+      check automaticDiagnostics.sceneCacheHits == 2
+      check automaticDiagnostics.meshUploads == 1
+
+      var changedScene = scene
+      changedScene.nodes = scene.nodes.mapIt(it)
+      changedScene.nodes[1].text = "B"
+      automatic.submitWgpuScene(changedScene, font)
+      automatic.submitWgpuScene(thirdScene, font)
+      automatic.submitWgpuScene(scene, font)
+      automaticDiagnostics = automatic.wgpuDiagnostics
+      check automaticDiagnostics.sceneCacheMisses == 4
+      check automaticDiagnostics.sceneCacheHits == 2
+      check automaticDiagnostics.sceneCacheEvictions == 2
+      check automaticDiagnostics.sceneCacheEntries == 2
+      check automaticDiagnostics.sceneCacheBytes <=
+        automaticDiagnostics.sceneCacheByteBudget
+      check automaticDiagnostics.meshUploads == 4
+      automatic.clearWgpuSceneCache()
+      automaticDiagnostics = automatic.wgpuDiagnostics
+      check automaticDiagnostics.sceneCacheEntries == 0
+      check automaticDiagnostics.sceneCacheBytes == 0
+      check automaticDiagnostics.sceneCachePeakBytes > 0
+      automatic.close()
+
+      let uncachedLarge = openWgpuBackend(libraryPath,
+        sceneCacheByteBudget = MinSceneCacheByteBudget)
+      uncachedLarge.submitWgpuScene(scene, font)
+      let uncachedDiagnostics = uncachedLarge.wgpuDiagnostics
+      check uncachedDiagnostics.sceneCacheMisses == 1
+      check uncachedDiagnostics.sceneCacheEntries == 0
+      check uncachedDiagnostics.sceneCacheBytes == 0
+      uncachedLarge.close()
 
       let chunked = openWgpuBackend(libraryPath, uploadChunkBytes = 16)
       let chunkedPixels = chunked.readWgpuMeshTarget(

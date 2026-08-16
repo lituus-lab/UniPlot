@@ -24,6 +24,10 @@ const MinManagedGpuByteBudget* = 1024'u64
 const DefaultManagedGpuByteBudget* = 512'u64 * 1024'u64 * 1024'u64
 const MaxStreamingRingEntries* = 8
 const DefaultStreamingRingEntries* = 3
+const MaxSceneCacheEntries* = 64
+const MinSceneCacheByteBudget* = 512'u64
+const DefaultSceneCacheByteBudget* = 256'u64 * 1024'u64 * 1024'u64
+const DefaultSceneCacheEntries* = 16
 
 type
   WgpuError* = object of CatchableError
@@ -69,10 +73,9 @@ type
     streamingBufferBytes*, targetTextureBytes*, readbackBufferBytes*: uint64
     streamingRingEntries*, streamingRingCapacity*: int
     streamingRingRotations*, streamingRingSyncs*: uint64
-
-  WgpuBackend* = ref object
-    state*: WgpuBackendState
-    runtime: NativeWgpuRuntime
+    sceneCacheHits*, sceneCacheMisses*, sceneCacheEvictions*: uint64
+    sceneCacheBytes*, sceneCachePeakBytes*, sceneCacheByteBudget*: uint64
+    sceneCacheEntries*, sceneCacheCapacity*: int
 
   WgpuPreparedScene* = ref object
     size: Size
@@ -80,6 +83,21 @@ type
     vertices: seq[float32]
     indices: seq[uint32]
     uploadToken: uint64
+
+  SceneCacheEntry = object
+    identity: WgpuSceneIdentity
+    prepared: WgpuPreparedScene
+    payloadBytes, stamp: uint64
+
+  WgpuBackend* = ref object
+    state*: WgpuBackendState
+    runtime: NativeWgpuRuntime
+    ownerThread: int
+    sceneCache: seq[SceneCacheEntry]
+    sceneCacheCapacity: int
+    sceneCacheByteBudget, sceneCacheBytes, sceneCachePeakBytes: uint64
+    sceneCacheHits, sceneCacheMisses, sceneCacheEvictions: uint64
+    sceneCacheClock: uint64
 
 var nextPreparedToken: Atomic[uint64]
 
@@ -92,6 +110,11 @@ proc newPreparedToken(): uint64 =
     if nextPreparedToken.compareExchange(current, desired, moRelaxed,
         moRelaxed):
       return desired
+
+proc validateBackendOwner(backend: WgpuBackend) {.inline.} =
+  if not backend.isNil and backend.ownerThread != getThreadId():
+    raise newException(WgpuError,
+      "WGPU backend must be used from its opening thread")
 
 func size*(prepared: WgpuPreparedScene): Size {.contractual.} =
   ## Return the immutable render target dimensions of a prepared scene.
@@ -128,7 +151,9 @@ proc openWgpuBackend*(libraryPath: string;
     preparedCacheByteBudget = DefaultPreparedCacheByteBudget;
     uploadChunkBytes = DefaultUploadChunkBytes;
     managedGpuByteBudget = DefaultManagedGpuByteBudget;
-    streamingRingCapacity = DefaultStreamingRingEntries): WgpuBackend {.
+    streamingRingCapacity = DefaultStreamingRingEntries;
+    sceneCacheCapacity = DefaultSceneCacheEntries;
+    sceneCacheByteBudget = DefaultSceneCacheByteBudget): WgpuBackend {.
     contractual.} =
   ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
@@ -140,6 +165,8 @@ proc openWgpuBackend*(libraryPath: string;
     managedGpuByteBudget >= MinManagedGpuByteBudget
     preparedCacheByteBudget <= managedGpuByteBudget
     streamingRingCapacity in 1 .. MaxStreamingRingEntries
+    sceneCacheCapacity in 1 .. MaxSceneCacheEntries
+    sceneCacheByteBudget >= MinSceneCacheByteBudget
   ensure:
     not result.isNil and result.state == wbsReady
   body:
@@ -167,7 +194,16 @@ proc openWgpuBackend*(libraryPath: string;
       raise newException(WgpuError,
         "WGPU streaming ring capacity must be in 1.." &
         $MaxStreamingRingEntries)
-    result = WgpuBackend(state: wbsUnavailable)
+    if sceneCacheCapacity notin 1 .. MaxSceneCacheEntries:
+      raise newException(WgpuError,
+        "WGPU scene cache capacity must be in 1.." & $MaxSceneCacheEntries)
+    if sceneCacheByteBudget < MinSceneCacheByteBudget:
+      raise newException(WgpuError,
+        "WGPU scene cache byte budget must be at least " &
+        $MinSceneCacheByteBudget)
+    result = WgpuBackend(state: wbsUnavailable, ownerThread: getThreadId(),
+      sceneCacheCapacity: sceneCacheCapacity,
+      sceneCacheByteBudget: sceneCacheByteBudget)
     try:
       result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity,
         preparedCacheByteBudget, uploadChunkBytes, managedGpuByteBudget,
@@ -178,19 +214,26 @@ proc openWgpuBackend*(libraryPath: string;
 
 proc close*(backend: WgpuBackend) {.contractual.} =
   ## Release queue, device, adapter, instance, and dynamic library in order.
+  require:
+    backend.isNil or backend.ownerThread == getThreadId()
   ensure:
     backend.isNil or backend.state == wbsUnavailable
   body:
     if backend.isNil: return
+    backend.validateBackendOwner()
     backend.runtime.close()
     backend.runtime = nil
+    backend.sceneCache.setLen(0)
+    backend.sceneCacheBytes = 0
     backend.state = wbsUnavailable
 
 proc waitWgpuIdle*(backend: WgpuBackend) {.contractual.} =
   ## Wait for all submitted GPU work and release streaming slots for reuse.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     try:
@@ -203,6 +246,7 @@ proc waitWgpuIdle*(backend: WgpuBackend) {.contractual.} =
 proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
   ## Report runtime availability without causing implicit library loading.
   result.implementationVersion = WgpuNativeTargetVersion
+  backend.validateBackendOwner()
   if not backend.isNil and backend.state == wbsReady:
     let adapter = backend.runtime.adapterCapabilities()
     result.available = true
@@ -221,8 +265,10 @@ proc wgpuCapabilities*(backend: WgpuBackend = nil): WgpuCapabilities =
 proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
   ## Report backend counters without exposing native WGPU handles.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     let
@@ -250,17 +296,27 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
       streamingRingEntries: uploads.ringEntries,
       streamingRingCapacity: uploads.ringCapacity,
       streamingRingRotations: uploads.ringRotations,
-      streamingRingSyncs: uploads.ringSyncs)
+      streamingRingSyncs: uploads.ringSyncs,
+      sceneCacheHits: backend.sceneCacheHits,
+      sceneCacheMisses: backend.sceneCacheMisses,
+      sceneCacheEvictions: backend.sceneCacheEvictions,
+      sceneCacheBytes: backend.sceneCacheBytes,
+      sceneCachePeakBytes: backend.sceneCachePeakBytes,
+      sceneCacheByteBudget: backend.sceneCacheByteBudget,
+      sceneCacheEntries: backend.sceneCache.len,
+      sceneCacheCapacity: backend.sceneCacheCapacity)
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =
   ## Clear an offscreen RGBA8 texture and read its unpadded pixels back.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     size.width > 0 and size.height > 0
     uint64(size.width) <= uint64(high(uint32))
     uint64(size.height) <= uint64(high(uint32))
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     size.validate()
@@ -301,7 +357,8 @@ proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
     mesh: VectorMesh; color: Color): seq[byte] {.contractual.} =
   ## Render one UniVector indexed triangle mesh into an RGBA8 target.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     size.width > 0 and size.height > 0
     uint64(size.width) <= uint64(high(uint32))
     uint64(size.height) <= uint64(high(uint32))
@@ -309,6 +366,7 @@ proc readWgpuMeshTarget*(backend: WgpuBackend; size: Size; background: Color;
   ensure:
     result.len == size.width * size.height * 4
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     size.validate()
@@ -336,12 +394,14 @@ proc submitWgpuMeshTarget*(backend: WgpuBackend; size: Size;
     background: Color; mesh: VectorMesh; color: Color) {.contractual.} =
   ## Upload and enqueue one direct UniVector mesh without readback.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     size.width > 0 and size.height > 0
     uint64(size.width) <= uint64(high(uint32))
     uint64(size.height) <= uint64(high(uint32))
     mesh.indexCount mod 3 == 0
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     size.validate()
@@ -417,6 +477,7 @@ proc prepareWgpuScene*(scene: Scene;
       for index in mesh.indices: result.indices.add(base + index)
 
 proc validateSceneTarget(backend: WgpuBackend; scene: Scene; font: Font) =
+  backend.validateBackendOwner()
   if backend.isNil or backend.state != wbsReady:
     raise newException(WgpuError, "WGPU backend is not ready")
   if font.isNil:
@@ -426,16 +487,94 @@ proc validateSceneTarget(backend: WgpuBackend; scene: Scene; font: Font) =
       uint64(scene.size.height) > uint64(high(uint32)):
     raise newException(WgpuError, "WGPU target dimensions exceed uint32")
 
+proc scenePayloadBytes(prepared: WgpuPreparedScene): uint64 =
+  const
+    VertexBytes = uint64(sizeof(float32))
+    IndexBytes = uint64(sizeof(uint32))
+  if uint64(prepared.vertices.len) > high(uint64) div VertexBytes or
+      uint64(prepared.indices.len) > high(uint64) div IndexBytes:
+    raise newException(WgpuError, "prepared WGPU scene byte size overflow")
+  let vertexBytes = uint64(prepared.vertices.len) * VertexBytes
+  let indexBytes = uint64(prepared.indices.len) * IndexBytes
+  if vertexBytes > high(uint64) - indexBytes:
+    raise newException(WgpuError, "prepared WGPU scene byte size overflow")
+  vertexBytes + indexBytes
+
+proc nextSceneCacheStamp(backend: WgpuBackend): uint64 =
+  if backend.sceneCacheClock == high(uint64):
+    raise newException(WgpuError, "WGPU scene cache clock exhausted")
+  inc backend.sceneCacheClock
+  backend.sceneCacheClock
+
+proc evictSceneCacheLru(backend: WgpuBackend) =
+  var oldest = 0
+  for index in 1 ..< backend.sceneCache.len:
+    if backend.sceneCache[index].stamp < backend.sceneCache[oldest].stamp:
+      oldest = index
+  backend.sceneCacheBytes -= backend.sceneCache[oldest].payloadBytes
+  backend.sceneCache.delete(oldest)
+  inc backend.sceneCacheEvictions
+
+proc prepareWgpuSceneCached*(backend: WgpuBackend; scene: Scene;
+                             font: Font): WgpuPreparedScene {.contractual.} =
+  ## Reuse shaping and tessellation by canonical scene and font identity.
+  require:
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
+    not font.isNil
+    scene.size.width > 0 and scene.size.height > 0
+  ensure:
+    not result.isNil and result.size == scene.size
+  body:
+    validateSceneTarget(backend, scene, font)
+    let identity = sceneIdentity(scene, font)
+    for entry in backend.sceneCache.mitems:
+      if entry.identity == identity:
+        inc backend.sceneCacheHits
+        entry.stamp = backend.nextSceneCacheStamp()
+        return entry.prepared
+
+    inc backend.sceneCacheMisses
+    result = scene.prepareWgpuScene(font)
+    let payloadBytes = result.scenePayloadBytes()
+    if payloadBytes > backend.sceneCacheByteBudget:
+      return
+    while backend.sceneCache.len >= backend.sceneCacheCapacity or
+        backend.sceneCacheBytes > backend.sceneCacheByteBudget - payloadBytes:
+      backend.evictSceneCacheLru()
+    backend.sceneCache.add SceneCacheEntry(identity: identity,
+      prepared: result, payloadBytes: payloadBytes,
+      stamp: backend.nextSceneCacheStamp())
+    backend.sceneCacheBytes += payloadBytes
+    if backend.sceneCacheBytes > backend.sceneCachePeakBytes:
+      backend.sceneCachePeakBytes = backend.sceneCacheBytes
+
+proc clearWgpuSceneCache*(backend: WgpuBackend) {.contractual.} =
+  ## Release all host-side automatically prepared scenes; counters continue.
+  require:
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
+  ensure:
+    backend.sceneCache.len == 0 and backend.sceneCacheBytes == 0
+  body:
+    backend.validateBackendOwner()
+    if backend.isNil or backend.state != wbsReady:
+      raise newException(WgpuError, "WGPU backend is not ready")
+    backend.sceneCache.setLen(0)
+    backend.sceneCacheBytes = 0
+
 proc renderWgpuPrepared*(backend: WgpuBackend;
                          prepared: WgpuPreparedScene): seq[
                              byte] {.contractual.} =
   ## Upload, submit and read one previously prepared scene as RGBA8.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     not prepared.isNil
   ensure:
     result.len == prepared.size.width * prepared.size.height * 4
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     if prepared.isNil:
@@ -455,9 +594,11 @@ proc submitWgpuPrepared*(backend: WgpuBackend;
                          prepared: WgpuPreparedScene) {.contractual.} =
   ## Upload and enqueue one previously prepared scene without readback.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     not prepared.isNil
   body:
+    backend.validateBackendOwner()
     if backend.isNil or backend.state != wbsReady:
       raise newException(WgpuError, "WGPU backend is not ready")
     if prepared.isNil:
@@ -476,22 +617,24 @@ proc renderWgpuScene*(backend: WgpuBackend; scene: Scene;
                       font: Font): seq[byte] {.contractual.} =
   ## Prepare, submit and read one retained scene back as unpadded RGBA8.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     not font.isNil
     scene.size.width > 0 and scene.size.height > 0
   ensure:
     result.len == scene.size.width * scene.size.height * 4
   body:
     validateSceneTarget(backend, scene, font)
-    backend.renderWgpuPrepared(scene.prepareWgpuScene(font))
+    backend.renderWgpuPrepared(backend.prepareWgpuSceneCached(scene, font))
 
 proc submitWgpuScene*(backend: WgpuBackend; scene: Scene;
                       font: Font) {.contractual.} =
   ## Prepare and enqueue one retained scene without a GPU-to-CPU transfer.
   require:
-    not backend.isNil and backend.state == wbsReady
+    not backend.isNil and backend.state == wbsReady and
+      backend.ownerThread == getThreadId()
     not font.isNil
     scene.size.width > 0 and scene.size.height > 0
   body:
     validateSceneTarget(backend, scene, font)
-    backend.submitWgpuPrepared(scene.prepareWgpuScene(font))
+    backend.submitWgpuPrepared(backend.prepareWgpuSceneCached(scene, font))
