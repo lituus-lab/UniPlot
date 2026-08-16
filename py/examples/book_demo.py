@@ -7,16 +7,16 @@ import uniplot
 
 
 def main() -> int:
-    if len(sys.argv) != 16:
+    if len(sys.argv) != 18:
         raise SystemExit(
             "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
             "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png "
-            "NUMHEAT.svg NUMHEAT.png IMAGE.svg IMAGE.png")
+            "NUMHEAT.svg NUMHEAT.png IMAGE.svg IMAGE.png TIME.svg TIME.png")
     (font, svg_path, png_path, box_svg_path, box_png_path,
      heat_svg_path, heat_png_path, histogram_svg_path,
      histogram_png_path, grouped_svg_path, grouped_png_path,
      numeric_heat_svg_path, numeric_heat_png_path, image_svg_path,
-     image_png_path) = map(
+     image_png_path, temporal_svg_path, temporal_png_path) = map(
         Path, sys.argv[1:])
     x = [0, 1, 2, 3, 4, 5]
     y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
@@ -90,6 +90,15 @@ def main() -> int:
                   .title("Python data-mapped image mark"))
     image_svg_path.write_bytes(image_plot.svg(font))
     image_png_path.write_bytes(image_plot.png(font))
+    temporal = (uniplot.Plot(760, 440)
+                .line([1704067200, 1704067260, 1704067320, 1704067380,
+                       1704067440], [0, 42, 75, 130, 190],
+                      color="#2457c5")
+                .scale_x_utc()
+                .scale_y_duration()
+                .title("Python UTC and duration axes"))
+    temporal_svg_path.write_bytes(temporal.svg(font))
+    temporal_png_path.write_bytes(temporal.png(font))
     return 0
 
 

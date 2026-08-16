@@ -13,11 +13,11 @@ static int write_bytes(const char *path, const uint8_t *data, size_t length) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 16) {
+  if (argc != 18) {
     fprintf(stderr, "usage: book_demo FONT MATRIX.svg MATRIX.png BOX.svg "
                     "BOX.png HEAT.svg HEAT.png HIST.svg HIST.png "
                     "GROUPED.svg GROUPED.png NUMHEAT.svg NUMHEAT.png "
-                    "IMAGE.svg IMAGE.png\n");
+                    "IMAGE.svg IMAGE.png TIME.svg TIME.png\n");
     return EXIT_FAILURE;
   }
   const double x[] = {0, 1, 2, 3, 4, 5};
@@ -39,6 +39,8 @@ int main(int argc, char **argv) {
   uint8_t *numeric_heat_png = NULL;
   uint8_t *image_svg = NULL;
   uint8_t *image_png = NULL;
+  uint8_t *temporal_svg = NULL;
+  uint8_t *temporal_png = NULL;
   size_t svg_length = 0;
   size_t png_length = 0;
   size_t json_length = 0;
@@ -54,11 +56,14 @@ int main(int argc, char **argv) {
   size_t numeric_heat_png_length = 0;
   size_t image_svg_length = 0;
   size_t image_png_length = 0;
+  size_t temporal_svg_length = 0;
+  size_t temporal_png_length = 0;
   uplot_plot *heatmap = NULL;
   uplot_plot *histogram = NULL;
   uplot_plot *grouped = NULL;
   uplot_plot *numeric_heatmap = NULL;
   uplot_plot *image_plot = NULL;
+  uplot_plot *temporal_plot = NULL;
   int result = EXIT_FAILURE;
 
   if (uplot_init() != UPLOT_OK) return EXIT_FAILURE;
@@ -192,6 +197,25 @@ int main(int argc, char **argv) {
       !write_bytes(argv[14], image_svg, image_svg_length) ||
       !write_bytes(argv[15], image_png, image_png_length))
     goto cleanup;
+  const double temporal_x[] = {1704067200.0, 1704067260.0, 1704067320.0,
+                               1704067380.0, 1704067440.0};
+  const double temporal_y[] = {0.0, 42.0, 75.0, 130.0, 190.0};
+  temporal_plot = uplot_plot_new(760, 440);
+  if (temporal_plot == NULL ||
+      uplot_add_line(temporal_plot, temporal_x, temporal_y, 5, "#2457c5",
+                     2.5f) != UPLOT_OK ||
+      uplot_set_x_axis_labels(temporal_plot, UPLOT_AXIS_UTC_DATETIME, 0) !=
+        UPLOT_OK ||
+      uplot_set_y_axis_labels(temporal_plot, UPLOT_AXIS_DURATION, 0) !=
+        UPLOT_OK ||
+      uplot_set_title(temporal_plot, "C UTC and duration axes") != UPLOT_OK ||
+      uplot_render_svg(temporal_plot, argv[1], &temporal_svg,
+                       &temporal_svg_length) != UPLOT_OK ||
+      uplot_render_png(temporal_plot, argv[1], &temporal_png,
+                       &temporal_png_length) != UPLOT_OK ||
+      !write_bytes(argv[16], temporal_svg, temporal_svg_length) ||
+      !write_bytes(argv[17], temporal_png, temporal_png_length))
+    goto cleanup;
   result = EXIT_SUCCESS;
 
 cleanup:
@@ -210,11 +234,14 @@ cleanup:
   uplot_buffer_free(numeric_heat_png, numeric_heat_png_length);
   uplot_buffer_free(image_svg, image_svg_length);
   uplot_buffer_free(image_png, image_png_length);
+  uplot_buffer_free(temporal_svg, temporal_svg_length);
+  uplot_buffer_free(temporal_png, temporal_png_length);
   uplot_plot_free(heatmap);
   uplot_plot_free(histogram);
   uplot_plot_free(grouped);
   uplot_plot_free(numeric_heatmap);
   uplot_plot_free(image_plot);
+  uplot_plot_free(temporal_plot);
   uplot_plot_free(plot);
   return result;
 }
