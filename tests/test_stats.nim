@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[math, unittest]
-import contracts
+import std/[math, sequtils, unittest]
+when not defined(release) and not defined(danger):
+  import contracts
+from UniMath import nextDown, nextUp
 import UniPlot
 
 suite "statistics":
@@ -41,6 +43,59 @@ suite "statistics":
   test "histograms reject invalid bin counts and ignore non-finite input":
     expect PlotError: discard histogram([1.0], 0)
     check histogram([NaN, Inf], 3).len == 0
+
+  test "automatic histogram rules are deterministic and scale invariant":
+    let values = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    check histogramBinCount(values, hrSquareRoot) == 3
+    check histogramBinCount(values, hrSturges) == 4
+    check histogramBinCount(values, hrRice) == 4
+    check histogramBinCount(values, hrScott) > 0
+    check histogramBinCount(values, hrFreedmanDiaconis) > 0
+    check histogramBinCount(values, hrAuto) ==
+      histogramBinCount(values, hrFreedmanDiaconis)
+    check histogramBinCount([NaN, Inf], hrAuto) == 0
+    check histogramBinCount([4.0, 4.0, 4.0], hrAuto) == 1
+    check histogramBinCount(values, hrScott) == histogramBinCount(
+      [0.0, 1e300, 2e300, 3e300, 4e300, 5e300, 6e300, 7e300], hrScott)
+
+  test "automatic histogram boundaries stay finite at float64 extremes":
+    let
+      extreme = automaticHistogramBreaks([-1e308, 0.0, 1e308], hrSturges)
+      adjacentValue = nextUp(1.0)
+      adjacent = automaticHistogramBreaks([1.0, adjacentValue], hrRice)
+      constant = automaticHistogramBreaks([1e308], hrAuto)
+      maximumConstant = automaticHistogramBreaks([nextDown(Inf)], hrAuto)
+    check extreme.len >= 2
+    for index, boundary in extreme:
+      check boundary.isFinite
+      if index > 0: check boundary > extreme[index - 1]
+    check adjacent == @[1.0, adjacentValue]
+    check constant.len == 2
+    check constant[0] < constant[1]
+    check maximumConstant.len == 2
+    check maximumConstant[0] < maximumConstant[1]
+    check histogram([-1e308, 0.0, 1e308], hrSturges).mapIt(it.count).sum == 3
+
+  test "automatic histogram recipe preserves counts and density area":
+    let
+      counts = histogramPlot([0.0, 0.5, 1.0, 2.0], hrSturges)
+      density = histogramPlot([0.0, 0.5, 1.0, 2.0], hrSturges,
+        density = true)
+    check counts.layers.len == 1
+    check counts.layers[0].mark == mkRect
+    check counts.data.numeric("yMax").sum == 4.0
+    var area = 0.0
+    for index, height in density.data.numeric("yMax"):
+      area += height * (density.data.numeric("xMax")[index] -
+        density.data.numeric("xMin")[index])
+    check abs(area - 1.0) < 1e-12
+    expect PlotError: discard histogramPlot([NaN], hrAuto)
+    let singletonDensity = histogramPlot([0.0], hrAuto, density = true)
+    check singletonDensity.data.numeric("xMin") == @[0.0]
+    check singletonDensity.data.numeric("xMax") == @[1.0]
+    check singletonDensity.data.numeric("yMax") == @[1.0]
+    expect PlotError:
+      discard histogramPlot([0.0], [0.0, nextUp(0.0)], density = true)
 
   test "explicit histogram breaks define half-open bins and a closed end":
     let bins = histogramBreaks(
