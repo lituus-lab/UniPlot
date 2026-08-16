@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/[json, math, monotimes, os, stats, strutils, times]
+import UniColor
 import UniGlyph
 import UniPlot
+import UniVector
 import UniPlot/render/wgpu
 
 proc elapsedMs(started: MonoTime): float64 =
@@ -18,7 +20,7 @@ proc checkBaseline(report: JsonNode; path: string) =
     if baseline[field] != report[field]:
       quit("WGPU baseline does not match current " & field, 1)
   for phase in ["preparation", "upload_submit", "submit",
-      "publication_frame"]:
+      "publication_frame", "direct_burst_single", "direct_burst_ring"]:
     let
       expected = baseline[phase]["mean_ms"].getFloat
       maxRatio = baseline[phase]["max_ratio"].getFloat
@@ -55,6 +57,7 @@ proc main() =
   defer: backend.close()
   let capabilities = wgpuCapabilities(backend)
   var preparationTimes, uploadSubmitTimes, submitTimes, frameTimes: RunningStat
+  var directSingleTimes, directRingTimes: RunningStat
   var prepared: WgpuPreparedScene
   for iteration in 0 ..< iterations + 3:
     let started = getMonoTime()
@@ -113,6 +116,59 @@ proc main() =
       diagnostics.streamingBufferBytes + diagnostics.targetTextureBytes +
       diagnostics.readbackBufferBytes:
     quit("managed GPU resource accounting is inconsistent", 1)
+  let
+    directMesh = parsePath("M 20 20 L 780 20 L 780 480 L 20 480 Z")
+      .preparePath().tessellateFill()
+    directSize = Size(width: 800, height: 500)
+    directBackground = parseColor("#ffffff").get
+    directColor = parseColor("#3366cc").get
+    singleBackend = openWgpuBackend(libraryPath, streamingRingCapacity = 1)
+    ringBackend = openWgpuBackend(libraryPath, streamingRingCapacity = 3)
+  defer:
+    singleBackend.close()
+    ringBackend.close()
+  for iteration in 0 ..< iterations + 3:
+    singleBackend.waitWgpuIdle()
+    ringBackend.waitWgpuIdle()
+    if (iteration and 1) == 0:
+      var started = getMonoTime()
+      for _ in 0 ..< 3:
+        singleBackend.submitWgpuMeshTarget(directSize, directBackground,
+          directMesh, directColor)
+      let singleMs = elapsedMs(started)
+      started = getMonoTime()
+      for _ in 0 ..< 3:
+        ringBackend.submitWgpuMeshTarget(directSize, directBackground,
+          directMesh, directColor)
+      let ringMs = elapsedMs(started)
+      if iteration >= 3:
+        directSingleTimes.push(singleMs)
+        directRingTimes.push(ringMs)
+    else:
+      var started = getMonoTime()
+      for _ in 0 ..< 3:
+        ringBackend.submitWgpuMeshTarget(directSize, directBackground,
+          directMesh, directColor)
+      let ringMs = elapsedMs(started)
+      started = getMonoTime()
+      for _ in 0 ..< 3:
+        singleBackend.submitWgpuMeshTarget(directSize, directBackground,
+          directMesh, directColor)
+      let singleMs = elapsedMs(started)
+      if iteration >= 3:
+        directSingleTimes.push(singleMs)
+        directRingTimes.push(ringMs)
+  let
+    singleDiagnostics = singleBackend.wgpuDiagnostics
+    ringDiagnostics = ringBackend.wgpuDiagnostics
+    directBursts = uint64(iterations + 3)
+    directSubmissions = directBursts * 3'u64
+  if singleDiagnostics.streamingRingRotations != directSubmissions or
+      singleDiagnostics.streamingRingSyncs != directBursts * 2'u64:
+    quit("single streaming slot did not synchronize twice per burst", 1)
+  if ringDiagnostics.streamingRingRotations != directSubmissions or
+      ringDiagnostics.streamingRingSyncs != 0:
+    quit("three-slot streaming ring lifetime accounting is inconsistent", 1)
   let report = %*{
     "provider": "UniPlot-WGPU",
     "wgpu_native": WgpuNativeTargetVersion,
@@ -122,12 +178,14 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "managed-budget-chunked-lru-2-v1",
+    "residency": "managed-budget-chunked-lru-ring-3-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
       "upload_submit": "cycle three identities through two slots and enqueue",
       "submit": "alternate two resident identities without upload/readback",
       "publication_frame": "submit resident geometry and read back RGBA8",
+      "direct_burst_single": "three direct submissions from idle through one fenced slot",
+      "direct_burst_ring": "three direct submissions from idle through three fenced slots",
       "prepared_cache_bytes": "allocated prepared vertex/index capacities only",
       "upload_writes": "queue writes split at the configured byte bound",
       "managed_gpu_bytes": "tracked buffers plus logical RGBA target bytes"
@@ -136,6 +194,8 @@ proc main() =
     "upload_submit": summary(uploadSubmitTimes),
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
+    "direct_burst_single": summary(directSingleTimes),
+    "direct_burst_ring": summary(directRingTimes),
     "mesh_uploads": diagnostics.meshUploads,
     "upload_write_calls": diagnostics.uploadWriteCalls,
     "upload_bytes": diagnostics.uploadBytes,
@@ -155,6 +215,9 @@ proc main() =
     "streaming_buffer_bytes": diagnostics.streamingBufferBytes,
     "target_texture_bytes": diagnostics.targetTextureBytes,
     "readback_buffer_bytes": diagnostics.readbackBufferBytes,
+    "single_stream_syncs": singleDiagnostics.streamingRingSyncs,
+    "ring_stream_syncs": ringDiagnostics.streamingRingSyncs,
+    "ring_stream_bytes": ringDiagnostics.streamingBufferBytes,
     "guard": consumed
   }
   echo $report

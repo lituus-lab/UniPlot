@@ -3,23 +3,31 @@
   "backend": "metal",
   "points": 1000,
   "canvas": "800x500",
-  "residency": "managed-budget-chunked-lru-2-v1",
+  "residency": "managed-budget-chunked-lru-ring-3-v1",
   "repeated_runs": 3,
   "iterations_per_run": 50,
   "preparation": {
-    "mean_ms": 73.76431495333333,
+    "mean_ms": 73.64308641333335,
     "max_ratio": 1.1
   },
   "upload_submit": {
-    "mean_ms": 1.06183196,
+    "mean_ms": 1.05991362,
     "max_ratio": 1.25
   },
   "submit": {
-    "mean_ms": 0.09220695333333332,
+    "mean_ms": 0.09574332,
     "max_ratio": 2.5
   },
   "publication_frame": {
-    "mean_ms": 3.07018912,
+    "mean_ms": 3.0883549933333335,
     "max_ratio": 1.2
+  },
+  "direct_burst_single": {
+    "mean_ms": 3.1345722,
+    "max_ratio": 1.25
+  },
+  "direct_burst_ring": {
+    "mean_ms": 0.09873415333333334,
+    "max_ratio": 2.0
   }
 }
