@@ -197,6 +197,38 @@ task wgpuBenchmark, "Benchmark warm WGPU frames with explicit readback":
   exec "nim c -r -d:release --path:src -o:build/benchmark_wgpu" &
        " benchmarks/benchmark_wgpu.nim"
 
+task wgpuRasterBenchmark, "Benchmark real WGPU RGBA texture frames":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r -d:release --mm:orc --path:src -o:build/benchmark_wgpu_raster" &
+       " benchmarks/benchmark_wgpu_raster.nim"
+
+task wgpuRasterBaseline, "Record three-run WGPU raster evidence":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -d:release --mm:orc --path:src -o:build/benchmark_wgpu_raster" &
+       " benchmarks/benchmark_wgpu_raster.nim"
+  exec "nim c -r -d:release --mm:orc -o:build/run_wgpu_raster_baseline" &
+       " benchmarks/run_wgpu_raster_baseline.nim"
+
 # Nim takes `-o:` literally and appends no platform extension.
 const
   sharedLib =
