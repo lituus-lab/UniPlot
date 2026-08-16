@@ -127,7 +127,10 @@ than introducing competing geometry or text implementations.
   buffer capacities, readback capacity and logical RGBA8 target bytes, with
   component/high-water diagnostics and LRU pressure tests. Opaque driver
   allocations remain explicitly outside this accounting boundary.
-- [ ] Add rotating/ring streaming buffers with submission-lifetime tracking.
+- [x] Rotate direct uploads through a configurable managed streaming ring,
+  retaining real wgpu-native submission indices and synchronizing a slot before
+  reuse; cover readback/idle release, exact diagnostics and drained-burst
+  benchmarks.
 - [ ] Level-of-detail, decimation and visibility culling for large series.
 - [ ] Instanced points, lines and rectangles; indirect draws where supported.
 - [ ] Timestamp-query instrumentation with wall-clock fallback.
