@@ -11,80 +11,114 @@
   "source": "512x512 RGBA8",
   "canvas": "800x600",
   "filter": "bilinear",
-  "semantics": "PlotSpec construction; raster snapshots and temporal labels compile through retained scenes; publication includes CPU render",
+  "semantics": "separate PlotSpec construction, automatic histogram selection, retained-scene compilation and complete CPU publication",
   "image_mark_count": 64,
   "image_resource_count": 4,
   "temporal_point_count": 1000,
+  "histogram_point_count": 100000,
+  "histogram_rule": "Freedman-Diaconis",
   "construction_snapshot": {
     "run_mean_ms": [
-      0.3323206,
-      0.34029590000000004,
-      0.3545248999999999
+      0.3225209,
+      0.3182836,
+      0.38535810000000004
     ],
-    "median_run_mean_ms": 0.34029590000000004
+    "median_run_mean_ms": 0.3225209
   },
   "compile": {
     "run_mean_ms": [
-      8.600029300000001,
-      8.7735001,
-      9.059991700000001
+      8.709746,
+      8.5743207,
+      10.1116749
     ],
-    "median_run_mean_ms": 8.7735001
+    "median_run_mean_ms": 8.709746
   },
   "publication": {
     "run_mean_ms": [
-      8.3586084,
-      8.598466600000002,
-      8.448070900000001
+      7.5713583,
+      7.5595292,
+      9.7900207
     ],
-    "median_run_mean_ms": 8.448070900000001
+    "median_run_mean_ms": 7.5713583
   },
   "image_mark_construction": {
     "run_mean_ms": [
-      0.0210375,
-      0.024562399999999998,
-      0.0244418
+      0.0219334,
+      0.020045699999999996,
+      0.02615
     ],
-    "median_run_mean_ms": 0.0244418
+    "median_run_mean_ms": 0.0219334
   },
   "image_mark_compile": {
     "run_mean_ms": [
-      3.1608292000000002,
-      3.2755584,
-      3.2383835
+      3.1760539999999997,
+      3.1357915999999997,
+      4.0425165000000005
     ],
-    "median_run_mean_ms": 3.2383835
+    "median_run_mean_ms": 3.1760539999999997
   },
   "image_mark_publication": {
     "run_mean_ms": [
-      7.609691600000001,
-      7.5993335,
-      7.715712400000001
+      7.0694875999999995,
+      7.018683299999999,
+      8.3291377
     ],
-    "median_run_mean_ms": 7.609691600000001
+    "median_run_mean_ms": 7.0694875999999995
   },
   "temporal_construction": {
     "run_mean_ms": [
-      0.014954299999999998,
-      0.014971,
-      0.016520899999999998
+      0.015371,
+      0.014091800000000003,
+      0.018070799999999998
     ],
-    "median_run_mean_ms": 0.014971
+    "median_run_mean_ms": 0.015371
   },
   "temporal_compile": {
     "run_mean_ms": [
-      0.1091833,
-      0.1084459,
-      0.1107749
+      0.1314585,
+      0.13031669999999998,
+      0.14622939999999998
     ],
-    "median_run_mean_ms": 0.1091833
+    "median_run_mean_ms": 0.1314585
   },
   "temporal_publication": {
     "run_mean_ms": [
-      13.715887500000001,
-      13.6371294,
-      14.2359333
+      13.0967918,
+      13.013921,
+      13.8242085
     ],
-    "median_run_mean_ms": 13.715887500000001
+    "median_run_mean_ms": 13.0967918
+  },
+  "histogram_selection": {
+    "run_mean_ms": [
+      12.1510248,
+      12.021729,
+      12.3666333
+    ],
+    "median_run_mean_ms": 12.1510248
+  },
+  "histogram_construction": {
+    "run_mean_ms": [
+      13.7086501,
+      13.635504200000002,
+      14.3349291
+    ],
+    "median_run_mean_ms": 13.7086501
+  },
+  "histogram_compile": {
+    "run_mean_ms": [
+      0.0302207,
+      0.0269168,
+      0.027774999999999998
+    ],
+    "median_run_mean_ms": 0.027774999999999998
+  },
+  "histogram_publication": {
+    "run_mean_ms": [
+      22.8165167,
+      22.467804200000003,
+      24.0679374
+    ],
+    "median_run_mean_ms": 22.8165167
   }
 }
