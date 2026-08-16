@@ -211,6 +211,11 @@ suite "WGPU boundary":
       check rasterGpu[covered .. covered + 3] == @[255'u8, 255, 0, 255]
       check rasterBackend.wgpuDiagnostics.textureUploads == 2
       check rasterBackend.wgpuDiagnostics.textureUploadBytes == 8
+      let residentBytes = rasterBackend.wgpuDiagnostics.preparedCacheBytes
+      discard rasterBackend.renderWgpuScene(rasterScene,
+        loadTtf("tests/DejaVuSans.ttf"))
+      check rasterBackend.wgpuDiagnostics.textureUploads == 2
+      check rasterBackend.wgpuDiagnostics.preparedCacheBytes == residentBytes
       var first = uimg.newImage[uint8](1, 1, uimg.csRgba)
       first.data = @[255'u8, 0, 0, 128]
       var second = uimg.newImage[uint8](1, 1, uimg.csRgba)
@@ -226,7 +231,87 @@ suite "WGPU boundary":
           loadTtf("tests/DejaVuSans.ttf"))
       check alphaGpu == alphaCpu
       check alphaGpu == @[85'u8, 0, 170, 192]
+      var thresholdFirst = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      thresholdFirst.data = @[255'u8, 255, 255, 199]
+      var thresholdSecond = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      thresholdSecond.data = @[255'u8, 255, 255, 7]
+      var thresholdScene = initScene(Size(width: 1, height: 1),
+        parseColor("#00000000").get)
+      thresholdScene.addImage(thresholdFirst, 0, 0)
+      thresholdScene.addImage(thresholdSecond, 0, 0)
+      let
+        thresholdCpu = thresholdScene.renderImage(
+          loadTtf("tests/DejaVuSans.ttf")).data
+        thresholdGpu = rasterBackend.renderWgpuScene(thresholdScene,
+          loadTtf("tests/DejaVuSans.ttf"))
+      check thresholdCpu == @[255'u8, 255, 255, 201]
+      check thresholdGpu == @[255'u8, 255, 255, 200]
+      for channel in 0 ..< 4:
+        check abs(int(thresholdGpu[channel]) - int(thresholdCpu[channel])) <= 1
+      var lowAlpha = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      lowAlpha.data = @[1'u8, 0, 0, 1]
+      var lowAlphaScene = initScene(Size(width: 1, height: 1),
+        parseColor("#00000000").get)
+      lowAlphaScene.addImage(lowAlpha, 0, 0)
+      check rasterBackend.renderWgpuScene(lowAlphaScene,
+        loadTtf("tests/DejaVuSans.ttf")) == @[1'u8, 0, 0, 1]
       rasterBackend.close()
+      let rasterLruBackend = openWgpuBackend(libraryPath,
+        preparedCacheCapacity = 1,
+        preparedCacheByteBudget = MinPreparedCacheByteBudget * 4)
+      var lruFirstImage = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      lruFirstImage.data = @[255'u8, 0, 0, 255]
+      var lruSecondImage = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      lruSecondImage.data = @[0'u8, 255, 0, 255]
+      var lruFirstScene = initScene(Size(width: 1, height: 1),
+        parseColor("#00000000").get)
+      lruFirstScene.addImage(lruFirstImage, 0, 0)
+      var lruSecondScene = initScene(Size(width: 1, height: 1),
+        parseColor("#00000000").get)
+      lruSecondScene.addImage(lruSecondImage, 0, 0)
+      check rasterLruBackend.renderWgpuScene(lruFirstScene,
+        loadTtf("tests/DejaVuSans.ttf")) == lruFirstImage.data
+      check rasterLruBackend.renderWgpuScene(lruSecondScene,
+        loadTtf("tests/DejaVuSans.ttf")) == lruSecondImage.data
+      var rasterLruDiagnostics = rasterLruBackend.wgpuDiagnostics
+      check rasterLruDiagnostics.preparedCacheEntries == 1
+      check rasterLruDiagnostics.preparedCacheEvictions == 1
+      check rasterLruDiagnostics.textureUploads == 2
+      check rasterLruBackend.renderWgpuScene(lruFirstScene,
+        loadTtf("tests/DejaVuSans.ttf")) == lruFirstImage.data
+      rasterLruDiagnostics = rasterLruBackend.wgpuDiagnostics
+      check rasterLruDiagnostics.preparedCacheEntries == 1
+      check rasterLruDiagnostics.preparedCacheEvictions == 2
+      check rasterLruDiagnostics.textureUploads == 3
+      check rasterLruDiagnostics.preparedCacheBytes <=
+        rasterLruDiagnostics.preparedCacheByteBudget
+      rasterLruBackend.close()
+      let rasterBudgetBackend = openWgpuBackend(libraryPath,
+        preparedCacheByteBudget = MinPreparedCacheByteBudget,
+        managedGpuByteBudget = 64'u64 * 1024'u64)
+      var oversizedRaster = uimg.newImage[uint8](16, 16, uimg.csRgba)
+      var oversizedScene = initScene(Size(width: 16, height: 16),
+        parseColor("#ffffff").get)
+      oversizedScene.addImage(oversizedRaster, 0, 0)
+      expect WgpuError:
+        discard rasterBudgetBackend.renderWgpuScene(oversizedScene,
+          loadTtf("tests/DejaVuSans.ttf"))
+      check rasterBudgetBackend.wgpuDiagnostics.preparedCacheEntries == 0
+      rasterBudgetBackend.close()
+      let mixedBudgetBackend = openWgpuBackend(libraryPath,
+        preparedCacheByteBudget = MinPreparedCacheByteBudget,
+        managedGpuByteBudget = 64'u64 * 1024'u64)
+      var mixedOversizedScene = oversizedScene
+      var mixedPath = newPath()
+      mixedPath.rect(1, 1, 2, 2)
+      mixedOversizedScene.addPath(mixedPath, parseColor("#ff0000").get)
+      expect WgpuError:
+        discard mixedBudgetBackend.renderWgpuScene(mixedOversizedScene,
+          loadTtf("tests/DejaVuSans.ttf"))
+      check mixedBudgetBackend.wgpuDiagnostics.preparedCacheEntries == 1
+      check mixedBudgetBackend.wgpuDiagnostics.preparedCacheBytes ==
+        MinPreparedCacheByteBudget
+      mixedBudgetBackend.close()
       let antialiasedPath = parsePath(
         "M 2.25 2.25 L 7.75 2.25 L 7.75 7.75 L 2.25 7.75 Z")
       let antialiasedMesh = antialiasedPath.preparePath().tessellateFill()
@@ -415,7 +500,7 @@ suite "WGPU boundary":
       check tooSmall.wgpuDiagnostics.preparedCacheBytes == 0
       tooSmall.close()
 
-      let targetBytes = uint64(scene.size.width * scene.size.height * 4)
+      let targetBytes = uint64(scene.size.width * scene.size.height * 8)
       let globallyLimited = openWgpuBackend(libraryPath,
         preparedCacheCapacity = 2,
         preparedCacheByteBudget = oneSceneBytes + targetBytes,
