@@ -2,6 +2,7 @@
 # Copyright 2026 lituus-lab
 import std/tables
 import UniColor
+import UniImage/core as ucore
 from UniVector import MarkerShape, CircleMarker, SquareMarker, TriangleMarker,
   DiamondMarker, PlusMarker, CrossMarker
 import contracts
@@ -89,6 +90,16 @@ type
     color*: Color
     size*, headSize*: float32
 
+  RasterFilter* = enum
+    RasterNearest
+    RasterBilinear
+    RasterBox
+
+  RasterLayer* = object
+    image*: ucore.Image[uint8]
+    xMin*, xMax*, yMin*, yMax*: float64
+    filter*: RasterFilter
+
   Aes* = object
     x*, y*: string
     xMin*, xMax*: string
@@ -132,6 +143,33 @@ type
     secondaryYSpec*: SecondaryAxisSpec
     references*: seq[Reference]
     annotations*: seq[Annotation]
+    rasters*: seq[RasterLayer]
+
+proc snapshot(image: ucore.Image[uint8]): ucore.Image[uint8] =
+  result = image
+  result.data = newSeq[uint8](image.data.len)
+  if image.data.len > 0:
+    copyMem(addr result.data[0], unsafeAddr image.data[0], image.data.len)
+
+proc raster*(spec: var PlotSpec; image: ucore.Image[uint8]; xMin, xMax, yMin,
+    yMax: float64; filter = RasterBilinear) {.contractual.} =
+  ## Add a retained raster behind data marks, positioned in numeric data
+  ## coordinates. Pixel storage is snapshotted so later caller mutation cannot
+  ## change the plot specification.
+  require:
+    image.validPackedImage
+    image.colorspace in {ucore.csGray, ucore.csRgb, ucore.csRgba}
+    xMin.isFinite and xMax.isFinite and xMin < xMax
+    yMin.isFinite and yMax.isFinite and yMin < yMax
+  body:
+    if not image.validPackedImage or
+        image.colorspace notin {ucore.csGray, ucore.csRgb, ucore.csRgba}:
+      raise newException(PlotError, "raster requires a valid Gray/RGB/RGBA8 image")
+    if not xMin.isFinite or not xMax.isFinite or xMin >= xMax or
+        not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
+      raise newException(PlotError, "raster extents must be finite and increasing")
+    spec.rasters.add RasterLayer(image: image.snapshot, xMin: xMin,
+      xMax: xMax, yMin: yMin, yMax: yMax, filter: filter)
 
 proc cssColor(value: string): Color =
   let parsed = parseColor(value)

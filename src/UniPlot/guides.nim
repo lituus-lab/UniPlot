@@ -2,6 +2,9 @@
 # Copyright 2026 lituus-lab
 import std/[math, tables]
 import UniColor
+import UniImage/core as ucore
+import UniImage/process/resize as uresize
+import UniImage/process/rotate as urotate
 import UniVector
 import UniPlot/[common, data, scales, grammar, scene]
 
@@ -199,26 +202,34 @@ type AxisDomains* = object
 
 proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   ## Accumulate every coordinate that must be representable by plot axes.
-  if spec.layers.len == 0:
+  if spec.layers.len == 0 and spec.rasters.len == 0:
     raise newException(PlotError, "plot has no layers")
-  let firstX = if spec.layers[0].mark == mkRect:
-    spec.layers[0].mapping.xMin else: spec.layers[0].mapping.x
-  if firstX notin spec.data.columns:
+  let firstX = if spec.layers.len > 0:
+    (if spec.layers[0].mark == mkRect:
+      spec.layers[0].mapping.xMin else: spec.layers[0].mapping.x)
+    else: ""
+  if spec.layers.len > 0 and firstX notin spec.data.columns:
     raise newException(PlotError, "layer mapping references a missing column")
-  result.xKind = spec.data.columns[firstX].kind
+  result.xKind = if spec.layers.len > 0:
+    spec.data.columns[firstX].kind else: ckNumeric
   if result.xKind == ckCategorical and spec.xScaleSpec.kind != skLinear:
     raise newException(PlotError,
       "categorical x coordinates only support a linear scale")
   result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
   result.xBand = initBandDomain()
-  let firstY = if spec.layers[0].mark == mkRect:
-    spec.layers[0].mapping.yMin else: spec.layers[0].mapping.y
-  if spec.layers[0].mark in {mkErrorBar, mkRibbon, mkRect}:
+  let firstY = if spec.layers.len > 0:
+    (if spec.layers[0].mark == mkRect:
+      spec.layers[0].mapping.yMin else: spec.layers[0].mapping.y)
+    else: ""
+  if spec.layers.len > 0 and
+      spec.layers[0].mark in {mkErrorBar, mkRibbon, mkRect}:
     result.yKind = ckNumeric
-  else:
+  elif spec.layers.len > 0:
     if firstY notin spec.data.columns:
       raise newException(PlotError, "layer mapping references a missing column")
     result.yKind = spec.data.columns[firstY].kind
+  else:
+    result.yKind = ckNumeric
   if result.yKind == ckCategorical and spec.yScaleSpec.kind != skLinear:
     raise newException(PlotError,
       "categorical y coordinates only support a linear scale")
@@ -270,6 +281,22 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
     if annotation.kind == akArrow:
       result.xContinuous.addValues([annotation.xEnd])
       result.yContinuous.addValues([annotation.yEnd])
+  for raster in spec.rasters:
+    if result.xKind != ckNumeric or result.yKind != ckNumeric:
+      raise newException(PlotError,
+        "raster layers require numeric x and y coordinates")
+    if not raster.image.validPackedImage or
+        raster.image.colorspace notin {ucore.csGray, ucore.csRgb,
+          ucore.csRgba} or
+        not raster.xMin.isFinite or not raster.xMax.isFinite or
+        raster.xMin >= raster.xMax or not raster.yMin.isFinite or
+        not raster.yMax.isFinite or raster.yMin >= raster.yMax:
+      raise newException(PlotError, "invalid raster layer")
+    if spec.xScaleSpec.kind != skLinear or spec.yScaleSpec.kind != skLinear:
+      raise newException(PlotError,
+        "raster layers currently require linear x and y scales")
+    result.xContinuous.addValues([raster.xMin, raster.xMax])
+    result.yContinuous.addValues([raster.yMin, raster.yMax])
   var includeZero = false
   for layer in spec.layers:
     let xMapping = if layer.mark == mkRect:
@@ -335,7 +362,8 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
 proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     height: 500)): Scene =
   size.validate()
-  if spec.layers.len == 0: raise newException(PlotError, "plot has no layers")
+  if spec.layers.len == 0 and spec.rasters.len == 0:
+    raise newException(PlotError, "plot has no layers")
   for margin in [spec.theme.margins.left, spec.theme.margins.top,
       spec.theme.margins.right, spec.theme.margins.bottom]:
     if margin < 0 or not margin.isFinite:
@@ -550,6 +578,27 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     else:
       domains.yBand.train(yRangeMin, yRangeMax)
   var nodeId = 1'u64
+  for raster in spec.rasters:
+    let
+      mappedX0 = xScale.map(raster.xMin)
+      mappedX1 = xScale.map(raster.xMax)
+      mappedY0 = yScale.map(raster.yMin)
+      mappedY1 = yScale.map(raster.yMax)
+      pixelX = int(round(min(mappedX0, mappedX1)))
+      pixelY = int(round(min(mappedY0, mappedY1)))
+      pixelWidth = max(1, int(round(abs(mappedX1 - mappedX0))))
+      pixelHeight = max(1, int(round(abs(mappedY1 - mappedY0))))
+      filter = case raster.filter
+        of RasterNearest: uresize.rfNearest
+        of RasterBilinear: uresize.rfBilinear
+        of RasterBox: uresize.rfBox
+    var resized = uresize.resize(raster.image, pixelWidth, pixelHeight, filter)
+    if mappedX1 < mappedX0:
+      resized = urotate.rotate(resized, urotate.flipH)
+    if mappedY1 > mappedY0:
+      resized = urotate.rotate(resized, urotate.flipV)
+    result.addImage(resized, pixelX, pixelY, id = nodeId)
+    inc nodeId
   if xKind == ckNumeric:
     for value in xScale.ticks():
       let x = xScale.map(value)
