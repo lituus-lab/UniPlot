@@ -99,7 +99,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.
-- [ ] Data-mapped image marks; retained raster layers are implemented.
+- [ ] Data-mapped image marks through the ordered owned-resource design in
+      ADR-0009; retained raster layers are implemented.
 - [x] Missing-value policies and intentional line breaks.
 - [x] Theme inheritance, reusable style values and publication presets.
 - [ ] Deterministic PDF output through a lower-level Uni* backend.
