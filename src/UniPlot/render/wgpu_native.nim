@@ -320,6 +320,9 @@ type
     vertexBuffer, indexBuffer: pointer
     vertexCapacity, indexCapacity: uint64
     vertexSize, indexSize: uint64
+    imageVertexBuffer: pointer
+    imageVertexCapacity, imageVertexSize, imageTextureBytes: uint64
+    imageTextures, imageViews, imageBindGroups: seq[pointer]
 
   StreamingMeshBuffers = object
     vertexBuffer, indexBuffer: pointer
@@ -384,6 +387,7 @@ const
   TextureUsageRenderAttachment = 0x10'u64
   TextureDimension2D = 2'u32
   TextureFormatRgba8Unorm = 0x16'u32
+  TextureFormatRgba16Float = 0x28'u32
   LoadOpClear = 2'u32
   StoreOpStore = 1'u32
   BufferUsageMapRead = 0x1'u64
@@ -422,6 +426,35 @@ proc grownCapacity(current, required: uint64): uint64 =
   while result < required:
     if result > high(uint64) div 2: return required
     result *= 2
+
+proc halfToFloat(value: uint16): float32 {.inline.} =
+  let
+    sign = uint32(value and 0x8000'u16) shl 16
+    exponent = uint32((value shr 10) and 0x1F'u16)
+  var
+    fraction = uint32(value and 0x03FF'u16)
+    bits: uint32
+  if exponent == 0:
+    if fraction == 0:
+      bits = sign
+    else:
+      var unbiasedExponent = -14
+      while (fraction and 0x0400'u32) == 0:
+        fraction = fraction shl 1
+        dec unbiasedExponent
+      fraction = fraction and 0x03FF'u32
+      bits = sign or (uint32(unbiasedExponent + 127) shl 23) or
+        (fraction shl 13)
+  elif exponent == 31:
+    bits = sign or 0x7F80_0000'u32 or (fraction shl 13)
+  else:
+    bits = sign or ((exponent + 112'u32) shl 23) or (fraction shl 13)
+  cast[float32](bits)
+
+proc unitFloatToByte(value: float32): byte {.inline.} =
+  if value <= 0'f32: 0
+  elif value >= 1'f32: 255
+  else: byte(value * 255'f32 + 0.5'f32)
 
 proc receiveDevice(status: uint32; device: pointer; message: WgpuStringView;
                    userdata1, userdata2: pointer) {.cdecl.} =
@@ -463,6 +496,18 @@ proc close*(runtime: NativeWgpuRuntime) =
     runtime.readbackBuffer = nil
   if runtime.releaseBuffer != nil:
     for entry in runtime.preparedMeshes.mitems:
+      if runtime.releaseBindGroup != nil:
+        for handle in entry.imageBindGroups:
+          if handle != nil: runtime.releaseBindGroup(handle)
+      if runtime.releaseView != nil:
+        for handle in entry.imageViews:
+          if handle != nil: runtime.releaseView(handle)
+      if runtime.releaseTexture != nil:
+        for handle in entry.imageTextures:
+          if handle != nil: runtime.releaseTexture(handle)
+      if entry.imageVertexBuffer != nil:
+        runtime.releaseBuffer(entry.imageVertexBuffer)
+        entry.imageVertexBuffer = nil
       if entry.indexBuffer != nil:
         runtime.releaseBuffer(entry.indexBuffer)
         entry.indexBuffer = nil
@@ -769,7 +814,18 @@ proc evictOldestPrepared(runtime: NativeWgpuRuntime;
       victim = index
   if victim < 0: return false
   let released = runtime.preparedMeshes[victim].vertexCapacity +
-    runtime.preparedMeshes[victim].indexCapacity
+    runtime.preparedMeshes[victim].indexCapacity +
+    runtime.preparedMeshes[victim].imageVertexCapacity +
+    runtime.preparedMeshes[victim].imageTextureBytes
+  for handle in runtime.preparedMeshes[victim].imageBindGroups:
+    if handle != nil: runtime.releaseBindGroup(handle)
+  for handle in runtime.preparedMeshes[victim].imageViews:
+    if handle != nil: runtime.releaseView(handle)
+  for handle in runtime.preparedMeshes[victim].imageTextures:
+    if handle != nil: runtime.releaseTexture(handle)
+  if runtime.preparedMeshes[victim].imageVertexBuffer != nil:
+    runtime.releaseBuffer(
+      runtime.preparedMeshes[victim].imageVertexBuffer)
   if runtime.preparedMeshes[victim].indexBuffer != nil:
     runtime.releaseBuffer(runtime.preparedMeshes[victim].indexBuffer)
   if runtime.preparedMeshes[victim].vertexBuffer != nil:
@@ -867,7 +923,7 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
       raise newException(LibraryError,
         "WGPU raster working set overflows uint64")
     rasterBytes += uint64(image.pixels.len)
-  runtime.transientRasterBytes = rasterBytes
+  runtime.transientRasterBytes = if uploadToken == 0: rasterBytes else: 0
   runtime.transientRasterPeakBytes = max(runtime.transientRasterPeakBytes,
     rasterBytes)
   defer: runtime.transientRasterBytes = 0
@@ -955,9 +1011,9 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
       height > runtime.adapterCapabilities.maxTextureDimension2D:
     raise newException(LibraryError,
       "WGPU target dimensions exceed the adapter limit")
-  if uint64(width) > high(uint64) div uint64(height) div 4'u64:
+  if uint64(width) > high(uint64) div uint64(height) div 8'u64:
     raise newException(LibraryError, "WGPU target byte size overflows uint64")
-  let requestedTargetBytes = uint64(width) * uint64(height) * 4'u64
+  let requestedTargetBytes = uint64(width) * uint64(height) * 8'u64
   if runtime.targetTexture == nil or runtime.targetWidth != width or
       runtime.targetHeight != height:
     runtime.makeManagedRoom(runtime.streamingBytes(), requestedTargetBytes,
@@ -975,7 +1031,7 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
       dimension: TextureDimension2D,
       size: WgpuExtent3D(width: width, height: height,
         depthOrArrayLayers: 1),
-      format: TextureFormatRgba8Unorm,
+      format: TextureFormatRgba16Float,
       mipLevelCount: 1,
       sampleCount: 1)
     runtime.targetTexture = createTexture(runtime.device,
@@ -1074,7 +1130,7 @@ struct VertexOut {
         alpha: WgpuBlendComponent(operation: BlendOperationAdd,
           srcFactor: BlendFactorOne,
           dstFactor: BlendFactorOneMinusSrcAlpha))
-      var target = WgpuColorTargetState(format: TextureFormatRgba8Unorm,
+      var target = WgpuColorTargetState(format: TextureFormatRgba16Float,
         blend: addr blend, writeMask: ColorWriteMaskAll)
       var fragment = WgpuFragmentState(module: runtime.meshShader,
         entryPoint: WgpuStringView(data: fragmentEntry.cstring,
@@ -1209,14 +1265,16 @@ struct VertexOut {
 
   var imageVertexBuffer: pointer
   var imageTextures, imageViews, imageBindGroups: seq[pointer]
+  var ownsImageResources = true
   defer:
-    for bindGroup in imageBindGroups:
-      if bindGroup != nil: runtime.releaseBindGroup(bindGroup)
-    for view in imageViews:
-      if view != nil: releaseView(view)
-    for texture in imageTextures:
-      if texture != nil: releaseTexture(texture)
-    if imageVertexBuffer != nil: releaseBuffer(imageVertexBuffer)
+    if ownsImageResources:
+      for bindGroup in imageBindGroups:
+        if bindGroup != nil: runtime.releaseBindGroup(bindGroup)
+      for view in imageViews:
+        if view != nil: releaseView(view)
+      for texture in imageTextures:
+        if texture != nil: releaseTexture(texture)
+      if imageVertexBuffer != nil: releaseBuffer(imageVertexBuffer)
   if images.len > 0:
     const imageShaderCode = """
 struct VertexOut {
@@ -1264,7 +1322,7 @@ struct VertexOut {
         alpha: WgpuBlendComponent(operation: BlendOperationAdd,
           srcFactor: BlendFactorOne,
           dstFactor: BlendFactorOneMinusSrcAlpha))
-      var target = WgpuColorTargetState(format: TextureFormatRgba8Unorm,
+      var target = WgpuColorTargetState(format: TextureFormatRgba16Float,
         blend: addr blend, writeMask: ColorWriteMaskAll)
       var fragment = WgpuFragmentState(module: runtime.imageShader,
         entryPoint: WgpuStringView(data: fragmentEntry.cstring,
@@ -1298,60 +1356,152 @@ struct VertexOut {
       if runtime.imageSampler == nil:
         raise newException(LibraryError,
           "wgpu-native did not create the image sampler")
-    let imageVertexSize = uint64(imageVertices.len) * uint64(sizeof(float32))
-    var descriptor = WgpuBufferDescriptor(label: emptyLabel,
-      usage: BufferUsageCopyDst or BufferUsageVertex, size: imageVertexSize)
-    imageVertexBuffer = createBuffer(runtime.device, addr descriptor)
-    if imageVertexBuffer == nil:
+    let
+      imageVertexSize = uint64(imageVertices.len) * uint64(sizeof(float32))
+      requiredImageVertexCapacity = grownCapacity(0, imageVertexSize)
+      imageTextureBytes = rasterBytes - imageVertexSize
+    if requiredImageVertexCapacity > high(uint64) - imageTextureBytes:
       raise newException(LibraryError,
-        "wgpu-native did not create the image vertex buffer")
-    runtime.writeBufferChunked(writeBuffer, imageVertexBuffer,
-      unsafeAddr imageVertices[0], imageVertexSize)
-    let layout = getBindGroupLayout(runtime.imagePipeline, 0)
-    if layout == nil:
-      raise newException(LibraryError,
-        "wgpu-native did not expose the image bind-group layout")
-    defer: runtime.releaseBindGroupLayout(layout)
-    imageTextures.setLen(images.len)
-    imageViews.setLen(images.len)
-    imageBindGroups.setLen(images.len)
-    for index, image in images:
-      var textureDescriptor = WgpuTextureDescriptor(label: emptyLabel,
-        usage: TextureUsageCopyDst or TextureUsageBinding,
-        dimension: TextureDimension2D,
-        size: WgpuExtent3D(width: image.width, height: image.height,
-          depthOrArrayLayers: 1), format: TextureFormatRgba8Unorm,
-        mipLevelCount: 1, sampleCount: 1)
-      imageTextures[index] = createTexture(runtime.device,
-        addr textureDescriptor)
-      if imageTextures[index] == nil:
+        "prepared WGPU raster capacities overflow uint64")
+    let requiredRasterBytes = requiredImageVertexCapacity + imageTextureBytes
+    var entryIndex = -1
+    for index, entry in runtime.preparedMeshes:
+      if entry.token == uploadToken:
+        entryIndex = index
+        break
+    var addedEntry = false
+    if entryIndex < 0:
+      inc runtime.preparedCacheMisses
+      if requiredRasterBytes > runtime.preparedCacheByteBudget:
         raise newException(LibraryError,
-          "wgpu-native did not create an image texture")
-      imageViews[index] = createView(imageTextures[index], nil)
-      if imageViews[index] == nil:
+          "prepared WGPU raster exceeds the cache byte budget")
+      runtime.makeManagedRoom(runtime.streamingBytes(),
+        runtime.targetTextureBytes, runtime.readbackCapacity,
+        incomingPrepared = requiredRasterBytes)
+      while runtime.preparedMeshes.len >= runtime.preparedCacheCapacity or
+          runtime.preparedCacheBytes >
+            runtime.preparedCacheByteBudget - requiredRasterBytes:
+        if not runtime.evictOldestPrepared():
+          raise newException(LibraryError,
+            "prepared WGPU cache could not evict an entry")
+      runtime.preparedMeshes.add PreparedMeshBuffers(token: uploadToken)
+      entryIndex = runtime.preparedMeshes.high
+      addedEntry = true
+    elif meshIndices.len == 0:
+      inc runtime.preparedCacheHits
+    if runtime.preparedMeshes[entryIndex].imageVertexBuffer != nil:
+      let entry = runtime.preparedMeshes[entryIndex]
+      if entry.imageVertexSize != imageVertexSize or
+          entry.imageTextureBytes != imageTextureBytes or
+          entry.imageTextures.len != images.len:
         raise newException(LibraryError,
-          "wgpu-native did not create an image texture view")
-      var destination = WgpuTexelCopyTextureInfo(
-        texture: imageTextures[index], aspect: TextureAspectAll)
-      var copyLayout = WgpuTexelCopyBufferLayout(
-        bytesPerRow: image.width * 4, rowsPerImage: image.height)
-      var copySize = WgpuExtent3D(width: image.width, height: image.height,
-        depthOrArrayLayers: 1)
-      writeTexture(runtime.queue, addr destination,
-        unsafeAddr image.pixels[0], csize_t(image.pixels.len),
-        addr copyLayout, addr copySize)
-      inc runtime.textureUploadCount
-      runtime.textureUploadBytes += uint64(image.pixels.len)
-      var entries = [
-        WgpuBindGroupEntry(binding: 0, sampler: runtime.imageSampler),
-        WgpuBindGroupEntry(binding: 1, textureView: imageViews[index])]
-      var bindDescriptor = WgpuBindGroupDescriptor(label: emptyLabel,
-        layout: layout, entryCount: 2, entries: addr entries[0])
-      imageBindGroups[index] = createBindGroup(runtime.device,
-        addr bindDescriptor)
-      if imageBindGroups[index] == nil:
+          "prepared WGPU token changed its raster payload")
+      imageVertexBuffer = entry.imageVertexBuffer
+      imageTextures = entry.imageTextures
+      imageViews = entry.imageViews
+      imageBindGroups = entry.imageBindGroups
+      ownsImageResources = false
+    else:
+      if not addedEntry:
+        if requiredRasterBytes > runtime.preparedCacheByteBudget:
+          raise newException(LibraryError,
+            "prepared WGPU raster exceeds the cache byte budget")
+        while runtime.preparedCacheBytes >
+            runtime.preparedCacheByteBudget - requiredRasterBytes:
+          if not runtime.evictOldestPrepared(uploadToken):
+            raise newException(LibraryError,
+              "prepared WGPU cache could not admit raster resources")
+        runtime.makeManagedRoom(runtime.streamingBytes(),
+          runtime.targetTextureBytes, runtime.readbackCapacity,
+          incomingPrepared = requiredRasterBytes,
+          protectedToken = uploadToken)
+        entryIndex = -1
+        for index, cached in runtime.preparedMeshes:
+          if cached.token == uploadToken:
+            entryIndex = index
+            break
+        if entryIndex < 0:
+          raise newException(LibraryError,
+            "prepared WGPU raster entry was evicted while protected")
+      var entry = addr runtime.preparedMeshes[entryIndex]
+      var descriptor = WgpuBufferDescriptor(label: emptyLabel,
+        usage: BufferUsageCopyDst or BufferUsageVertex,
+        size: requiredImageVertexCapacity)
+      imageVertexBuffer = createBuffer(runtime.device, addr descriptor)
+      if imageVertexBuffer == nil:
+        if addedEntry: runtime.preparedMeshes.delete(entryIndex)
         raise newException(LibraryError,
-          "wgpu-native did not create an image bind group")
+          "wgpu-native did not create the image vertex buffer")
+      runtime.writeBufferChunked(writeBuffer, imageVertexBuffer,
+        unsafeAddr imageVertices[0], imageVertexSize)
+      let layout = getBindGroupLayout(runtime.imagePipeline, 0)
+      if layout == nil:
+        if addedEntry: runtime.preparedMeshes.delete(entryIndex)
+        raise newException(LibraryError,
+          "wgpu-native did not expose the image bind-group layout")
+      defer: runtime.releaseBindGroupLayout(layout)
+      imageTextures.setLen(images.len)
+      imageViews.setLen(images.len)
+      imageBindGroups.setLen(images.len)
+      for index, image in images:
+        var textureDescriptor = WgpuTextureDescriptor(label: emptyLabel,
+          usage: TextureUsageCopyDst or TextureUsageBinding,
+          dimension: TextureDimension2D,
+          size: WgpuExtent3D(width: image.width, height: image.height,
+            depthOrArrayLayers: 1), format: TextureFormatRgba8Unorm,
+          mipLevelCount: 1, sampleCount: 1)
+        imageTextures[index] = createTexture(runtime.device,
+          addr textureDescriptor)
+        if imageTextures[index] == nil:
+          if addedEntry: runtime.preparedMeshes.delete(entryIndex)
+          raise newException(LibraryError,
+            "wgpu-native did not create an image texture")
+        imageViews[index] = createView(imageTextures[index], nil)
+        if imageViews[index] == nil:
+          if addedEntry: runtime.preparedMeshes.delete(entryIndex)
+          raise newException(LibraryError,
+            "wgpu-native did not create an image texture view")
+        var destination = WgpuTexelCopyTextureInfo(
+          texture: imageTextures[index], aspect: TextureAspectAll)
+        var copyLayout = WgpuTexelCopyBufferLayout(
+          bytesPerRow: image.width * 4, rowsPerImage: image.height)
+        var copySize = WgpuExtent3D(width: image.width, height: image.height,
+          depthOrArrayLayers: 1)
+        writeTexture(runtime.queue, addr destination,
+          unsafeAddr image.pixels[0], csize_t(image.pixels.len),
+          addr copyLayout, addr copySize)
+        inc runtime.textureUploadCount
+        runtime.textureUploadBytes += uint64(image.pixels.len)
+        var entries = [
+          WgpuBindGroupEntry(binding: 0, sampler: runtime.imageSampler),
+          WgpuBindGroupEntry(binding: 1, textureView: imageViews[index])]
+        var bindDescriptor = WgpuBindGroupDescriptor(label: emptyLabel,
+          layout: layout, entryCount: 2, entries: addr entries[0])
+        imageBindGroups[index] = createBindGroup(runtime.device,
+          addr bindDescriptor)
+        if imageBindGroups[index] == nil:
+          if addedEntry: runtime.preparedMeshes.delete(entryIndex)
+          raise newException(LibraryError,
+            "wgpu-native did not create an image bind group")
+      entry.imageVertexBuffer = imageVertexBuffer
+      entry.imageVertexCapacity = requiredImageVertexCapacity
+      entry.imageVertexSize = imageVertexSize
+      entry.imageTextureBytes = imageTextureBytes
+      entry.imageTextures = imageTextures
+      entry.imageViews = imageViews
+      entry.imageBindGroups = imageBindGroups
+      runtime.preparedCacheBytes += requiredRasterBytes
+      runtime.preparedCachePeakBytes = max(runtime.preparedCachePeakBytes,
+        runtime.preparedCacheBytes)
+      ownsImageResources = false
+      runtime.recordManagedPeak()
+    if meshIndices.len == 0:
+      if runtime.preparedUseClock == high(uint64):
+        for cached in runtime.preparedMeshes.mitems: cached.lastUse = 0
+        runtime.preparedUseClock = 1
+      else:
+        inc runtime.preparedUseClock
+      runtime.preparedMeshes[entryIndex].lastUse = runtime.preparedUseClock
 
   for command in commands:
     case command.kind
@@ -1375,7 +1525,7 @@ struct VertexOut {
   renderPassOpen = false
   var unpaddedRow, paddedRow, bufferSize: uint64
   if readback:
-    unpaddedRow = uint64(width) * 4'u64
+    unpaddedRow = uint64(width) * 8'u64
     paddedRow = (unpaddedRow + 255'u64) and not 255'u64
     if paddedRow > uint64(high(uint32)) or
         paddedRow > uint64(high(int)) div uint64(height):
@@ -1449,23 +1599,25 @@ struct VertexOut {
   if mapped == nil:
     raise newException(LibraryError, "wgpu-native returned no mapped data")
   defer: unmapBuffer(runtime.readbackBuffer)
-  let outputSize = int(unpaddedRow * uint64(height))
+  let outputSize = int(uint64(width) * uint64(height) * 4'u64)
   result = newSeq[byte](outputSize)
   let sourceBytes = cast[ptr UncheckedArray[byte]](mapped)
   for row in 0 ..< int(height):
-    copyMem(addr result[row * int(unpaddedRow)],
-      unsafeAddr sourceBytes[row * int(paddedRow)], int(unpaddedRow))
-  for offset in countup(0, result.high, 4):
-    let outputAlpha = uint32(result[offset + 3])
-    if outputAlpha == 0:
-      result[offset] = 0
-      result[offset + 1] = 0
-      result[offset + 2] = 0
-    elif outputAlpha < 255:
-      for channel in 0 ..< 3:
-        result[offset + channel] = byte(min(255'u32,
-          (uint32(result[offset + channel]) * 255'u32 + outputAlpha div 2) div
-            outputAlpha))
+    for column in 0 ..< int(width):
+      let
+        sourceOffset = row * int(paddedRow) + column * 8
+        outputOffset = (row * int(width) + column) * 4
+      var channels: array[4, float32]
+      for channel in 0 ..< 4:
+        let half = uint16(sourceBytes[sourceOffset + channel * 2]) or
+          (uint16(sourceBytes[sourceOffset + channel * 2 + 1]) shl 8)
+        channels[channel] = half.halfToFloat
+      let outputAlpha = channels[3]
+      result[outputOffset + 3] = outputAlpha.unitFloatToByte
+      if outputAlpha > 0'f32:
+        for channel in 0 ..< 3:
+          result[outputOffset + channel] =
+            (channels[channel] / outputAlpha).unitFloatToByte
   if runtime.deviceLostReason() != 0'u32:
     raise newException(LibraryError, "wgpu-native device was lost")
   if runtime.takeUncapturedError() != 0'u32:

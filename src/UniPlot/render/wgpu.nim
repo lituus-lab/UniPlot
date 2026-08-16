@@ -490,6 +490,10 @@ proc prepareWgpuScene*(scene: Scene;
           visibleHeight = min(node.image.height - sourceY,
             scene.size.height - destinationY)
         if visibleWidth <= 0 or visibleHeight <= 0: continue
+        if visibleWidth > high(int) div visibleHeight or
+            visibleWidth * visibleHeight > high(int) div 4:
+          raise newException(WgpuError,
+            "WGPU visible image byte size exceeds host limits")
         if uint64(result.imageVertices.len div 4) >
             uint64(high(uint32)) - 6'u64:
           raise newException(WgpuError,
