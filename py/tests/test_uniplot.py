@@ -63,6 +63,31 @@ def test_raster_pixels_render_and_validate_contracts():
     with pytest.raises(ValueError):
         uniplot.Plot().raster(bytes(4), 1, 1, 4, float("nan"), 1, 0, 1)
 
+def test_image_marks_copy_pixels_and_preserve_existing_rows():
+    pixels = bytearray([12, 34, 56, 255])
+    plot = (uniplot.Plot(320, 240)
+            .line([0, 1, 2], [1, 2, 1])
+            .image(pixels, 1, 1, 4, 0.5, 1.5, 0.5, 1.5,
+                   uniplot.RASTER_BILINEAR))
+    pixels[0] = 0
+    encoded = plot.to_json()
+    assert "DCI4/w==" in encoded
+    assert "mkImage" in encoded
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    plot.image(bytes([90, 80, 70, 255]), 1, 1, 4, 1.5, 2.5, 0.5, 1.5)
+    plot.line([0, 1, 2], [2, 1, 2])
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        uniplot.Plot().image(b"short", 1, 1, 4, 0, 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().image(bytes(4), 1, 1, 4, 1, 0, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().image(bytes(4), 1, 1, 2, 0, 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().image(bytes(4), 1, 1, 4, float("inf"), 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().image(bytes(4), 1, 1, 4, 0, 1, 0, 1, 99)
+
 def test_categorical_facets_render_svg_and_png():
     plot = (uniplot.Plot()
             .line([0, 1, 2, 3], [1, 3, 2, 4])
