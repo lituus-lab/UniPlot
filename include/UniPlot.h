@@ -65,6 +65,10 @@ int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
 int uplot_add_raster(uplot_plot *, const uint8_t *pixels, size_t length,
                      int width, int height, int channels, double x_min,
                      double x_max, double y_min, double y_max, int filter);
+/* Add one data mark in layer order. Pixels are copied and remain caller-owned. */
+int uplot_add_image_mark(uplot_plot *, const uint8_t *pixels, size_t length,
+                         int width, int height, int channels, double x_min,
+                         double x_max, double y_min, double y_max, int filter);
 int uplot_add_box_plot(uplot_plot *, const char *const *groups,
                        const double *values, size_t count,
                        double whisker_length, const char *color,

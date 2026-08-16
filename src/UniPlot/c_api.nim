@@ -86,6 +86,16 @@ proc resizeFrame(frame: var DataFrame; rowCount: int) =
       frame.columns[name].categories.setLen(rowCount)
   frame.rowCount = rowCount
 
+proc snapshotFrame(frame: DataFrame): DataFrame =
+  ## Build an independent candidate so ABI mutations publish atomically.
+  result = initDataFrame()
+  for name in frame.order:
+    case frame.columns[name].kind
+    of ckNumeric:
+      result.addColumn(name, frame.columns[name].numbers)
+    of ckCategorical:
+      result.addColumn(name, frame.columns[name].categories)
+
 proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     mark: MarkKind; color: cstring; size: float32;
     lineStyle = SolidLine; shape = CircleMarker;
@@ -100,7 +110,17 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     let h = handle(value)
     let inputCount = int(count)
     let targetCount = max(inputCount, h.spec.data.rowCount)
-    h.spec.data.resizeFrame(targetCount)
+    var candidate = h.nextColumn
+    while "x" & $candidate in h.spec.data.columns or
+        "y" & $candidate in h.spec.data.columns:
+      if candidate == high(int): return UPLOT_ERR_ARGUMENT
+      inc candidate
+    if candidate == high(int): return UPLOT_ERR_ARGUMENT
+    var candidateSpec = h.spec
+    candidateSpec.data = h.spec.data.snapshotFrame
+    candidateSpec.layers = newSeqOfCap[Layer](h.spec.layers.len + 1)
+    for layer in h.spec.layers: candidateSpec.layers.add layer
+    candidateSpec.data.resizeFrame(targetCount)
     var xv = newSeq[float64](targetCount)
     var yv = newSeq[float64](targetCount)
     let xa = cast[ptr UncheckedArray[float64]](xs)
@@ -109,14 +129,16 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
       xv[i] = xa[i]; yv[i] = ya[i]
     for i in inputCount ..< targetCount:
       xv[i] = NaN; yv[i] = NaN
-    let xName = "x" & $h.nextColumn
-    let yName = "y" & $h.nextColumn
-    h.spec.data.addColumn(xName, xv)
-    h.spec.data.addColumn(yName, yv)
-    h.spec.addLayer(mark, aes(xName, yName), $color, size,
+    let xName = "x" & $candidate
+    let yName = "y" & $candidate
+    candidateSpec.data.addColumn(xName, xv)
+    candidateSpec.data.addColumn(yName, yv)
+    candidateSpec.addLayer(mark, aes(xName, yName), $color, size,
       lineStyle = lineStyle, shape = shape, missingValues = missingValues)
-    inc h.nextColumn
+    h.spec = candidateSpec
+    h.nextColumn = candidate + 1
     UPLOT_OK
+  except OutOfMemDefect: UPLOT_ERR_MEMORY
   except CatchableError, Defect: UPLOT_ERR_ARGUMENT
 
 proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
@@ -155,6 +177,105 @@ proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
     copyMem(addr image.data[0], pixels, expected)
     handle(value).spec.rasters.add RasterLayer(image: image, xMin: xMin,
       xMax: xMax, yMin: yMin, yMax: yMax, filter: RasterFilter(filter))
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
+    width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
+    filter: cint): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or pixels.isNil or width <= 0 or height <= 0 or
+      channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
+      filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
+      xMin >= xMax or not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
+    return UPLOT_ERR_ARGUMENT
+  let
+    w = int(width)
+    h = int(height)
+    ch = int(channels)
+  if w > high(int) div h or w * h > high(int) div ch:
+    return UPLOT_ERR_ARGUMENT
+  let expected = w * h * ch
+  if length != csize_t(expected):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let
+      colorspace = case ch
+        of 1: uimg.csGray
+        of 3: uimg.csRgb
+        else: uimg.csRgba
+      hnd = handle(value)
+      targetCount = max(1, hnd.spec.data.rowCount)
+    var candidate = hnd.nextColumn
+    while true:
+      let
+        suffix = $candidate
+        resourceName = "image-resource-" & suffix
+        leftName = "image-left-" & suffix
+        rightName = "image-right-" & suffix
+        bottomName = "image-bottom-" & suffix
+        topName = "image-top-" & suffix
+        resourceColumn = "image-name-" & suffix
+      var occupied = leftName in hnd.spec.data.columns or
+        rightName in hnd.spec.data.columns or
+        bottomName in hnd.spec.data.columns or
+        topName in hnd.spec.data.columns or
+        resourceColumn in hnd.spec.data.columns
+      for resource in hnd.spec.imageResources:
+        occupied = occupied or resource.name == resourceName
+      if not occupied: break
+      if candidate == high(int): return UPLOT_ERR_ARGUMENT
+      inc candidate
+    if candidate == high(int): return UPLOT_ERR_ARGUMENT
+    let
+      suffix = $candidate
+      resourceName = "image-resource-" & suffix
+      leftName = "image-left-" & suffix
+      rightName = "image-right-" & suffix
+      bottomName = "image-bottom-" & suffix
+      topName = "image-top-" & suffix
+      resourceColumn = "image-name-" & suffix
+    var image = uimg.Image[uint8](width: w, height: h, channels: ch,
+      colorspace: colorspace, data: newSeq[uint8](expected))
+    copyMem(addr image.data[0], pixels, expected)
+    var candidateSpec = hnd.spec
+    candidateSpec.data = hnd.spec.data.snapshotFrame
+    candidateSpec.layers = newSeqOfCap[Layer](hnd.spec.layers.len + 1)
+    for layer in hnd.spec.layers: candidateSpec.layers.add layer
+    candidateSpec.imageResources = newSeqOfCap[ImageResource](
+      hnd.spec.imageResources.len + 1)
+    for resource in hnd.spec.imageResources:
+      candidateSpec.imageResources.add resource
+    candidateSpec.data.resizeFrame(targetCount)
+    var left = newSeq[float64](targetCount)
+    var right = newSeq[float64](targetCount)
+    var bottom = newSeq[float64](targetCount)
+    var top = newSeq[float64](targetCount)
+    var names = newSeq[string](targetCount)
+    for index in 0 ..< targetCount:
+      left[index] = NaN
+      right[index] = NaN
+      bottom[index] = NaN
+      top[index] = NaN
+    left[0] = xMin
+    right[0] = xMax
+    bottom[0] = yMin
+    top[0] = yMax
+    names[0] = resourceName
+    candidateSpec.data.addColumn(leftName, left)
+    candidateSpec.data.addColumn(rightName, right)
+    candidateSpec.data.addColumn(bottomName, bottom)
+    candidateSpec.data.addColumn(topName, top)
+    candidateSpec.data.addColumn(resourceColumn, names)
+    candidateSpec.imageResources.add ImageResource(name: resourceName,
+      image: image)
+    candidateSpec.geomImage(aes("", "", xMin = leftName, xMax = rightName,
+      yMin = bottomName, yMax = topName, image = resourceColumn),
+      RasterFilter(filter))
+    hnd.spec = candidateSpec
+    hnd.nextColumn = candidate + 1
     UPLOT_OK
   except OutOfMemDefect:
     UPLOT_ERR_MEMORY
