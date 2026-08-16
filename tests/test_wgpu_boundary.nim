@@ -84,6 +84,10 @@ suite "WGPU boundary":
     check frame.resources == @[WgpuResource(id: 9, kind: wrImageTexture)]
     scene.nodes[0].image.data[2] = 8
     check scene.wgpuSceneIdentity(font) != original
+    var offscreen = initScene(Size(width: 10, height: 10),
+      parseColor("#ffffff").get)
+    offscreen.addImage(image, high(int), high(int))
+    check offscreen.prepareWgpuScene(font).size == offscreen.size
 
   test "an invalid runtime path fails without affecting the core":
     expect WgpuError:
@@ -185,6 +189,44 @@ suite "WGPU boundary":
       for index, value in meshPixels:
         if value != cpuPixels[index]: inc differentChannels
       check differentChannels == 0
+      var raster = uimg.newImage[uint8](2, 1, uimg.csRgba)
+      raster.data = @[255'u8, 0, 0, 255, 0, 255, 0, 255]
+      var rasterScene = initScene(Size(width: 4, height: 3),
+        parseColor("#ffffff").get)
+      rasterScene.addImage(raster, -1, 1)
+      var coveringPath = newPath()
+      coveringPath.rect(0, 1, 1, 1)
+      rasterScene.addPath(coveringPath, parseColor("#0000ff").get)
+      var top = uimg.newImage[uint8](1, 1, uimg.csRgb)
+      top.data = @[255'u8, 255, 0]
+      rasterScene.addImage(top, 0, 1)
+      let rasterBackend = openWgpuBackend(libraryPath)
+      let
+        rasterCpu = rasterScene.renderImage(
+          loadTtf("tests/DejaVuSans.ttf")).data
+        rasterGpu = rasterBackend.renderWgpuScene(rasterScene,
+          loadTtf("tests/DejaVuSans.ttf"))
+        covered = (1 * 4) * 4
+      check rasterGpu == rasterCpu
+      check rasterGpu[covered .. covered + 3] == @[255'u8, 255, 0, 255]
+      check rasterBackend.wgpuDiagnostics.textureUploads == 2
+      check rasterBackend.wgpuDiagnostics.textureUploadBytes == 8
+      var first = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      first.data = @[255'u8, 0, 0, 128]
+      var second = uimg.newImage[uint8](1, 1, uimg.csRgba)
+      second.data = @[0'u8, 0, 255, 128]
+      var alphaScene = initScene(Size(width: 1, height: 1),
+        parseColor("#00000000").get)
+      alphaScene.addImage(first, 0, 0)
+      alphaScene.addImage(second, 0, 0)
+      let
+        alphaCpu = alphaScene.renderImage(
+          loadTtf("tests/DejaVuSans.ttf")).data
+        alphaGpu = rasterBackend.renderWgpuScene(alphaScene,
+          loadTtf("tests/DejaVuSans.ttf"))
+      check alphaGpu == alphaCpu
+      check alphaGpu == @[85'u8, 0, 170, 192]
+      rasterBackend.close()
       let antialiasedPath = parsePath(
         "M 2.25 2.25 L 7.75 2.25 L 7.75 7.75 L 2.25 7.75 Z")
       let antialiasedMesh = antialiasedPath.preparePath().tessellateFill()
