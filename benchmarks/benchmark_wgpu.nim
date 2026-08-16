@@ -19,7 +19,8 @@ proc checkBaseline(report: JsonNode; path: string) =
   for field in ["adapter", "backend", "points", "canvas", "residency"]:
     if baseline[field] != report[field]:
       quit("WGPU baseline does not match current " & field, 1)
-  for phase in ["preparation", "upload_submit", "submit",
+  for phase in ["preparation", "scene_identity", "scene_cache_hit",
+      "automatic_submit", "upload_submit", "submit",
       "publication_frame", "direct_burst_single", "direct_burst_ring"]:
     let
       expected = baseline[phase]["mean_ms"].getFloat
@@ -57,6 +58,7 @@ proc main() =
   defer: backend.close()
   let capabilities = wgpuCapabilities(backend)
   var preparationTimes, uploadSubmitTimes, submitTimes, frameTimes: RunningStat
+  var identityTimes, cacheHitTimes, automaticSubmitTimes: RunningStat
   var directSingleTimes, directRingTimes: RunningStat
   var prepared: WgpuPreparedScene
   for iteration in 0 ..< iterations + 3:
@@ -116,6 +118,34 @@ proc main() =
       diagnostics.streamingBufferBytes + diagnostics.targetTextureBytes +
       diagnostics.readbackBufferBytes:
     quit("managed GPU resource accounting is inconsistent", 1)
+  let automaticBackend = openWgpuBackend(libraryPath)
+  defer: automaticBackend.close()
+  for iteration in 0 ..< iterations + 3:
+    let started = getMonoTime()
+    discard scene.wgpuSceneIdentity(font)
+    let identityMs = elapsedMs(started)
+    if iteration >= 3: identityTimes.push(identityMs)
+  let cachedPrepared = automaticBackend.prepareWgpuSceneCached(scene, font)
+  for iteration in 0 ..< iterations + 3:
+    let started = getMonoTime()
+    let candidate = automaticBackend.prepareWgpuSceneCached(scene, font)
+    let cacheHitMs = elapsedMs(started)
+    if cast[pointer](candidate) != cast[pointer](cachedPrepared):
+      quit("automatic scene cache did not return its retained preparation", 1)
+    if iteration >= 3: cacheHitTimes.push(cacheHitMs)
+  automaticBackend.submitWgpuScene(scene, font)
+  let automaticUploads = automaticBackend.wgpuDiagnostics.meshUploads
+  for iteration in 0 ..< iterations + 3:
+    let started = getMonoTime()
+    automaticBackend.submitWgpuScene(scene, font)
+    let automaticSubmitMs = elapsedMs(started)
+    if iteration >= 3: automaticSubmitTimes.push(automaticSubmitMs)
+  let automaticDiagnostics = automaticBackend.wgpuDiagnostics
+  if automaticDiagnostics.meshUploads != automaticUploads or
+      automaticDiagnostics.sceneCacheMisses != 1 or
+      automaticDiagnostics.sceneCacheHits != uint64((iterations + 3) * 2 + 1):
+    quit("automatic prepared-scene cache accounting is inconsistent", 1)
+  automaticBackend.waitWgpuIdle()
   let
     directMesh = parsePath("M 20 20 L 780 20 L 780 480 L 20 480 Z")
       .preparePath().tessellateFill()
@@ -178,19 +208,26 @@ proc main() =
     "warmup_iterations": 3,
     "points": pointCount,
     "canvas": "800x500",
-    "residency": "managed-budget-chunked-lru-ring-3-v1",
+    "residency": "managed-budget-chunked-lru-ring-3-scene-key-v1",
     "semantics": {
       "preparation": "shape UniGlyph text and tessellate UniVector paths",
+      "scene_identity": "hash canonical render semantics and exact font identity",
+      "scene_cache_hit": "hash and return one retained host preparation",
+      "automatic_submit": "hash, hit both host and GPU caches, then enqueue",
       "upload_submit": "cycle three identities through two slots and enqueue",
       "submit": "alternate two resident identities without upload/readback",
       "publication_frame": "submit resident geometry and read back RGBA8",
       "direct_burst_single": "three direct submissions from idle through one fenced slot",
       "direct_burst_ring": "three direct submissions from idle through three fenced slots",
       "prepared_cache_bytes": "allocated prepared vertex/index capacities only",
+      "scene_cache_bytes": "retained host vertex/index logical payload only",
       "upload_writes": "queue writes split at the configured byte bound",
       "managed_gpu_bytes": "tracked buffers plus logical RGBA target bytes"
     },
     "preparation": summary(preparationTimes),
+    "scene_identity": summary(identityTimes),
+    "scene_cache_hit": summary(cacheHitTimes),
+    "automatic_submit": summary(automaticSubmitTimes),
     "upload_submit": summary(uploadSubmitTimes),
     "submit": summary(submitTimes),
     "publication_frame": summary(frameTimes),
@@ -218,6 +255,12 @@ proc main() =
     "single_stream_syncs": singleDiagnostics.streamingRingSyncs,
     "ring_stream_syncs": ringDiagnostics.streamingRingSyncs,
     "ring_stream_bytes": ringDiagnostics.streamingBufferBytes,
+    "scene_cache_hits": automaticDiagnostics.sceneCacheHits,
+    "scene_cache_misses": automaticDiagnostics.sceneCacheMisses,
+    "scene_cache_evictions": automaticDiagnostics.sceneCacheEvictions,
+    "scene_cache_bytes": automaticDiagnostics.sceneCacheBytes,
+    "scene_cache_peak_bytes": automaticDiagnostics.sceneCachePeakBytes,
+    "scene_cache_byte_budget": automaticDiagnostics.sceneCacheByteBudget,
     "guard": consumed
   }
   echo $report
