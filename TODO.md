@@ -75,7 +75,7 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Fill, shape and line-style aesthetic mappings.
 - [x] Continuous colour maps, discrete palettes and colour bars.
 - [x] Logarithmic transformed and reversed Cartesian axes.
-- [ ] Deterministic UTC date/time and signed-duration axes using the numeric
+- [x] Deterministic UTC date/time and signed-duration axes using the numeric
   retained-scene path defined by ADR-0010.
 - [ ] Additional numeric transforms and polar coordinates.
 - [x] Error bars and ribbons with explicit numeric bounds and missing-value
