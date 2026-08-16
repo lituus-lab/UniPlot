@@ -12,16 +12,54 @@
   "canvas": "800x600",
   "filter": "bilinear",
   "semantics": "PlotSpec construction plus snapshot; compile includes alpha-correct resize; publication includes CPU render",
+  "image_mark_count": 64,
+  "image_resource_count": 4,
   "construction_snapshot": {
-    "run_mean_ms": [0.3149959, 0.3129666, 0.3162834],
-    "median_run_mean_ms": 0.3149959
+    "run_mean_ms": [
+      0.3139918,
+      0.3132792,
+      0.31305419999999995
+    ],
+    "median_run_mean_ms": 0.3132792
   },
   "compile": {
-    "run_mean_ms": [8.3061583, 8.2757331, 8.293908299999998],
-    "median_run_mean_ms": 8.293908299999998
+    "run_mean_ms": [
+      8.5182126,
+      8.480633200000002,
+      8.5058875
+    ],
+    "median_run_mean_ms": 8.5058875
   },
   "publication": {
-    "run_mean_ms": [7.9844791, 7.976716700000001, 7.9795041],
-    "median_run_mean_ms": 7.9795041
+    "run_mean_ms": [
+      8.058566699999998,
+      8.037004199999998,
+      7.982091799999999
+    ],
+    "median_run_mean_ms": 8.037004199999998
+  },
+  "image_mark_construction": {
+    "run_mean_ms": [
+      0.016775,
+      0.017116700000000002,
+      0.015170799999999998
+    ],
+    "median_run_mean_ms": 0.016775
+  },
+  "image_mark_compile": {
+    "run_mean_ms": [
+      3.0359122,
+      3.0793209,
+      3.1191164
+    ],
+    "median_run_mean_ms": 3.0793209
+  },
+  "image_mark_publication": {
+    "run_mean_ms": [
+      7.3226458,
+      7.3000999,
+      7.2940834
+    ],
+    "median_run_mean_ms": 7.3000999
   }
 }

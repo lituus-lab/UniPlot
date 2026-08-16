@@ -7,13 +7,19 @@ Agg backend, Plotly/Kaleido, ggplot2 and Plots.jl when available, on the same
 1,000-point line-plus-scatter plot, 800×500 canvas, three warmups and a
 configurable number of measured iterations.
 
-## Retained PlotSpec raster stages
+## Retained raster and image-mark stages
 
 Run `nimble rasterSpecBaseline` for the reproducible 3×10 Apple M4 protocol.
-It separates PlotSpec construction plus the caller-buffer snapshot, scene compilation (including the
-alpha-correct 512×512 to plot-area resize), and complete 800×600 CPU
-publication. The versioned JSON records the measured medians for all three
-phases. Allocation is included in every phase; setup and warmups are not.
+It separates PlotSpec construction plus the caller-buffer snapshot, scene
+compilation (including the alpha-correct 512×512 to plot-area resize), and
+complete 800×600 CPU publication. The same processes also measure 64
+data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources.
+Allocation is included in every phase; setup and warmups are not.
+
+The current Apple M4 medians are 0.3133 / 8.5059 / 8.0370 ms for the retained
+raster construction / compile / publication phases, and 0.0168 / 3.0793 /
+7.3001 ms for the 64-mark construction / compile / publication phases. These
+are same-machine regression evidence, not cross-machine performance claims.
 The exact samples are stored in
 `benchmarks/baselines/apple-m4-raster-spec.json`.
 
