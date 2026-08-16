@@ -60,10 +60,11 @@ def main() -> int:
     heat_svg_path.write_bytes(heatmap.svg(font))
     heat_png_path.write_bytes(heatmap.png(font))
     histogram = (uniplot.Plot(760, 440)
-                 .histogram(
+                 .automatic_histogram(
                      [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0],
-                     [0.0, 0.5, 1.0, 2.0], color="#267a5e", density=True)
-                 .title("Python variable-width density"))
+                     uniplot.HISTOGRAM_FREEDMAN_DIACONIS,
+                     color="#267a5e", density=True)
+                 .title("Python automatic FD density"))
     histogram_svg_path.write_bytes(histogram.svg(font))
     histogram_png_path.write_bytes(histogram.png(font))
     grouped = (uniplot.Plot(760, 440)

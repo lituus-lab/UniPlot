@@ -135,13 +135,12 @@ int main(int argc, char **argv) {
     goto cleanup;
   const double histogram_values[] = {-1.0, 0.0, 0.3, 0.9, 1.0,
                                      1.4, 2.0, 3.0};
-  const double histogram_breaks[] = {0.0, 0.5, 1.0, 2.0};
   histogram = uplot_plot_new(760, 440);
   if (histogram == NULL ||
-      uplot_add_numeric_histogram(histogram, histogram_values, 8,
-                                  histogram_breaks, 4, 1,
-                                  "#267a5e") != UPLOT_OK ||
-      uplot_set_title(histogram, "C variable-width density") != UPLOT_OK ||
+      uplot_add_automatic_histogram(
+        histogram, histogram_values, 8,
+        UPLOT_HISTOGRAM_FREEDMAN_DIACONIS, 1, "#267a5e") != UPLOT_OK ||
+      uplot_set_title(histogram, "C automatic FD density") != UPLOT_OK ||
       uplot_render_svg(histogram, argv[1], &histogram_svg,
                        &histogram_svg_length) != UPLOT_OK ||
       uplot_render_png(histogram, argv[1], &histogram_png,
