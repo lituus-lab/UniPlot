@@ -3,12 +3,14 @@
 import std/[locks, tables]
 import UniColor
 import UniGlyph
+import UniImage/core as uimg
 import UniPlot
 
 const
   UPLOT_OK* = 0.cint
   UPLOT_ERR_ARGUMENT* = 1.cint
   UPLOT_ERR_RENDER* = 2.cint
+  UPLOT_ERR_MEMORY* = 3.cint
   UPLOT_ABI_VERSION* = 1.cint
 
 type PlotHandle = ref object
@@ -43,9 +45,12 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
     cast[pointer](handle)
   except CatchableError, Defect: nil
 
-proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
-    height: cint): pointer {.exportc, dynlib, cdecl.} =
-  if payload.isNil or length == 0 or length > csize_t(high(int)): return nil
+proc uplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
+    height: cint; output: ptr pointer): cint {.exportc, dynlib, cdecl.} =
+  if output.isNil: return UPLOT_ERR_ARGUMENT
+  output[] = nil
+  if payload.isNil or length == 0 or length > csize_t(high(int)):
+    return UPLOT_ERR_ARGUMENT
   try:
     let size = Size(width: int(width), height: int(height))
     size.validate()
@@ -53,9 +58,18 @@ proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
     copyMem(addr encoded[0], payload, int(length))
     let parsed = PlotHandle(spec: fromJson(encoded), size: size)
     GC_ref(parsed)
-    cast[pointer](parsed)
+    output[] = cast[pointer](parsed)
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    nil
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
+    height: cint): pointer {.exportc, dynlib, cdecl.} =
+  ## Compatibility entry point. New bindings should use the status API above.
+  discard uplot_plot_from_json_status(payload, length, width, height,
+    addr result)
 
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
 
@@ -113,6 +127,39 @@ proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
 proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
   addSeries(value, xs, ys, count, mkPoint, color, radius)
+
+proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
+    width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
+    filter: cint): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or pixels.isNil or width <= 0 or height <= 0 or
+      channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
+      filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
+      xMin >= xMax or not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
+    return UPLOT_ERR_ARGUMENT
+  let
+    w = int(width)
+    h = int(height)
+    ch = int(channels)
+  if w > high(int) div h or w * h > high(int) div ch:
+    return UPLOT_ERR_ARGUMENT
+  let expected = w * h * ch
+  if length != csize_t(expected):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let colorspace = case ch
+      of 1: uimg.csGray
+      of 3: uimg.csRgb
+      else: uimg.csRgba
+    var image = uimg.Image[uint8](width: w, height: h, channels: ch,
+      colorspace: colorspace, data: newSeq[uint8](expected))
+    copyMem(addr image.data[0], pixels, expected)
+    handle(value).spec.rasters.add RasterLayer(image: image, xMin: xMin,
+      xMax: xMax, yMin: yMin, yMax: yMax, filter: RasterFilter(filter))
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
 
 proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; whiskerLength: float64; color,

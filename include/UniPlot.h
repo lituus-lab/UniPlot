@@ -10,7 +10,8 @@ extern "C" {
 
 #define UNIPLOT_VERSION "1.0.0"
 #define UNIPLOT_ABI_VERSION 1
-enum { UPLOT_OK = 0, UPLOT_ERR_ARGUMENT = 1, UPLOT_ERR_RENDER = 2 };
+enum { UPLOT_OK = 0, UPLOT_ERR_ARGUMENT = 1, UPLOT_ERR_RENDER = 2,
+       UPLOT_ERR_MEMORY = 3 };
 typedef enum {
   UPLOT_LINE_SOLID = 0,
   UPLOT_LINE_DASHED = 1,
@@ -38,6 +39,11 @@ typedef enum {
   UPLOT_AGG_MINIMUM = 3,
   UPLOT_AGG_MAXIMUM = 4
 } uplot_aggregation;
+typedef enum {
+  UPLOT_RASTER_NEAREST = 0,
+  UPLOT_RASTER_BILINEAR = 1,
+  UPLOT_RASTER_BOX = 2
+} uplot_raster_filter;
 typedef struct uplot_plot uplot_plot;
 
 int uplot_init(void);
@@ -46,11 +52,19 @@ int uplot_abi_version(void);
 uplot_plot *uplot_plot_new(int width, int height);
 uplot_plot *uplot_plot_from_json(const uint8_t *, size_t, int width,
                                  int height);
+/* Status-returning variant. On every failure, *out_plot is set to NULL. */
+int uplot_plot_from_json_status(const uint8_t *, size_t, int width, int height,
+                                uplot_plot **out_plot);
 int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *);
 int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                      const char *color, float radius);
+/* Pixels are copied. channels must be 1, 3, or 4 and length must equal
+ * width*height*channels. The caller retains ownership of pixels. */
+int uplot_add_raster(uplot_plot *, const uint8_t *pixels, size_t length,
+                     int width, int height, int channels, double x_min,
+                     double x_max, double y_min, double y_max, int filter);
 int uplot_add_box_plot(uplot_plot *, const char *const *groups,
                        const double *values, size_t count,
                        double whisker_length, const char *color,
