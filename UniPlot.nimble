@@ -182,6 +182,17 @@ task wgpuTest, "Create a real native WGPU device (run wgpuDeps first)":
   exec "nim c -r --path:src -o:build/test_wgpu_native" &
        " tests/test_wgpu_boundary.nim"
 
+task rasterSpecBenchmark, "Benchmark retained PlotSpec raster stages":
+  exec "nim c -r -d:release --mm:orc --path:src" &
+       " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
+
+task rasterSpecBaseline, "Record three-run PlotSpec raster evidence":
+  exec "nim c -d:release --mm:orc --path:src" &
+       " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
+  exec "nim c -r -d:release --mm:orc" &
+       " -o:build/run_raster_spec_baseline" &
+       " benchmarks/run_raster_spec_baseline.nim"
+
 task wgpuBenchmark, "Benchmark warm WGPU frames with explicit readback":
   let
     platformName = when defined(macosx): "macos" else:
