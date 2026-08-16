@@ -269,9 +269,15 @@ sample produces zero-height rectangles. Interval widths must remain finite;
 the ordinary explicit-break validation still requires finite strictly
 increasing boundaries.
 
-Automatic Scott, Sturges and Freedman–Diaconis selection is intentionally not
-implemented locally: those rules need floating-point transcendental/root
-primitives that must first belong to UniMath.
+The automatic overload `histogramPlot(values, rule, ...)` derives equal-width
+numeric intervals with square-root, Sturges, Rice, Scott or
+Freedman–Diaconis selection. `hrAuto` prefers Freedman–Diaconis and uses a
+deterministic fallback when the interquartile range degenerates. Non-finite
+samples are excluded consistently from selection and counting; a sample with
+no finite value is rejected. The root, logarithm, ceiling and neighbouring
+float operations come from UniMath, so the recipe does not depend directly on
+`std/math`. Constant samples receive a finite representable interval, and a
+density recipe rejects any interval whose normalised height would overflow.
 
 ## Grouped aggregation
 """

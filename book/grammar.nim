@@ -38,8 +38,8 @@ nbCode:
   var recipeHistogram = histogramPlot([
     0.2, 0.3, 0.4, 0.8, 1.0, 1.1, 1.2, 1.4,
     1.7, 1.8, 2.0, 2.1, 2.4, 2.8, 3.0, 3.2
-  ], binCount = 6, color = "#8e63ce")
-  recipeHistogram.labels(title = "histogramPlot", x = "range", y = "count")
+  ], hrFreedmanDiaconis, color = "#8e63ce")
+  recipeHistogram.labels(title = "Freedman–Diaconis", x = "value", y = "count")
 
   let recipeSvgs = [
     recipeLine.compileScene(Size(width: 500, height: 320)).toSvg(font),
@@ -52,12 +52,18 @@ nbRawHtml gallery([
   svgFigure(recipeSvgs[0], "Numeric line recipe."),
   svgFigure(recipeSvgs[1], "Numeric scatter recipe."),
   svgFigure(recipeSvgs[2], "Categorical bar recipe."),
-  svgFigure(recipeSvgs[3], "Histogram statistic and bar geometry.")
+  svgFigure(recipeSvgs[3],
+    "Automatic Freedman–Diaconis selection and numeric rectangle geometry.")
 ])
 
 nbText: """
 Recipes are not a separate rendering path. Their result can be labelled,
 themed or extended with additional layers.
+
+Automatic histograms accept `hrSquareRoot`, `hrSturges`, `hrRice`, `hrScott`
+and `hrFreedmanDiaconis`; `hrAuto` uses Freedman–Diaconis with a deterministic
+Sturges fallback. Non-finite samples are ignored. The resulting numeric
+rectangles are ordinary retained marks shared by CPU, SVG and WGPU.
 
 ## Core geometries
 

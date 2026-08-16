@@ -95,6 +95,10 @@ copying it.
   variable-width rectangles on an empty `Plot`; the last supplied boundary is
   included. With `density=True`, total rectangle area is one for a non-empty
   in-domain sample.
+- `automatic_histogram(values, rule=HISTOGRAM_AUTO, color="#3366cc",
+  density=False)` exposes square-root, Sturges, Rice, Scott and
+  Freedman–Diaconis selection. The embedded Python figure is generated through
+  this method with `HISTOGRAM_FREEDMAN_DIACONIS`.
 - `aggregate(groups, values, aggregation=AGG_MEAN, color="#3366cc")`
   computes a first-seen categorical count, sum, mean, minimum or maximum on an
   empty `Plot`. Non-finite observations do not contribute.

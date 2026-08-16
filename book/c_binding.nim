@@ -131,6 +131,9 @@ int main(void) {
 - `uplot_add_numeric_histogram` uses the same validated breaks as numeric
   data-coordinate rectangles. Its `density` flag is exactly `0` or `1`; the
   latter normalises rectangle area to one for a non-empty in-domain sample.
+- `uplot_add_automatic_histogram` selects equal-width numeric bins with one of
+  the `UPLOT_HISTOGRAM_*` rules. The generated C figure uses
+  Freedman–Diaconis density and therefore exercises the real ABI entry point.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.
