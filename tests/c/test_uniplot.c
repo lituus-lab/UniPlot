@@ -150,6 +150,28 @@ int main(void) {
   uplot_buffer_free(png, png_len);
   assert(uplot_clear_secondary_y(plot) == UPLOT_OK);
   assert(uplot_clear_secondary_y(NULL) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_x_axis_labels(plot, UPLOT_AXIS_UTC_DATETIME, 0) ==
+         UPLOT_OK);
+  assert(uplot_set_y_axis_labels(plot, UPLOT_AXIS_DURATION, 1) == UPLOT_OK);
+  assert(uplot_set_x_axis_labels(NULL, UPLOT_AXIS_NUMERIC, 0) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_x_axis_labels(plot, 99, 0) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_y_axis_labels(plot, UPLOT_AXIS_NUMERIC, 2) ==
+         UPLOT_ERR_ARGUMENT);
+  uint8_t *temporal_json = NULL;
+  size_t temporal_json_len = 0;
+  assert(uplot_plot_to_json(plot, &temporal_json, &temporal_json_len) ==
+         UPLOT_OK);
+  assert(contains_bytes(temporal_json, temporal_json_len, "alkUtcDateTime"));
+  assert(contains_bytes(temporal_json, temporal_json_len, "alkDuration"));
+  uplot_buffer_free(temporal_json, temporal_json_len);
+  svg = NULL;
+  svg_len = 0;
+  assert(uplot_render_svg(plot, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+  assert(svg_len > 4 && memcmp(svg, "<svg", 4) == 0);
+  uplot_buffer_free(svg, svg_len);
+  assert(uplot_set_x_axis_labels(plot, UPLOT_AXIS_NUMERIC, 0) == UPLOT_OK);
+  assert(uplot_set_y_axis_labels(plot, UPLOT_AXIS_NUMERIC, 0) == UPLOT_OK);
   assert(uplot_clear_annotations(plot) == UPLOT_OK);
   assert(uplot_clear_annotations(NULL) == UPLOT_ERR_ARGUMENT);
 
