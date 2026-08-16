@@ -6,6 +6,7 @@ import UniColor
 import UniGlyph
 import UniPlot
 import UniVector
+import UniCrypto/hash/blake3/blake3 as ublake3
 import UniPlot/render/wgpu
 
 suite "WGPU boundary":
@@ -16,6 +17,59 @@ suite "WGPU boundary":
     check frame.size.width == 100
     check not wgpuCapabilities().available
     check WgpuNativeTargetVersion == "29.0.1.1"
+
+  test "scene identity covers render semantics and exact font content":
+    let font = loadTtf("tests/DejaVuSans.ttf")
+    var scene = initScene(Size(width: 100, height: 80),
+      parseColor("#ffffff").get)
+    scene.addPath(parsePath("M 1 1 L 20 1 L 20 20 Z"),
+      parseColor("#3366cc").get, id = 7)
+    scene.addText("axis", Point(x: 24, y: 30), 14,
+      parseColor("#111111").get, id = 8)
+    let original = scene.wgpuSceneIdentity(font)
+    check ublake3.toHex(original) ==
+      "e3ef1283a0151aabb4ad58de36cfa400632cf64f85debde665aea7ee11641d57"
+    check scene.wgpuSceneIdentity(font) == original
+
+    var metadataOnly = scene
+    metadataOnly.nodes = scene.nodes.mapIt(it)
+    metadataOnly.nodes[0].id = 99
+    metadataOnly.nodes[0].path.at = vec2(999'f32, 999'f32)
+    check metadataOnly.wgpuSceneIdentity(font) == original
+
+    var changed = scene
+    changed.nodes = scene.nodes.mapIt(it)
+    changed.nodes[1].text = "axes"
+    check changed.wgpuSceneIdentity(font) != original
+    changed = scene
+    changed.nodes = scene.nodes.mapIt(it)
+    changed.nodes[0].path = scene.nodes[0].path.copy
+    var command = changed.nodes[0].path.commands[1]
+    command.p = vec2(21'f32, command.p.y)
+    changed.nodes[0].path.commands[1] = command
+    check changed.wgpuSceneIdentity(font) != original
+
+    let raw = readFile("tests/DejaVuSans.ttf")
+    var changedBytes = newSeq[byte](raw.len)
+    copyMem(changedBytes[0].addr, raw[0].unsafeAddr, raw.len)
+    changedBytes[^1] = changedBytes[^1] xor 1'u8
+    let changedFont = loadTtfFromBytes(changedBytes)
+    check scene.wgpuSceneIdentity(changedFont) != original
+
+    var pathOnly = initScene(scene.size, scene.background)
+    pathOnly.addPath(scene.nodes[0].path, scene.nodes[0].color)
+    check pathOnly.wgpuSceneIdentity(font) ==
+      pathOnly.wgpuSceneIdentity(changedFont)
+
+  test "scene identity validates its public inputs":
+    let scene = initScene(Size(width: 10, height: 10),
+      parseColor("#ffffff").get)
+    when defined(release):
+      expect WgpuError:
+        discard scene.wgpuSceneIdentity(Font(nil))
+    else:
+      expect PreConditionDefect:
+        discard scene.wgpuSceneIdentity(Font(nil))
 
   test "an invalid runtime path fails without affecting the core":
     expect WgpuError:

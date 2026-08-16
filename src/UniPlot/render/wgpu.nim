@@ -9,6 +9,9 @@ import UniGlyph
 import UniVector
 import UniPlot/[common, scene]
 import UniPlot/render/wgpu_native
+from UniPlot/render/wgpu_identity import WgpuSceneIdentity, sceneIdentity
+
+export WgpuSceneIdentity
 
 const WgpuNativeTargetVersion* = "29.0.1.1"
 const MaxPreparedCacheEntries* = 64
@@ -98,6 +101,18 @@ func size*(prepared: WgpuPreparedScene): Size {.contractual.} =
     if prepared.isNil:
       raise newException(WgpuError, "prepared WGPU scene is nil")
     prepared.size
+
+proc wgpuSceneIdentity*(scene: Scene;
+                        font: Font): WgpuSceneIdentity {.contractual.} =
+  ## Hash every render-relevant scene value and exact source font bytes.
+  require:
+    not font.isNil
+    scene.size.width > 0 and scene.size.height > 0
+  body:
+    if font.isNil:
+      raise newException(WgpuError, "WGPU scene identity requires a font")
+    scene.size.validate()
+    sceneIdentity(scene, font)
 
 proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
   ## Extract stable semantic resource identifiers before any device is needed.
