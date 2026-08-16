@@ -1,13 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[algorithm, math, tables]
+import std/[algorithm, tables]
 import contracts
 import UniAccurate
+import UniMath
 import UniPlot/common
 
 type HistogramBin* = object
   lower*, upper*: float64
   count*: int
+
+type HistogramRule* = enum
+  ## Automatic equal-width histogram bin-selection rules.
+  hrAuto
+  hrSquareRoot
+  hrSturges
+  hrRice
+  hrScott
+  hrFreedmanDiaconis
 
 type DescriptiveSummary* = object
   count*: int
@@ -39,6 +49,109 @@ proc finiteSorted(values: openArray[float64]): seq[float64] =
   for value in values:
     if value.isFinite: result.add value
   result.sort()
+
+func quantileSorted(values: openArray[float64]; probability: float64):
+    float64
+func stableMean(values: openArray[float64]; minimum,
+    maximum: float64): float64
+proc histogramBreaks*(values, breaks: openArray[float64]):
+    seq[HistogramBin]
+
+func boundedBinCount(candidate: float64; sampleCount: int): int =
+  if not candidate.isFinite or candidate >= float64(sampleCount):
+    sampleCount
+  else:
+    max(1, int(ceil(candidate)))
+
+proc normalizedFinite(values: openArray[float64]):
+    tuple[sorted: seq[float64]; magnitude: float64] =
+  result.sorted = finiteSorted(values)
+  if result.sorted.len == 0: return
+  result.magnitude = max(abs(result.sorted[0]), abs(result.sorted[^1]))
+  if result.magnitude > 0:
+    for value in result.sorted.mitems:
+      value /= result.magnitude
+
+proc histogramBinCount*(values: openArray[float64]; rule = hrAuto): int =
+  ## Select an equal-width bin count from finite samples. Scale-dependent rules
+  ## operate on normalized values, avoiding overflow for extreme finite ranges.
+  let normalized = normalizedFinite(values)
+  let finite = normalized.sorted
+  if finite.len == 0: return 0
+  if finite[0] == finite[^1]: return 1
+  let
+    sampleCount = finite.len
+    count = float64(sampleCount)
+    cubeRoot = cbrt(count)
+    sturges = boundedBinCount(log2(count) + 1.0, sampleCount)
+  case rule
+  of hrAuto, hrFreedmanDiaconis:
+    let
+      spread = quantileSorted(finite, 0.75) - quantileSorted(finite, 0.25)
+      width = 2.0 * spread / cubeRoot
+    if width > 0 and width.isFinite:
+      result = boundedBinCount((finite[^1] - finite[0]) / width, sampleCount)
+    else:
+      result = sturges
+  of hrSquareRoot:
+    result = boundedBinCount(sqrt(count), sampleCount)
+  of hrSturges:
+    result = sturges
+  of hrRice:
+    result = boundedBinCount(2.0 * cubeRoot, sampleCount)
+  of hrScott:
+    let mean = stableMean(finite, finite[0], finite[^1])
+    var squares = newSeqOfCap[float64](sampleCount)
+    for value in finite:
+      let deviation = value - mean
+      squares.add deviation * deviation
+    let
+      deviation = sqrt(neumaierSum(squares, assumeFinite = true) / count)
+      width = 3.5 * deviation / cubeRoot
+    if width > 0 and width.isFinite:
+      result = boundedBinCount((finite[^1] - finite[0]) / width, sampleCount)
+    else:
+      result = sturges
+
+proc automaticHistogramBreaks*(values: openArray[float64]; rule = hrAuto):
+    seq[float64] =
+  ## Return finite, strictly increasing equal-width boundaries. Adjacent
+  ## float64 values can make requested interior boundaries unrepresentable;
+  ## those duplicates are removed rather than emitting an invalid interval.
+  let finite = finiteSorted(values)
+  if finite.len == 0: return
+  let
+    lower = finite[0]
+    upper = finite[^1]
+  if lower == upper:
+    let unitWidth = lower + 1.0
+    if unitWidth.isFinite and unitWidth > lower:
+      return @[lower, unitWidth]
+    let successor = nextUp(lower)
+    if successor.isFinite:
+      return @[lower, successor]
+    let predecessor = nextDown(lower)
+    if predecessor.isFinite:
+      return @[predecessor, lower]
+    raise newException(PlotError,
+      "constant histogram value has no finite neighbouring boundary")
+  let count = histogramBinCount(finite, rule)
+  result = newSeqOfCap[float64](count + 1)
+  result.add lower
+  for index in 1 ..< count:
+    let
+      ratio = float64(index) / float64(count)
+      boundary = lower * (1.0 - ratio) + upper * ratio
+    if boundary.isFinite and boundary > result[^1] and boundary < upper:
+      result.add boundary
+  result.add upper
+
+proc histogram*(values: openArray[float64]; rule: HistogramRule):
+    seq[HistogramBin] =
+  ## Histogram using an automatic equal-width selection rule.
+  let breaks = automaticHistogramBreaks(values, rule)
+  if breaks.len == 0: return
+  histogramBreaks(values, breaks)
 
 func quantileSorted(values: openArray[float64]; probability: float64): float64 =
   if values.len == 1: return values[0]
