@@ -17,6 +17,8 @@ const DefaultPreparedCacheByteBudget* = 256'u64 * 1024'u64 * 1024'u64
 const MinUploadChunkBytes* = 4'u64
 const MaxUploadChunkBytes* = 64'u64 * 1024'u64 * 1024'u64
 const DefaultUploadChunkBytes* = 4'u64 * 1024'u64 * 1024'u64
+const MinManagedGpuByteBudget* = 1024'u64
+const DefaultManagedGpuByteBudget* = 512'u64 * 1024'u64 * 1024'u64
 
 type
   WgpuError* = object of CatchableError
@@ -58,6 +60,8 @@ type
     preparedCacheBytes*, preparedCachePeakBytes*: uint64
     preparedCacheByteBudget*: uint64
     preparedCacheEntries*, preparedCacheCapacity*: int
+    managedGpuBytes*, managedGpuPeakBytes*, managedGpuByteBudget*: uint64
+    streamingBufferBytes*, targetTextureBytes*, readbackBufferBytes*: uint64
 
   WgpuBackend* = ref object
     state*: WgpuBackendState
@@ -103,7 +107,8 @@ proc prepareWgpuFrame*(scene: Scene): WgpuFrame =
 proc openWgpuBackend*(libraryPath: string;
     preparedCacheCapacity = 4;
     preparedCacheByteBudget = DefaultPreparedCacheByteBudget;
-    uploadChunkBytes = DefaultUploadChunkBytes): WgpuBackend {.
+    uploadChunkBytes = DefaultUploadChunkBytes;
+    managedGpuByteBudget = DefaultManagedGpuByteBudget): WgpuBackend {.
     contractual.} =
   ## Open a real adapter/device/queue and a bounded prepared-mesh LRU.
   require:
@@ -112,6 +117,8 @@ proc openWgpuBackend*(libraryPath: string;
     preparedCacheByteBudget >= MinPreparedCacheByteBudget
     uploadChunkBytes in MinUploadChunkBytes .. MaxUploadChunkBytes
     uploadChunkBytes mod 4'u64 == 0'u64
+    managedGpuByteBudget >= MinManagedGpuByteBudget
+    preparedCacheByteBudget <= managedGpuByteBudget
   ensure:
     not result.isNil and result.state == wbsReady
   body:
@@ -130,10 +137,15 @@ proc openWgpuBackend*(libraryPath: string;
       raise newException(WgpuError,
         "WGPU upload chunk size must be a multiple of 4 bytes in " &
         $MinUploadChunkBytes & ".." & $MaxUploadChunkBytes)
+    if managedGpuByteBudget < MinManagedGpuByteBudget or
+        preparedCacheByteBudget > managedGpuByteBudget:
+      raise newException(WgpuError,
+        "managed WGPU byte budget must be at least " &
+        $MinManagedGpuByteBudget & " and contain the prepared-cache budget")
     result = WgpuBackend(state: wbsUnavailable)
     try:
       result.runtime = openNativeWgpu(libraryPath, preparedCacheCapacity,
-        preparedCacheByteBudget, uploadChunkBytes)
+        preparedCacheByteBudget, uploadChunkBytes, managedGpuByteBudget)
       result.state = wbsReady
     except LibraryError as error:
       raise newException(WgpuError, error.msg)
@@ -188,7 +200,13 @@ proc wgpuDiagnostics*(backend: WgpuBackend): WgpuDiagnostics {.contractual.} =
       preparedCachePeakBytes: cache.peakBytes,
       preparedCacheByteBudget: cache.byteBudget,
       preparedCacheEntries: cache.entries,
-      preparedCacheCapacity: cache.capacity)
+      preparedCacheCapacity: cache.capacity,
+      managedGpuBytes: uploads.managedBytes,
+      managedGpuPeakBytes: uploads.managedPeakBytes,
+      managedGpuByteBudget: uploads.managedBudget,
+      streamingBufferBytes: uploads.streamingBytes,
+      targetTextureBytes: uploads.targetBytes,
+      readbackBufferBytes: uploads.readbackBytes)
 
 proc readWgpuClearTarget*(backend: WgpuBackend; size: Size;
     color: Color): seq[byte] {.contractual.} =

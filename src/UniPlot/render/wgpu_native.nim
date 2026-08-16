@@ -296,6 +296,7 @@ type
     preparedCachePeakBytes: uint64
     uploadChunkBytes, uploadWriteCalls, uploadBytes: uint64
     largestUploadWrite: uint64
+    managedGpuByteBudget, managedGpuPeakBytes, targetTextureBytes: uint64
     preparedMeshes: seq[PreparedMeshBuffers]
     preparedUseClock: uint64
     meshUploadCount, preparedCacheHits, preparedCacheMisses: uint64
@@ -415,6 +416,7 @@ proc close*(runtime: NativeWgpuRuntime) =
   if runtime.targetTexture != nil and runtime.releaseTexture != nil:
     runtime.releaseTexture(runtime.targetTexture)
     runtime.targetTexture = nil
+  runtime.targetTextureBytes = 0
   if runtime.meshPipeline != nil and runtime.releasePipeline != nil:
     runtime.releasePipeline(runtime.meshPipeline)
     runtime.meshPipeline = nil
@@ -468,7 +470,8 @@ proc backendName(value: uint32): string =
 proc openNativeWgpu*(libraryPath: string;
                      preparedCacheCapacity: int;
                      preparedCacheByteBudget: uint64;
-                     uploadChunkBytes: uint64): NativeWgpuRuntime =
+                     uploadChunkBytes: uint64;
+                     managedGpuByteBudget: uint64): NativeWgpuRuntime =
   ## Load wgpu-native, select its first adapter, and create a real device/queue.
   if preparedCacheCapacity <= 0:
     raise newException(LibraryError,
@@ -481,13 +484,18 @@ proc openNativeWgpu*(libraryPath: string;
       uploadChunkBytes mod 4'u64 != 0:
     raise newException(LibraryError,
       "WGPU upload chunk size must be a multiple of 4 bytes in 4..67108864")
+  if managedGpuByteBudget < 1024'u64 or
+      preparedCacheByteBudget > managedGpuByteBudget:
+    raise newException(LibraryError,
+      "managed WGPU byte budget must contain the prepared-cache budget")
   let library = loadLib(libraryPath)
   if library == nil:
     raise newException(LibraryError, "cannot load wgpu-native: " & libraryPath)
   result = NativeWgpuRuntime(library: library,
     preparedCacheCapacity: preparedCacheCapacity,
     preparedCacheByteBudget: preparedCacheByteBudget,
-    uploadChunkBytes: uploadChunkBytes)
+    uploadChunkBytes: uploadChunkBytes,
+    managedGpuByteBudget: managedGpuByteBudget)
   try:
     let
       createInstance = loadSymbol[CreateInstanceProc](library,
@@ -628,10 +636,64 @@ proc preparedCacheStats*(runtime: NativeWgpuRuntime): tuple[
     runtime.preparedMeshes.len, runtime.preparedCacheCapacity)
 
 proc uploadStats*(runtime: NativeWgpuRuntime): tuple[
-    writeCalls, bytes, largestWrite, chunkBytes: uint64] =
-  if runtime.isNil: return (0'u64, 0'u64, 0'u64, 0'u64)
+    writeCalls, bytes, largestWrite, chunkBytes: uint64;
+    managedBytes, managedPeakBytes, managedBudget: uint64;
+    streamingBytes, targetBytes, readbackBytes: uint64] =
+  if runtime.isNil:
+    return (0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64, 0'u64,
+      0'u64, 0'u64, 0'u64)
   (runtime.uploadWriteCalls, runtime.uploadBytes, runtime.largestUploadWrite,
-    runtime.uploadChunkBytes)
+    runtime.uploadChunkBytes, runtime.preparedCacheBytes +
+      runtime.vertexCapacity + runtime.indexCapacity +
+      runtime.targetTextureBytes + runtime.readbackCapacity,
+    runtime.managedGpuPeakBytes, runtime.managedGpuByteBudget,
+    runtime.vertexCapacity + runtime.indexCapacity,
+    runtime.targetTextureBytes, runtime.readbackCapacity)
+
+proc evictOldestPrepared(runtime: NativeWgpuRuntime;
+                         protectedToken = 0'u64): bool =
+  var victim = -1
+  for index, entry in runtime.preparedMeshes:
+    if entry.token != protectedToken and
+        (victim < 0 or entry.lastUse < runtime.preparedMeshes[victim].lastUse):
+      victim = index
+  if victim < 0: return false
+  let released = runtime.preparedMeshes[victim].vertexCapacity +
+    runtime.preparedMeshes[victim].indexCapacity
+  if runtime.preparedMeshes[victim].indexBuffer != nil:
+    runtime.releaseBuffer(runtime.preparedMeshes[victim].indexBuffer)
+  if runtime.preparedMeshes[victim].vertexBuffer != nil:
+    runtime.releaseBuffer(runtime.preparedMeshes[victim].vertexBuffer)
+  runtime.preparedMeshes.delete(victim)
+  runtime.preparedCacheBytes -= released
+  inc runtime.preparedCacheEvictions
+  true
+
+proc makeManagedRoom(runtime: NativeWgpuRuntime;
+                     vertexBytes, indexBytes, targetBytes,
+                     readbackBytes: uint64; incomingPrepared = 0'u64;
+                     protectedToken = 0'u64) =
+  var base = vertexBytes
+  for value in [indexBytes, targetBytes, readbackBytes]:
+    if base > high(uint64) - value:
+      raise newException(LibraryError,
+        "managed WGPU resource capacities overflow uint64")
+    base += value
+  if base > runtime.managedGpuByteBudget or
+      incomingPrepared > runtime.managedGpuByteBudget - base:
+    raise newException(LibraryError,
+      "managed WGPU resources exceed the byte budget")
+  let preparedLimit = runtime.managedGpuByteBudget - base - incomingPrepared
+  while runtime.preparedCacheBytes > preparedLimit:
+    if not runtime.evictOldestPrepared(protectedToken):
+      raise newException(LibraryError,
+        "managed WGPU resources exceed the byte budget")
+
+proc recordManagedPeak(runtime: NativeWgpuRuntime) =
+  let current = runtime.preparedCacheBytes + runtime.vertexCapacity +
+    runtime.indexCapacity + runtime.targetTextureBytes +
+    runtime.readbackCapacity
+  runtime.managedGpuPeakBytes = max(runtime.managedGpuPeakBytes, current)
 
 proc writeBufferChunked(runtime: NativeWgpuRuntime;
                         writeBuffer: WriteBufferProc; buffer: pointer;
@@ -717,14 +779,24 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
   runtime.releaseTexture = releaseTexture
   runtime.releaseView = releaseView
   runtime.releaseBuffer = releaseBuffer
+  if width > runtime.adapterCapabilities.maxTextureDimension2D or
+      height > runtime.adapterCapabilities.maxTextureDimension2D:
+    raise newException(LibraryError,
+      "WGPU target dimensions exceed the adapter limit")
+  if uint64(width) > high(uint64) div uint64(height) div 4'u64:
+    raise newException(LibraryError, "WGPU target byte size overflows uint64")
+  let requestedTargetBytes = uint64(width) * uint64(height) * 4'u64
   if runtime.targetTexture == nil or runtime.targetWidth != width or
       runtime.targetHeight != height:
+    runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
+      requestedTargetBytes, runtime.readbackCapacity)
     if runtime.targetView != nil:
       releaseView(runtime.targetView)
       runtime.targetView = nil
     if runtime.targetTexture != nil:
       releaseTexture(runtime.targetTexture)
       runtime.targetTexture = nil
+    runtime.targetTextureBytes = 0
     var textureDescriptor = WgpuTextureDescriptor(
       label: emptyLabel,
       usage: TextureUsageCopySrc or TextureUsageRenderAttachment,
@@ -746,6 +818,8 @@ proc renderPixels(runtime: NativeWgpuRuntime; width, height: uint32;
         "wgpu-native did not create a texture view")
     runtime.targetWidth = width
     runtime.targetHeight = height
+    runtime.targetTextureBytes = requestedTargetBytes
+    runtime.recordManagedPeak()
   let encoder = createEncoder(runtime.device, nil)
   if encoder == nil:
     raise newException(LibraryError, "wgpu-native did not create an encoder")
@@ -860,10 +934,17 @@ struct VertexOut {
 
     var activeVertexBuffer, activeIndexBuffer: pointer
     if uploadToken == 0:
+      let
+        desiredVertexCapacity = grownCapacity(runtime.vertexCapacity,
+          vertexSize)
+        desiredIndexCapacity = grownCapacity(runtime.indexCapacity, indexSize)
+      runtime.makeManagedRoom(desiredVertexCapacity, desiredIndexCapacity,
+        runtime.targetTextureBytes, runtime.readbackCapacity)
       ensureBuffer(runtime.vertexBuffer, runtime.vertexCapacity, vertexSize,
         BufferUsageVertex, "vertex")
       ensureBuffer(runtime.indexBuffer, runtime.indexCapacity, indexSize,
         BufferUsageIndex, "index")
+      runtime.recordManagedPeak()
       runtime.writeBufferChunked(writeBuffer, runtime.vertexBuffer,
         unsafeAddr meshVertices[0], vertexSize)
       runtime.writeBufferChunked(writeBuffer, runtime.indexBuffer,
@@ -895,23 +976,15 @@ struct VertexOut {
         if requiredBytes > runtime.preparedCacheByteBudget:
           raise newException(LibraryError,
             "prepared WGPU scene exceeds the cache byte budget")
+        runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
+          runtime.targetTextureBytes, runtime.readbackCapacity,
+          incomingPrepared = requiredBytes)
         while runtime.preparedMeshes.len >= runtime.preparedCacheCapacity or
             runtime.preparedCacheBytes >
               runtime.preparedCacheByteBudget - requiredBytes:
-          var victim = 0
-          for index in 1 ..< runtime.preparedMeshes.len:
-            if runtime.preparedMeshes[index].lastUse <
-                runtime.preparedMeshes[victim].lastUse:
-              victim = index
-          let released = runtime.preparedMeshes[victim].vertexCapacity +
-            runtime.preparedMeshes[victim].indexCapacity
-          if runtime.preparedMeshes[victim].indexBuffer != nil:
-            releaseBuffer(runtime.preparedMeshes[victim].indexBuffer)
-          if runtime.preparedMeshes[victim].vertexBuffer != nil:
-            releaseBuffer(runtime.preparedMeshes[victim].vertexBuffer)
-          runtime.preparedMeshes.delete(victim)
-          runtime.preparedCacheBytes -= released
-          inc runtime.preparedCacheEvictions
+          if not runtime.evictOldestPrepared():
+            raise newException(LibraryError,
+              "prepared WGPU cache could not evict an entry")
         runtime.preparedMeshes.add PreparedMeshBuffers()
         entryIndex = runtime.preparedMeshes.high
         var entry = addr runtime.preparedMeshes[entryIndex]
@@ -929,6 +1002,7 @@ struct VertexOut {
           entry.indexCapacity
         runtime.preparedCachePeakBytes = max(runtime.preparedCachePeakBytes,
           runtime.preparedCacheBytes)
+        runtime.recordManagedPeak()
         runtime.writeBufferChunked(writeBuffer, entry.vertexBuffer,
           unsafeAddr meshVertices[0], vertexSize)
         runtime.writeBufferChunked(writeBuffer, entry.indexBuffer,
@@ -962,11 +1036,15 @@ struct VertexOut {
       raise newException(LibraryError, "WGPU readback size exceeds host limits")
     bufferSize = paddedRow * uint64(height)
     if runtime.readbackCapacity < bufferSize:
+      let desiredReadbackCapacity = grownCapacity(runtime.readbackCapacity,
+        bufferSize)
+      runtime.makeManagedRoom(runtime.vertexCapacity, runtime.indexCapacity,
+        runtime.targetTextureBytes, desiredReadbackCapacity,
+        protectedToken = uploadToken)
       if runtime.readbackBuffer != nil:
         releaseBuffer(runtime.readbackBuffer)
         runtime.readbackBuffer = nil
-      runtime.readbackCapacity = grownCapacity(runtime.readbackCapacity,
-        bufferSize)
+      runtime.readbackCapacity = desiredReadbackCapacity
       var descriptor = WgpuBufferDescriptor(label: emptyLabel,
         usage: BufferUsageMapRead or BufferUsageCopyDst,
         size: runtime.readbackCapacity)
@@ -975,6 +1053,7 @@ struct VertexOut {
         runtime.readbackCapacity = 0
         raise newException(LibraryError,
           "wgpu-native did not create a readback buffer")
+      runtime.recordManagedPeak()
     var source = WgpuTexelCopyTextureInfo(texture: runtime.targetTexture,
       aspect: TextureAspectAll)
     var destination = WgpuTexelCopyBufferInfo(

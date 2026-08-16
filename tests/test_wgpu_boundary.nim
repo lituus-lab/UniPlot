@@ -37,6 +37,9 @@ suite "WGPU boundary":
           MinPreparedCacheByteBudget - 1)
       expect WgpuError:
         discard openWgpuBackend("/unused", uploadChunkBytes = 6)
+      expect WgpuError:
+        discard openWgpuBackend("/unused", managedGpuByteBudget =
+          DefaultPreparedCacheByteBudget - 1)
     else:
       expect PreConditionDefect: discard openWgpuBackend("/unused", 0)
       expect PreConditionDefect:
@@ -46,6 +49,9 @@ suite "WGPU boundary":
           MinPreparedCacheByteBudget - 1)
       expect PreConditionDefect:
         discard openWgpuBackend("/unused", uploadChunkBytes = 6)
+      expect PreConditionDefect:
+        discard openWgpuBackend("/unused", managedGpuByteBudget =
+          DefaultPreparedCacheByteBudget - 1)
 
   test "a configured native runtime submits an offscreen render pass":
     let libraryPath = getEnv("UNIPLOT_WGPU_LIBRARY")
@@ -59,6 +65,8 @@ suite "WGPU boundary":
       check backend.wgpuDiagnostics.preparedCacheByteBudget ==
         DefaultPreparedCacheByteBudget
       check backend.wgpuDiagnostics.uploadChunkBytes == DefaultUploadChunkBytes
+      check backend.wgpuDiagnostics.managedGpuByteBudget ==
+        DefaultManagedGpuByteBudget
       let capabilities = wgpuCapabilities(backend)
       check capabilities.available
       check capabilities.storageBuffers
@@ -164,6 +172,12 @@ suite "WGPU boundary":
       check backend.wgpuDiagnostics.preparedCacheEvictions == 2
       check backend.wgpuDiagnostics.preparedCacheMisses == 4
       check backend.wgpuDiagnostics.preparedCacheHits == 3
+      let managed = backend.wgpuDiagnostics
+      check managed.managedGpuBytes == managed.preparedCacheBytes +
+        managed.streamingBufferBytes + managed.targetTextureBytes +
+        managed.readbackBufferBytes
+      check managed.managedGpuBytes <= managed.managedGpuByteBudget
+      check managed.managedGpuPeakBytes <= managed.managedGpuByteBudget
       backend.close()
       check backend.state == wbsUnavailable
 
@@ -202,3 +216,29 @@ suite "WGPU boundary":
       check tooSmall.wgpuDiagnostics.preparedCacheEntries == 0
       check tooSmall.wgpuDiagnostics.preparedCacheBytes == 0
       tooSmall.close()
+
+      let targetBytes = uint64(scene.size.width * scene.size.height * 4)
+      let globallyLimited = openWgpuBackend(libraryPath,
+        preparedCacheCapacity = 2,
+        preparedCacheByteBudget = oneSceneBytes + targetBytes,
+        managedGpuByteBudget = oneSceneBytes + targetBytes)
+      globallyLimited.submitWgpuPrepared(prepared)
+      globallyLimited.submitWgpuPrepared(samePrepared)
+      let limitedDiagnostics = globallyLimited.wgpuDiagnostics
+      check limitedDiagnostics.preparedCacheEntries == 1
+      check limitedDiagnostics.preparedCacheEvictions == 1
+      check limitedDiagnostics.managedGpuBytes <=
+        limitedDiagnostics.managedGpuByteBudget
+      globallyLimited.close()
+
+      let targetLimited = openWgpuBackend(libraryPath,
+        preparedCacheByteBudget = MinPreparedCacheByteBudget,
+        managedGpuByteBudget = MinManagedGpuByteBudget * 2)
+      expect WgpuError:
+        discard targetLimited.readWgpuClearTarget(Size(width: 64, height: 64),
+          parseColor("#ffffff").get)
+      check targetLimited.wgpuDiagnostics.managedGpuBytes == 0
+      let recovered = targetLimited.readWgpuClearTarget(
+        Size(width: 4, height: 4), parseColor("#204060").get)
+      check recovered.len == 4 * 4 * 4
+      targetLimited.close()
