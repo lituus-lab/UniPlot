@@ -74,6 +74,14 @@ bytes through 64 MiB. `WgpuDiagnostics` reports queue-write calls, exact bytes
 submitted and the largest individual write. This is a per-call transfer bound;
 it is not a ring buffer or a bound on total backend memory.
 
+`managedGpuByteBudget` defaults to 512 MiB and must be at least as large as the
+prepared-cache budget. UniPlot accounts allocated prepared and direct buffer
+capacities, readback capacity and the logical RGBA8 target payload together.
+Resource growth first evicts unprotected LRU entries and otherwise fails before
+allocation. Current, component and peak values are available in diagnostics.
+This is a hard bound for those UniPlot-managed quantities, not a measurement of
+opaque driver padding, metadata, command storage or internal allocations.
+
 ## Typed failures
 
 Plotting-domain and user-input failures raise `PlotError`. UniPlot rejects

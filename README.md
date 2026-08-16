@@ -128,12 +128,19 @@ Least-recently-used entries are evicted until both bounds are satisfied, and a
 single prepared scene larger than the byte budget is rejected. The byte count
 covers allocated prepared vertex/index capacities. Direct streaming buffers,
 the render target and readback storage are separate and are not included in
-that prepared-cache budget.
+that prepared-cache budget. They are included in the separate managed-resource
+budget together with prepared and direct-stream buffers. Its default is
+512 MiB and `managedGpuByteBudget` must contain the configured prepared-cache
+budget. Growth evicts unprotected least-recently-used prepared entries first,
+then fails before allocation if the bound still cannot hold. Diagnostics expose
+each component, the current sum and its high-water mark. Texture accounting is
+the logical RGBA8 payload requested by UniPlot; driver metadata, alignment and
+internal allocations are not observable and are not claimed.
 Queue uploads are split into aligned writes of at most 4 MiB by default.
 `uploadChunkBytes` configures a multiple of four bytes from 4 bytes through
 64 MiB; diagnostics expose the call count, transferred bytes and largest
-write. This bounds each native queue write, not total streaming-buffer or GPU
-memory use.
+write. This bounds each native queue write; it is independent of the managed
+resource-capacity budget.
 `renderWgpuPrepared` returns unpadded RGBA8 pixels. Convenience scene overloads
 prepare on each call. `nimble wgpuBenchmark` measures preparation,
 forced LRU misses, alternating resident submission and publication separately.

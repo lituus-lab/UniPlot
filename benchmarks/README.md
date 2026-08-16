@@ -365,6 +365,17 @@ establish a slowdown. These counters measure host-to-queue calls and payload;
 they do not measure PCIe traffic, GPU completion, allocation traffic or total
 resident memory.
 
+The managed-resource follow-up adds a 512 MiB aggregate bound over prepared and
+streaming buffer capacities, readback capacity and logical RGBA8 target bytes.
+Three 50-iteration runs reported an exact 24,668,672-byte current and peak sum:
+20,971,520 prepared bytes, 1,600,000 target bytes and a 2,097,152-byte readback
+buffer, with no direct-stream buffer retained by this prepared workload.
+Preparation averaged 73.7643 ms, forced-miss upload plus submission 1.0618 ms,
+resident submission 0.0922 ms and publication 3.0702 ms. The upload mean is
+1.44% above the prior three-run mean while the other stages moved in both
+directions; this small run does not isolate a statistically reliable policy
+cost. Driver-private memory is unavailable and excluded from the byte sum.
+
 The optional fourth argument compares the current means with a baseline only
 after adapter, backend, workload, canvas and residency semantics match. Each
 phase carries its own ratio derived from repeated runs, because asynchronous
