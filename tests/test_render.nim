@@ -3,6 +3,7 @@
 import std/[unittest, strutils]
 import contracts
 import UniGlyph
+import UniImage/core as uimg
 from UniVector import lineTo
 import UniPlot
 
@@ -78,3 +79,42 @@ suite "rendering":
       expect PreConditionDefect: discard absent.size
     expect PlotError: discard absent.toSvg
     expect PlotError: discard absent.renderImage
+
+  test "raster layers preserve order clipping identity and snapshots":
+    let font = loadTtf("tests/DejaVuSans.ttf")
+    var pixels = uimg.newImage[uint8](2, 1, uimg.csRgb)
+    pixels.data = @[255'u8, 0, 0, 0, 255, 0]
+    var scene = initScene(Size(width: 2, height: 1),
+      defaultTheme().background)
+    scene.addImage(pixels, -1, 0, id = 42)
+    let
+      svg = scene.toSvg(font)
+      rendered = scene.renderImage(font)
+      prepared = scene.prepareScene(font)
+      preparedPixels = prepared.renderImage
+    check "<image x=\"-1\"" in svg
+    check "data:image/png;base64," in svg
+    check "data-uplot-id=\"42\"" in svg
+    check rendered.data[0 .. 3] == @[0'u8, 255, 0, 255]
+    check preparedPixels.data == rendered.data
+    pixels.data[3] = 17
+    scene.nodes[0].image.data[3] = 17
+    check prepared.renderImage.data == preparedPixels.data
+
+  test "raster layers reject malformed images in debug and release":
+    var scene = initScene(Size(width: 2, height: 2),
+      defaultTheme().background)
+    var malformed = uimg.newImage[uint8](1, 1, uimg.csRgb)
+    malformed.data.setLen(2)
+    when defined(release):
+      expect PlotError: scene.addImage(malformed, 0, 0)
+    else:
+      expect PreConditionDefect: scene.addImage(malformed, 0, 0)
+    malformed.width = high(int)
+    malformed.height = 2
+    malformed.channels = 3
+    malformed.data.setLen(0)
+    when defined(release):
+      expect PlotError: scene.addImage(malformed, 0, 0)
+    else:
+      expect PreConditionDefect: scene.addImage(malformed, 0, 0)

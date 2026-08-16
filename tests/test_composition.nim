@@ -37,6 +37,9 @@ suite "plot composition":
         check $composed.path == $source.path
       of snText:
         check composed.position == source.position
+      of snImage:
+        check composed.imageX == source.imageX
+        check composed.imageY == source.imageY
 
     var comparedStableId = false
     for index, source in secondScene.nodes:
@@ -48,6 +51,9 @@ suite "plot composition":
       of snText:
         check composed.position == Point(x: source.position.x + 416'f32,
           y: source.position.y)
+      of snImage:
+        check composed.imageX == source.imageX + 416
+        check composed.imageY == source.imageY
       if source.id != 0:
         check composed.id != source.id
         comparedStableId = true
@@ -107,6 +113,8 @@ suite "plot composition":
       of snText:
         check shared.nodes[index].text == expected.nodes[index].text
         check shared.nodes[index].position == expected.nodes[index].position
+      of snImage:
+        check shared.nodes[index].image.data == expected.nodes[index].image.data
 
   test "shared numeric domains reject incompatible axes":
     let
@@ -144,6 +152,8 @@ suite "plot composition":
       of snText:
         check shared.nodes[index].text == expected.nodes[index].text
         check shared.nodes[index].position == expected.nodes[index].position
+      of snImage:
+        check shared.nodes[index].image.data == expected.nodes[index].image.data
 
   test "share categorical y domains in first-seen panel order":
     let
@@ -166,6 +176,8 @@ suite "plot composition":
       of snText:
         check shared.nodes[index].text == expected.nodes[index].text
         check shared.nodes[index].position == expected.nodes[index].position
+      of snImage:
+        check shared.nodes[index].image.data == expected.nodes[index].image.data
 
   test "facet specifications retain category order and complete semantics":
     var frame = initDataFrame()

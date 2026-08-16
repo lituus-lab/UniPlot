@@ -4,6 +4,7 @@ import std/[os, sequtils, unittest]
 import contracts
 import UniColor
 import UniGlyph
+import UniImage/core as uimg
 import UniPlot
 import UniVector
 import UniCrypto/hash/blake3/blake3 as ublake3
@@ -70,6 +71,19 @@ suite "WGPU boundary":
     else:
       expect PreConditionDefect:
         discard scene.wgpuSceneIdentity(Font(nil))
+
+  test "image resources and exact pixels participate in scene identity":
+    let font = loadTtf("tests/DejaVuSans.ttf")
+    var image = uimg.newImage[uint8](1, 1, uimg.csRgba)
+    image.data = @[1'u8, 2, 3, 4]
+    var scene = initScene(Size(width: 10, height: 10),
+      parseColor("#ffffff").get)
+    scene.addImage(image, -2, 3, 127, id = 9)
+    let original = scene.wgpuSceneIdentity(font)
+    let frame = prepareWgpuFrame(scene)
+    check frame.resources == @[WgpuResource(id: 9, kind: wrImageTexture)]
+    scene.nodes[0].image.data[2] = 8
+    check scene.wgpuSceneIdentity(font) != original
 
   test "an invalid runtime path fails without affecting the core":
     expect WgpuError:
