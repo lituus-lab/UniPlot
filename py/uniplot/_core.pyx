@@ -6,6 +6,9 @@ from libc.stdlib cimport malloc, free
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
 cdef extern from "UniPlot.h":
+    enum:
+        UPLOT_OK
+        UPLOT_ERR_MEMORY
     ctypedef struct uplot_plot:
         pass
     int uplot_init()
@@ -13,11 +16,15 @@ cdef extern from "UniPlot.h":
     int uplot_abi_version()
     uplot_plot *uplot_plot_new(int, int)
     uplot_plot *uplot_plot_from_json(const uint8_t *, size_t, int, int)
+    int uplot_plot_from_json_status(const uint8_t *, size_t, int, int,
+                                    uplot_plot **)
     int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *)
     int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                        const char *, float)
     int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                          const char *, float)
+    int uplot_add_raster(uplot_plot *, const uint8_t *, size_t, int, int, int,
+                         double, double, double, double, int)
     int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
                            double, const char *, const char *)
     int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
@@ -100,6 +107,9 @@ AGG_SUM = 1
 AGG_MEAN = 2
 AGG_MINIMUM = 3
 AGG_MAXIMUM = 4
+RASTER_NEAREST = 0
+RASTER_BILINEAR = 1
+RASTER_BOX = 2
 
 cdef class Plot:
     cdef uplot_plot *_handle
@@ -113,6 +123,23 @@ cdef class Plot:
         if self._handle != NULL:
             uplot_plot_free(self._handle)
 
+    def raster(self, pixels, int width, int height, int channels,
+               double x_min, double x_max, double y_min, double y_max,
+               int filter=RASTER_BILINEAR):
+        cdef bytes payload = bytes(pixels)
+        cdef const uint8_t *data = payload
+        if len(payload) == 0:
+            raise ValueError("raster pixels cannot be empty")
+        cdef int status = uplot_add_raster(
+            self._handle, data, len(payload), width, height, channels,
+            x_min, x_max, y_min, y_max, filter)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != 0:
+            raise ValueError(
+                "invalid raster pixels, dimensions, extents, or filter")
+        return self
+
     @classmethod
     def from_json(cls, payload, int width=800, int height=500):
         cdef bytes encoded
@@ -122,9 +149,12 @@ cdef class Plot:
             encoded = payload.encode("utf-8")
         else:
             raise TypeError("payload must be str or bytes")
-        cdef uplot_plot *parsed = uplot_plot_from_json(
-            <const uint8_t *>encoded, len(encoded), width, height)
-        if parsed == NULL:
+        cdef uplot_plot *parsed = NULL
+        cdef int status = uplot_plot_from_json_status(
+            <const uint8_t *>encoded, len(encoded), width, height, &parsed)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
             raise ValueError("invalid UniPlot JSON or plot dimensions")
         result = cls(width, height)
         uplot_plot_free((<Plot>result)._handle)

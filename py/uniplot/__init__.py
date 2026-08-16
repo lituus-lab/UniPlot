@@ -21,6 +21,9 @@ from ._core import (
     MISSING_BREAK,
     MISSING_DROP,
     MISSING_REJECT,
+    RASTER_BILINEAR,
+    RASTER_BOX,
+    RASTER_NEAREST,
     Plot,
     abi_version,
     facet_png,
@@ -39,6 +42,7 @@ __all__ = [
     "LINE_SOLID", "MARKER_CIRCLE", "MARKER_CROSS", "MARKER_DIAMOND",
     "MARKER_PLUS", "MARKER_SQUARE", "MARKER_TRIANGLE", "Plot",
     "MISSING_BREAK", "MISSING_DROP", "MISSING_REJECT",
+    "RASTER_BILINEAR", "RASTER_BOX", "RASTER_NEAREST",
     "abi_version", "facet_matrix_png", "facet_matrix_svg", "facet_png",
     "facet_svg", "grid_png", "grid_svg", "version", "__version__",
 ]
