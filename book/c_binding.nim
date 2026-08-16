@@ -96,7 +96,8 @@ int main(void) {
   documents.
 - Caller-owned input arrays only need to remain valid for the duration of the
   add call; UniPlot copies them into its specification.
-- Status is `UPLOT_OK`, `UPLOT_ERR_ARGUMENT` or `UPLOT_ERR_RENDER`.
+- Status is `UPLOT_OK`, `UPLOT_ERR_ARGUMENT`, `UPLOT_ERR_RENDER` or
+  `UPLOT_ERR_MEMORY`.
 - A null pointer, zero-sized series, length mismatch, invalid colour or invalid
   dimensions is an argument error rather than undefined behaviour.
 - `uplot_add_line_styled` accepts the five `UPLOT_LINE_*` values;
@@ -145,10 +146,13 @@ version; changing an existing signature or ownership rule may not.
 The direct C builders include numeric/categorical plots and retained rasters.
 `uplot_add_raster` copies a caller-owned packed Gray/RGB/RGBA8 buffer and
 positions it with numeric extents; `UPLOT_RASTER_NEAREST`, `BILINEAR` and `BOX`
-select UniImage filtering. The versioned JSON bridge transports the complete
+select UniImage filtering. `uplot_add_image_mark` uses the same copied input
+contract but inserts the image in ordinary data-layer order rather than behind
+the guides. The versioned JSON bridge transports the complete
 valid Nim `PlotSpec`, including layers, mappings, references, scales, themes
-palettes and rasters, without duplicating the grammar in C. The original solid-line
-and circle-point functions remain ABI-compatible convenience entry points.
+palettes, rasters and image resources, without duplicating the grammar in C.
+The original solid-line and circle-point functions remain ABI-compatible
+convenience entry points.
 
 Next: [Python binding](python_binding.html).
 """
@@ -167,6 +171,8 @@ let
   cNumericHeatSvg = readFile("../assets/generated/c_numeric_heatmap.svg")
   cNumericHeatPng = pngDataUri(
     readFile("../assets/generated/c_numeric_heatmap.png"))
+  cImageSvg = readFile("../assets/generated/c_image_mark.svg")
+  cImagePng = pngDataUri(readFile("../assets/generated/c_image_mark.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
@@ -189,7 +195,11 @@ nbRawHtml gallery([
     "A variable-size numeric cell grid built through the C ABI."),
   pngFigure(cNumericHeatPng,
     "The same C numeric heatmap as an embedded PNG.",
-    "A numeric heatmap rendered through the UniPlot C ABI")
+    "A numeric heatmap rendered through the UniPlot C ABI"),
+  svgFigure(cImageSvg,
+    "A copied RGBA resource inserted with `uplot_add_image_mark`."),
+  pngFigure(cImagePng, "The same C image mark as an embedded PNG.",
+    "A data-mapped image mark rendered through the UniPlot C ABI")
 ])
 
 nbSave

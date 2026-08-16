@@ -392,7 +392,9 @@ cell is needed to train the default continuous colour guide.
 
 The recipe produces ordinary numeric `geomRect` paths and a continuous
 UniColor guide. It is a vector-cell heatmap, not an image sampler: dense raster
-images, image marks and contour estimation remain separate roadmap items.
+heatmap recipes and contour estimation remain separate roadmap items. Generic
+retained rasters and data-mapped image marks are documented in the grammar
+chapter.
 
 Next: [Scenes and rendering](scene_rendering.html).
 """

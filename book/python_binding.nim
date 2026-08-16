@@ -128,7 +128,9 @@ ABI conventions.
 
 `Plot.raster(pixels, width, height, channels, x_min, x_max, y_min, y_max)`
 copies packed Gray/RGB/RGBA8 bytes into the retained plot. The `RASTER_*`
-constants select nearest, bilinear or box filtering. The JSON bridge gives
+constants select nearest, bilinear or box filtering. `Plot.image(...)` accepts
+the same arguments but inserts the copied resource as an ordinary data mark,
+preserving its order relative to vector layers. The JSON bridge gives
 Python lossless transport of every valid Nim
 grammar feature without reimplementing its validation or rendering semantics
 in Cython. More ergonomic builders can grow additively over that foundation.
@@ -153,6 +155,9 @@ let
     "../assets/generated/python_numeric_heatmap.svg")
   pythonNumericHeatPng = pngDataUri(
     readFile("../assets/generated/python_numeric_heatmap.png"))
+  pythonImageSvg = readFile("../assets/generated/python_image_mark.svg")
+  pythonImagePng = pngDataUri(
+    readFile("../assets/generated/python_image_mark.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
@@ -177,7 +182,12 @@ nbRawHtml gallery([
     "A variable-size numeric cell grid built through `Plot.numeric_heatmap`."),
   pngFigure(pythonNumericHeatPng,
     "The same Python numeric heatmap as an embedded PNG.",
-    "A numeric heatmap rendered through the Python binding")
+    "A numeric heatmap rendered through the Python binding"),
+  svgFigure(pythonImageSvg,
+    "A copied RGBA resource inserted through `Plot.image`."),
+  pngFigure(pythonImagePng,
+    "The same Python image mark as an embedded PNG.",
+    "A data-mapped image mark rendered through the Python binding")
 ])
 
 nbSave

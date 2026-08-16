@@ -119,6 +119,43 @@ nbRawHtml pngFigure(pngDataUri(rasterPng),
   "RGBA raster layer rendered by UniPlot")
 
 nbText: """
+## Data-mapped image marks
+
+`addImageResource` snapshots a named UniImage once. `geomImage` maps a
+categorical resource-name column and numeric `xMin`, `xMax`, `yMin`, `yMax`
+columns, so each retained image participates in ordinary layer and row order.
+The registry is insertion ordered, names are unique, and missing names are
+typed errors. Linear reversed axes mirror the image; nonlinear axes are
+rejected until an explicit warp contract exists.
+"""
+
+nbCode:
+  var imageData = initDataFrame()
+  imageData.addColumn("left", [0.0, 2.2])
+  imageData.addColumn("right", [1.8, 4.0])
+  imageData.addColumn("bottom", [0.0, 0.5])
+  imageData.addColumn("top", [1.8, 2.3])
+  imageData.addColumn("resource", ["warm", "cool"])
+  var warm = uimg.newImage[uint8](2, 2, uimg.csRgba)
+  warm.data = @[245'u8, 100, 70, 255, 255, 190, 70, 220,
+    190, 45, 80, 220, 255, 235, 150, 255]
+  var cool = uimg.newImage[uint8](2, 2, uimg.csRgba)
+  cool.data = @[45'u8, 120, 220, 255, 85, 210, 220, 220,
+    35, 65, 155, 220, 170, 235, 245, 255]
+  var imageMarks = plot(imageData)
+  imageMarks.addImageResource("warm", warm)
+  imageMarks.addImageResource("cool", cool)
+  imageMarks.geomImage(aes("", "", xMin = "left", xMax = "right",
+    yMin = "bottom", yMax = "top", image = "resource"), RasterNearest)
+  imageMarks.labels(title = "Data-mapped image resources", x = "x", y = "y")
+  let imageMarkPng = imageMarks.compileScene(
+    Size(width: 720, height: 420)).encodePng(font)
+
+nbRawHtml pngFigure(pngDataUri(imageMarkPng),
+  "Two named resources resolved from categorical row data.",
+  "Data-mapped image marks rendered by the Nim API")
+
+nbText: """
 Layer order is rendering order. A zero line width or point radius selects the
 theme default; an explicit positive value overrides it for that layer. Text
 requires the mapped label column to be categorical.
