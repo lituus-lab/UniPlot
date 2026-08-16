@@ -59,8 +59,9 @@ wgpu-native 29.0.1.1 and stored under the ignored `.deps` directory.
 `prepareWgpuScene(scene, font)` uses the same UniGlyph layouts and UniVector
 tessellation as the CPU backends. Its first submission uploads and enqueues the
 retained indexed geometry. Reusing that exact prepared handle keeps its
-vertex/index pair resident. A backend retains at most four prepared handles and
-256 MiB of their allocated vertex/index capacities by default. Configure the
+mesh/image buffers and textures resident. A backend retains at most four
+prepared handles and 256 MiB of their allocated buffer capacities and logical
+RGBA8 texture payloads by default. Configure the
 contractual limits with `preparedCacheCapacity` (1 through 64) and
 `preparedCacheByteBudget` (at least 512 bytes). Eviction is least-recently-used
 until both limits hold; a single scene exceeding the byte budget is rejected.
@@ -72,7 +73,7 @@ The convenience `submitWgpuScene` and `renderWgpuScene` overloads also maintain
 a host-side preparation LRU. Its key is BLAKE3-256 over canonical scene values
 and, when text exists, UniGlyph's BLAKE3 identity of the exact font bytes.
 Process-local pointers, node IDs and path-builder cursors are not keys. The
-defaults retain 16 entries and 256 MiB of logical vertex/index payload;
+defaults retain 16 entries and 256 MiB of prepared mesh and RGBA image payload;
 `sceneCacheCapacity` and `sceneCacheByteBudget` configure them independently
 from GPU residency. Oversized preparations remain correct but are prepared
 again rather than retained. `clearWgpuSceneCache` explicitly releases them.
@@ -84,8 +85,12 @@ thread. Debug contracts reject a violation and release builds raise
 `WgpuError`; renderer-free scene construction and `prepareWgpuScene` remain
 independent of a backend.
 
-The headless validation task checks individual pixels, exact CPU/GPU parity,
-direct uploads, canonical invalidation, both cache layers and LRU eviction. Run
+The headless validation task checks individual pixels, exact CPU/GPU parity
+for pixel-aligned opaque geometry and single RGBA8 layers,
+and a one-RGBA8-unit tolerance fixture for stacked translucent layers because
+the CPU quantizes after every layer while the GPU retains RGBA16F. It also
+checks direct uploads, canonical invalidation, both cache layers and LRU
+eviction. Run
 `nimble wgpuBenchmark` to measure identity construction, a host-cache hit,
 automatic submission, explicit preparation, forced GPU misses, alternating
 resident submission and publication separately.
@@ -98,7 +103,7 @@ it is independent of resource residency.
 
 `managedGpuByteBudget` defaults to 512 MiB and must be at least as large as the
 prepared-cache budget. UniPlot accounts allocated prepared and direct buffer
-capacities, readback capacity and the logical RGBA8 target payload together.
+capacities, readback capacity and the logical RGBA16F target payload together.
 Resource growth first evicts unprotected LRU entries and otherwise fails before
 allocation. Current, component and peak values are available in diagnostics.
 This is a hard bound for those UniPlot-managed quantities, not a measurement of

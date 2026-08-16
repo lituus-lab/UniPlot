@@ -45,7 +45,9 @@ scene without weakening its deterministic CPU semantics.
 - [x] Handle uncaptured validation errors and asynchronous device loss.
 - [x] Expose adapter identity and relevant limits without leaking WGPU ABI
   types.
-- [x] Add an exact CPU/GPU pixel-parity fixture for pixel-aligned geometry.
+- [x] Add exact CPU/GPU pixel-parity fixtures for pixel-aligned geometry and
+  single-layer RGBA8 publication; bound stacked translucent differences to one
+  RGBA8 unit because CPU quantizes after every layer while GPU retains RGBA16F.
 - [x] Add an antialiased CPU/GPU fixture whose tolerance is confined to the
   one-pixel cells intersected by the geometric edge.
 - [x] Add release benchmarks separating scene preparation, retained upload and
@@ -117,13 +119,14 @@ than introducing competing geometry or text implementations.
 - [ ] Observable data updates and incremental scene diffs.
 - [ ] Persistent GPU resources keyed by semantic resource IDs.
 - [x] Keep a configurable, count- and byte-bounded LRU of `WgpuPreparedScene`
-  vertex/index buffers by unique process-local handle identity, with independent
-  direct-stream buffers and explicit hit/miss/upload/eviction tests. The byte
-  budget covers allocated prepared-buffer capacities.
+  mesh buffers, image-quad buffers and logical RGBA8 textures by unique
+  process-local handle identity, with independent direct-stream buffers and
+  explicit hit/miss/upload/eviction tests. The byte budget covers allocated
+  prepared-buffer capacities and resident texture payloads.
 - [x] Split vertex/index queue uploads into configurable aligned byte-bounded
   writes, with exact call/byte diagnostics and pixel-identity tests.
 - [x] Enforce a total configurable bound over UniPlot-managed prepared/direct
-  buffer capacities, readback capacity and logical RGBA8 target bytes, with
+  buffer capacities, readback capacity and logical RGBA16F target bytes, with
   component/high-water diagnostics and LRU pressure tests. Opaque driver
   allocations remain explicitly outside this accounting boundary.
 - [x] Rotate direct uploads through a configurable managed streaming ring,

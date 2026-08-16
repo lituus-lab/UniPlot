@@ -59,6 +59,30 @@ bytes, but not cumulative requested bytes. The harness therefore does not
 rename allocation counts or heap growth as “bytes allocated per frame”; that
 separate measurement remains open.
 
+The optional hardware raster benchmark is separate from the cross-library
+workload:
+
+```bash
+nimble wgpuDeps
+nimble wgpuRasterBenchmark -- 20 build/wgpu-raster.json # one diagnostic run
+nimble wgpuRasterBaseline                               # three-run evidence
+```
+
+It renders one retained 512×512 RGBA8 image into an 800×600 Metal target. The
+submit phase excludes readback; the publication phase renders into a
+premultiplied RGBA16F target before publishing straight RGBA8 pixels. On the
+2026-08-16 Apple M4 reference run, the medians of three 20-iteration run means
+were 0.1269 ms for a resident enqueue and 6.5775 ms for publication. The
+first prepared submission uploaded 1,048,576
+texture bytes exactly once and retained 1,048,832 budgeted GPU bytes including
+the quad buffer. The RGBA16F target preserves low-alpha straight-color
+semantics that an RGBA8 premultiplied target cannot recover. Publication is
+therefore measured independently from enqueue because conversion and
+GPU-to-CPU readback dominate it. The recorded three-run evidence is
+`benchmarks/baselines/apple-m4-metal-raster.json`; it is hardware-specific and
+not a claim about other adapters. The baseline task reproduces the complete
+three-run aggregation into `build/wgpu-raster-baseline.json`.
+
 `benchmarkDeps` creates `build/benchmark-python` for Matplotlib, Plotly and
 Kaleido; `build/benchmark-r-library` for ggplot2 when R is installed; and uses
 the dedicated `benchmarks/julia/Project.toml` for Plots.jl when Julia is
@@ -366,7 +390,8 @@ they do not measure PCIe traffic, GPU completion, allocation traffic or total
 resident memory.
 
 The managed-resource follow-up adds a 512 MiB aggregate bound over prepared and
-streaming buffer capacities, readback capacity and logical RGBA8 target bytes.
+streaming buffer capacities, readback capacity and logical RGBA16F target
+bytes.
 Three 50-iteration runs reported an exact 24,668,672-byte current and peak sum:
 20,971,520 prepared bytes, 1,600,000 target bytes and a 2,097,152-byte readback
 buffer, with no direct-stream buffer retained by this prepared workload.

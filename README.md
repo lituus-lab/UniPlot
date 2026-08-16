@@ -122,8 +122,9 @@ downloaded runtime stays in the ignored `.deps` directory.
 including UniVector marker geometry and expanded dashed strokes.
 `submitWgpuScene` and `renderWgpuScene` first derive a BLAKE3-256 key from the
 canonical render semantics and UniGlyph's exact font-content identity. A
-backend retains up to 16 host preparations and 256 MiB of vertex/index logical
-payload by default; `sceneCacheCapacity` and `sceneCacheByteBudget` configure
+backend retains up to 16 host preparations and 256 MiB of prepared mesh,
+image-quad and logical RGBA8 texture payload by default; `sceneCacheCapacity`
+and `sceneCacheByteBudget` configure
 those independent bounds. Node IDs and path-builder cursor state are excluded
 because neither changes pixels. Any render value or text-bearing font change
 causes a miss. `clearWgpuSceneCache` releases retained host preparations while
@@ -135,7 +136,8 @@ on a cache hit. `openWgpuBackend` accepts contractual bounds of 1 through 64
 entries and at least 512 bytes; the defaults are four entries and 256 MiB.
 Least-recently-used entries are evicted until both bounds are satisfied, and a
 single prepared scene larger than the byte budget is rejected. The byte count
-covers allocated prepared vertex/index capacities. Direct streaming buffers,
+covers allocated prepared mesh/image buffer capacities and logical RGBA8
+texture bytes. Direct streaming buffers,
 the render target and readback storage are separate and are not included in
 that prepared-cache budget. They are included in the separate managed-resource
 budget together with prepared and direct-stream buffers. Its default is
