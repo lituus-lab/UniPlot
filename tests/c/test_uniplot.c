@@ -77,6 +77,41 @@ int main(void) {
                           UPLOT_RASTER_NEAREST) == UPLOT_ERR_ARGUMENT);
   assert(uplot_add_raster(plot, raster_pixels, sizeof(raster_pixels), 2, 1, 4,
                           0.0, 2.0, 1.0, 3.0, 99) == UPLOT_ERR_ARGUMENT);
+  uint8_t mark_pixels[] = {12, 34, 56, 255};
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 1, 1, 4,
+                              0.5, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_OK);
+  mark_pixels[0] = 0;
+  raster_json = NULL;
+  raster_json_len = 0;
+  assert(uplot_plot_to_json(plot, &raster_json, &raster_json_len) == UPLOT_OK);
+  assert(contains_bytes(raster_json, raster_json_len, "DCI4/w=="));
+  assert(contains_bytes(raster_json, raster_json_len, "mkImage"));
+  uplot_buffer_free(raster_json, raster_json_len);
+  assert(uplot_add_image_mark(NULL, mark_pixels, sizeof(mark_pixels), 1, 1, 4,
+                              0.5, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, NULL, sizeof(mark_pixels), 1, 1, 4,
+                              0.5, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, 3, 1, 1, 4, 0.5, 1.5, 0.5,
+                              1.5, UPLOT_RASTER_BILINEAR) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 0, 1, 4,
+                              0.5, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 1, 1, 2,
+                              0.5, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 1, 1, 4,
+                              NAN, 1.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 1, 1, 4,
+                              1.5, 0.5, 0.5, 1.5,
+                              UPLOT_RASTER_BILINEAR) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_add_image_mark(plot, mark_pixels, sizeof(mark_pixels), 1, 1, 4,
+                              0.5, 1.5, 0.5, 1.5, 99) ==
+         UPLOT_ERR_ARGUMENT);
   const double gap_y[] = {1.0, NAN, 2.0};
   assert(uplot_add_line(plot, x, gap_y, 3, "#3366cc", 2.0f) == UPLOT_OK);
   assert(uplot_add_points(plot, x, y, 3, "#cc3333", 4.0f) == UPLOT_OK);
@@ -206,6 +241,19 @@ int main(void) {
   assert(uplot_plot_to_json(restored, &roundtrip, &roundtrip_len) == UPLOT_OK);
   assert(roundtrip_len == json_len);
   assert(memcmp(roundtrip, json, json_len) == 0);
+  assert(uplot_add_image_mark(restored, mark_pixels, sizeof(mark_pixels),
+                              1, 1, 4, 1.5, 2.5, 0.5, 1.5,
+                              UPLOT_RASTER_NEAREST) == UPLOT_OK);
+  assert(uplot_add_image_mark(restored, mark_pixels, sizeof(mark_pixels),
+                              1, 1, 4, 2.5, 3.5, 0.5, 1.5,
+                              UPLOT_RASTER_NEAREST) == UPLOT_OK);
+  assert(uplot_add_line(restored, x, y, 3, "#3366cc", 2.0f) == UPLOT_OK);
+  uint8_t *restored_png = NULL;
+  size_t restored_png_len = 0;
+  assert(uplot_render_png(restored, TEST_FONT, &restored_png,
+                          &restored_png_len) == UPLOT_OK);
+  assert(restored_png != NULL && restored_png_len > 8);
+  uplot_buffer_free(restored_png, restored_png_len);
   uplot_buffer_free(json, json_len);
   uplot_buffer_free(roundtrip, roundtrip_len);
   uplot_plot_free(restored);
