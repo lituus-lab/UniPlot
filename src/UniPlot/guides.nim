@@ -212,9 +212,10 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
     raise newException(PlotError, "layer mapping references a missing column")
   result.xKind = if spec.layers.len > 0:
     spec.data.columns[firstX].kind else: ckNumeric
-  if result.xKind == ckCategorical and spec.xScaleSpec.kind != skLinear:
+  if result.xKind == ckCategorical and (spec.xScaleSpec.kind != skLinear or
+      spec.xScaleSpec.labelKind != alkNumeric):
     raise newException(PlotError,
-      "categorical x coordinates only support a linear scale")
+      "categorical x coordinates require numeric labels on a linear scale")
   result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
   result.xBand = initBandDomain()
   let firstY = if spec.layers.len > 0:
@@ -230,9 +231,10 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
     result.yKind = spec.data.columns[firstY].kind
   else:
     result.yKind = ckNumeric
-  if result.yKind == ckCategorical and spec.yScaleSpec.kind != skLinear:
+  if result.yKind == ckCategorical and (spec.yScaleSpec.kind != skLinear or
+      spec.yScaleSpec.labelKind != alkNumeric):
     raise newException(PlotError,
-      "categorical y coordinates only support a linear scale")
+      "categorical y coordinates require numeric labels on a linear scale")
   result.yContinuous = initContinuousDomain(spec.yScaleSpec.kind)
   result.yBand = initBandDomain()
   for reference in spec.references:
@@ -599,13 +601,16 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     xScale = domains.xContinuous.train(xRangeMin, xRangeMax,
       spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
   elif xKind == ckNumeric:
-    xScale = domains.xContinuous.train(xRangeMin, xRangeMax)
+    xScale = domains.xContinuous.trainAxis(xRangeMin, xRangeMax,
+      spec.xScaleSpec.labelKind)
   else:
     xBand = if spec.xScaleSpec.categories.configured:
       domains.xBand.train(xRangeMin, xRangeMax,
         spec.xScaleSpec.categories.values)
     else:
       domains.xBand.train(xRangeMin, xRangeMax)
+  if xKind == ckNumeric:
+    xScale.validateAxisLabels(spec.xScaleSpec.labelKind)
   if yKind == ckCategorical and spec.yScaleSpec.domain.configured:
     raise newException(PlotError,
       "numeric y limits cannot be applied to categorical coordinates")
@@ -616,13 +621,19 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     yScale = domains.yContinuous.train(yRangeMin, yRangeMax,
       spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
   elif yKind == ckNumeric:
-    yScale = domains.yContinuous.train(yRangeMin, yRangeMax)
+    yScale = domains.yContinuous.trainAxis(yRangeMin, yRangeMax,
+      spec.yScaleSpec.labelKind)
   else:
     yBand = if spec.yScaleSpec.categories.configured:
       domains.yBand.train(yRangeMin, yRangeMax,
         spec.yScaleSpec.categories.values)
     else:
       domains.yBand.train(yRangeMin, yRangeMax)
+  if yKind == ckNumeric:
+    yScale.validateAxisLabels(spec.yScaleSpec.labelKind)
+  if spec.secondaryYSpec.enabled and spec.yScaleSpec.labelKind != alkNumeric:
+    raise newException(PlotError,
+      "secondary y guides cannot relabel a temporal primary axis")
   var nodeId = 1'u64
   for raster in spec.rasters:
     let
@@ -646,22 +657,24 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     result.addImage(resized, pixelX, pixelY, id = nodeId)
     inc nodeId
   if xKind == ckNumeric:
-    for value in xScale.ticks():
+    for value in xScale.axisTicks(spec.xScaleSpec.labelKind):
       let x = xScale.map(value)
       result.addPath(segmentPath(Point(x: x, y: area.yMin),
         Point(x: x, y: area.yMax), 1), spec.theme.gridColor)
-      result.addText(tickLabel(value), Point(x: x, y: area.yMax + 20), 11,
+      result.addText(xScale.axisTickLabel(value, spec.xScaleSpec.labelKind),
+        Point(x: x, y: area.yMax + 20), 11,
         spec.theme.foreground, anchor = textMiddle)
   else:
     for value in xBand.domain:
       result.addText(value, Point(x: xBand.map(value), y: area.yMax + 20), 11,
         spec.theme.foreground, anchor = textMiddle)
   if yKind == ckNumeric:
-    for value in yScale.ticks():
+    for value in yScale.axisTicks(spec.yScaleSpec.labelKind):
       let y = yScale.map(value)
       result.addPath(segmentPath(Point(x: area.xMin, y: y),
         Point(x: area.xMax, y: y), 1), spec.theme.gridColor)
-      result.addText(tickLabel(value), Point(x: 5, y: y), 11,
+      result.addText(yScale.axisTickLabel(value, spec.yScaleSpec.labelKind),
+        Point(x: 5, y: y), 11,
         spec.theme.foreground)
       if spec.secondaryYSpec.enabled:
         let secondaryValue = value * spec.secondaryYSpec.scale +

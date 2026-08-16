@@ -111,15 +111,19 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
     xCoordinateKind, yCoordinateKind = ckNumeric
     xKind = skLinear
     yKind = skLinear
+    xLabelKind = alkNumeric
+    yLabelKind = alkNumeric
     xReversed = false
     yReversed = false
   for spec in specs:
     let domains = collectAxisDomains(spec)
     if not initialized:
       xKind = spec.xScaleSpec.kind
+      xLabelKind = spec.xScaleSpec.labelKind
       xCoordinateKind = domains.xKind
       yCoordinateKind = domains.yKind
       yKind = spec.yScaleSpec.kind
+      yLabelKind = spec.yScaleSpec.labelKind
       xReversed = spec.xScaleSpec.reversed
       yReversed = spec.yScaleSpec.reversed
       xDomain = initContinuousDomain(xKind)
@@ -130,9 +134,10 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
         raise newException(PlotError,
           "shared x axes require matching coordinate kinds")
       if spec.xScaleSpec.kind != xKind or
+          spec.xScaleSpec.labelKind != xLabelKind or
           spec.xScaleSpec.reversed != xReversed:
         raise newException(PlotError,
-          "shared x axes require matching scale kinds and directions")
+          "shared x axes require matching transforms, labels and directions")
       if domains.xKind == ckNumeric:
         if spec.xScaleSpec.categories.configured:
           raise newException(PlotError,
@@ -158,9 +163,10 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
         raise newException(PlotError,
           "shared y axes require matching coordinate kinds")
       if spec.yScaleSpec.kind != yKind or
+          spec.yScaleSpec.labelKind != yLabelKind or
           spec.yScaleSpec.reversed != yReversed:
         raise newException(PlotError,
-          "shared y axes require matching scale kinds and directions")
+          "shared y axes require matching transforms, labels and directions")
       if domains.yKind == ckNumeric:
         if spec.yScaleSpec.categories.configured:
           raise newException(PlotError,

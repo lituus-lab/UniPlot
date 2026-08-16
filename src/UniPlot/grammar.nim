@@ -58,6 +58,7 @@ type
 
   AxisScaleSpec* = object
     kind*: ScaleKind
+    labelKind*: AxisLabelKind
     reversed*: bool
     domain*: AxisDomainSpec
     categories*: AxisCategoryDomainSpec
@@ -431,11 +432,37 @@ proc scaleX*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric x transform and the direction of numeric or
   ## categorical x coordinates.
   spec.xScaleSpec.kind = kind
+  spec.xScaleSpec.labelKind = alkNumeric
   spec.xScaleSpec.reversed = reversed
 
 proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric y transform and coordinate direction.
   spec.yScaleSpec.kind = kind
+  spec.yScaleSpec.labelKind = alkNumeric
+  spec.yScaleSpec.reversed = reversed
+
+proc scaleXUtc*(spec: var PlotSpec; reversed = false) =
+  ## Interpret numeric x values as POSIX seconds and label them in UTC.
+  spec.xScaleSpec.kind = skLinear
+  spec.xScaleSpec.labelKind = alkUtcDateTime
+  spec.xScaleSpec.reversed = reversed
+
+proc scaleYUtc*(spec: var PlotSpec; reversed = false) =
+  ## Interpret numeric y values as POSIX seconds and label them in UTC.
+  spec.yScaleSpec.kind = skLinear
+  spec.yScaleSpec.labelKind = alkUtcDateTime
+  spec.yScaleSpec.reversed = reversed
+
+proc scaleXDuration*(spec: var PlotSpec; reversed = false) =
+  ## Interpret numeric x values as signed elapsed seconds.
+  spec.xScaleSpec.kind = skLinear
+  spec.xScaleSpec.labelKind = alkDuration
+  spec.xScaleSpec.reversed = reversed
+
+proc scaleYDuration*(spec: var PlotSpec; reversed = false) =
+  ## Interpret numeric y values as signed elapsed seconds.
+  spec.yScaleSpec.kind = skLinear
+  spec.yScaleSpec.labelKind = alkDuration
   spec.yScaleSpec.reversed = reversed
 
 proc secondaryY*(spec: var PlotSpec; scale = 1.0; offset = 0.0;
