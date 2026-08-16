@@ -74,6 +74,10 @@ copying it.
 - `title(text)` sets the plot title.
 - `secondary_y(scale=1.0, offset=0.0, label="")` adds an affine right-side
   guide; `clear_secondary_y()` removes it.
+- `scale_x_utc()` / `scale_y_utc()` interpret numeric values as POSIX seconds;
+  `scale_x_duration()` / `scale_y_duration()` interpret signed elapsed seconds.
+  Each accepts `reversed=True`. The generic `x_axis_labels` and
+  `y_axis_labels` methods accept the exported `AXIS_*` constants.
 - `annotate_text(x, y, text, color="#202124", font_size=13)` and
   `annotate_arrow(x, y, x_end, y_end, color="#202124", width=2,
   head_size=8)` retain numeric data-coordinate annotations;
@@ -158,6 +162,9 @@ let
   pythonImageSvg = readFile("../assets/generated/python_image_mark.svg")
   pythonImagePng = pngDataUri(
     readFile("../assets/generated/python_image_mark.png"))
+  pythonTemporalSvg = readFile("../assets/generated/python_temporal.svg")
+  pythonTemporalPng = pngDataUri(
+    readFile("../assets/generated/python_temporal.png"))
 nbRawHtml gallery([
   svgFigure(pythonSvg, "An annotated matrix returned by Python `facet_matrix_svg`."),
   pngFigure(pythonPng, "The same matrix, including its empty cell, as PNG.",
@@ -187,7 +194,12 @@ nbRawHtml gallery([
     "A copied RGBA resource inserted through `Plot.image`."),
   pngFigure(pythonImagePng,
     "The same Python image mark as an embedded PNG.",
-    "A data-mapped image mark rendered through the Python binding")
+    "A data-mapped image mark rendered through the Python binding"),
+  svgFigure(pythonTemporalSvg,
+    "UTC and duration guides configured through the Python binding."),
+  pngFigure(pythonTemporalPng,
+    "The same temporal Python plot as an embedded PNG.",
+    "UTC and duration axes rendered through the Python binding")
 ])
 
 nbSave

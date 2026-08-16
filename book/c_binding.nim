@@ -154,6 +154,11 @@ palettes, rasters and image resources, without duplicating the grammar in C.
 The original solid-line and circle-point functions remain ABI-compatible
 convenience entry points.
 
+`uplot_set_x_axis_labels` and `uplot_set_y_axis_labels` accept
+`UPLOT_AXIS_NUMERIC`, `UPLOT_AXIS_UTC_DATETIME` or `UPLOT_AXIS_DURATION`, plus
+an exact `0`/`1` reversal flag. Temporal inputs remain ordinary `double`
+seconds, so the ABI owns no calendar structure and never uses the host locale.
+
 Next: [Python binding](python_binding.html).
 """
 
@@ -173,6 +178,8 @@ let
     readFile("../assets/generated/c_numeric_heatmap.png"))
   cImageSvg = readFile("../assets/generated/c_image_mark.svg")
   cImagePng = pngDataUri(readFile("../assets/generated/c_image_mark.png"))
+  cTemporalSvg = readFile("../assets/generated/c_temporal.svg")
+  cTemporalPng = pngDataUri(readFile("../assets/generated/c_temporal.png"))
 nbRawHtml gallery([
   svgFigure(cSvg, "An annotated two-dimensional facet matrix produced through the C ABI."),
   pngFigure(cPng, "The same matrix, including its empty cell, as PNG.",
@@ -199,7 +206,11 @@ nbRawHtml gallery([
   svgFigure(cImageSvg,
     "A copied RGBA resource inserted with `uplot_add_image_mark`."),
   pngFigure(cImagePng, "The same C image mark as an embedded PNG.",
-    "A data-mapped image mark rendered through the UniPlot C ABI")
+    "A data-mapped image mark rendered through the UniPlot C ABI"),
+  svgFigure(cTemporalSvg,
+    "UTC and duration guides configured through the additive C ABI."),
+  pngFigure(cTemporalPng, "The same temporal C plot as an embedded PNG.",
+    "UTC and duration axes rendered through the UniPlot C ABI")
 ])
 
 nbSave

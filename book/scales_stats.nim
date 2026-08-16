@@ -54,6 +54,38 @@ nbRawHtml svgFigure(transformedSvg,
   "A real scene using a logarithmic, reversed x coordinate and logarithmic y.")
 
 nbText: """
+## UTC date/time and duration axes
+
+Temporal axes keep the data numeric. UTC values are POSIX seconds; durations
+are signed elapsed seconds. Tick placement and text are locale-independent,
+and the same retained geometry is consumed by CPU, SVG and WGPU.
+"""
+
+nbCode:
+  var temporal = linePlot(
+    [1_704_067_200.0, 1_704_067_260.0, 1_704_067_320.0,
+      1_704_067_380.0, 1_704_067_440.0],
+    [0.0, 42.0, 75.0, 130.0, 190.0], color = "#2457c5")
+  temporal.scaleXUtc()
+  temporal.scaleYDuration()
+  temporal.labels(title = "UTC observations", x = "UTC", y = "elapsed")
+  let temporalSvg = temporal.compileScene(
+    Size(width: 720, height: 420)).toSvg(
+      loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(temporalSvg,
+  "POSIX seconds and elapsed seconds rendered with deterministic semantic labels.")
+
+nbText: """
+`scaleXUtc` / `scaleYUtc` format years 0001 through 9999 in UTC and use
+calendar-aligned month or year ticks for long spans. `scaleXDuration` /
+`scaleYDuration` use a fixed seconds ladder and signed duration labels. Temporal
+labels require a linear transform. Calling ordinary `scaleX` or `scaleY`
+restores numeric labels. Schema-v1 JSON stores the label kind only when it is
+non-numeric.
+"""
+
+nbText: """
 `scaleX` and `scaleY` select `skLinear` or `skLog10` and independently reverse
 the output direction. Logarithmic coordinates reject non-positive mapped
 values. Categorical x coordinates remain linear; bars and areas reject a
