@@ -33,7 +33,7 @@ proc main() =
       quit("benchmark report does not match the requested protocol", 1)
     if run > 0:
       for field in ["warmup_iterations", "source", "canvas", "filter",
-          "semantics"]:
+          "semantics", "image_mark_count", "image_resource_count"]:
         if reports[run][field] != reports[0][field]:
           quit("benchmark invariant changed between runs: " & field, 1)
   proc phase(field: string): JsonNode =
@@ -55,9 +55,14 @@ proc main() =
     "warmup_iterations": first["warmup_iterations"],
     "source": first["source"], "canvas": first["canvas"],
     "filter": first["filter"], "semantics": first["semantics"],
+    "image_mark_count": first["image_mark_count"],
+    "image_resource_count": first["image_resource_count"],
     "construction_snapshot": phase("construction_snapshot_mean_ms"),
     "compile": phase("compile_mean_ms"),
-    "publication": phase("publication_mean_ms")}
+    "publication": phase("publication_mean_ms"),
+    "image_mark_construction": phase("image_mark_construction_mean_ms"),
+    "image_mark_compile": phase("image_mark_compile_mean_ms"),
+    "image_mark_publication": phase("image_mark_publication_mean_ms")}
   let encoded = pretty(result) & "\n"
   echo encoded
   writeFile(output, encoded)
