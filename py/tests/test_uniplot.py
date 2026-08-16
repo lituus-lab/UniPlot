@@ -43,6 +43,26 @@ def test_plot_grid_renders_svg_and_png():
     with pytest.raises(TypeError):
         uniplot.grid_svg([first, object()], FONT, columns=2)
 
+def test_raster_pixels_render_and_validate_contracts():
+    pixels = bytearray([255, 0, 0, 255, 0, 0, 255, 128])
+    plot = uniplot.Plot(320, 240).raster(
+        pixels, 2, 1, 4, 0.0, 2.0, 0.0, 1.0,
+        uniplot.RASTER_NEAREST)
+    pixels[0] = 0
+    assert "/wAA/wAA/4A=" in plot.to_json()
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster(b"short", 2, 1, 4, 0, 2, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster(bytes(4), 1, 1, 4, 1, 0, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster(bytes(4), 1, 1, 2, 0, 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster(bytes(4), 1, 1, 4, 0, 1, 0, 1, 99)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster(bytes(4), 1, 1, 4, float("nan"), 1, 0, 1)
+
 def test_categorical_facets_render_svg_and_png():
     plot = (uniplot.Plot()
             .line([0, 1, 2, 3], [1, 3, 2, 4])
