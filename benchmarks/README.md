@@ -23,28 +23,33 @@ a 128×128 grid, a 256×256 dense raster heatmap and a 1,000-point signed-power
 line, plus a 1,000-point retained polar line with its circular guides.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3219 / 8.5212 / 7.5981 ms for the retained
-raster construction / compile / publication phases, 0.0210 / 3.1963 / 7.0834
-ms for the 64-mark phases, and 0.0145 / 0.1377 / 13.2056 ms for temporal
+The current Apple M4 medians are 0.3199 / 8.5595 / 7.5729 ms for the retained
+raster construction / compile / publication phases, 0.0212 / 3.1977 / 7.0374
+ms for the 64-mark phases, and 0.0151 / 0.1354 / 13.1101 ms for temporal
 construction / compile / CPU publication. Temporal construction copies the
 two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 14.4208 ms;
-complete PlotSpec construction including the same selection costs 15.8816 ms,
-then scene compilation/publication costs 0.0293 / 22.5379 ms. Selection sorts
+UTC/duration formatting. Automatic histogram selection costs 14.3750 ms;
+complete PlotSpec construction including the same selection costs 15.9323 ms,
+then scene compilation/publication costs 0.0291 / 22.6336 ms. Selection sorts
 finite samples to compute exact type-7 quartiles; no linear-time approximation
-is substituted. The range-safe linear fit costs 0.5900 ms; complete smoothing
+is substituted. The range-safe linear fit costs 0.5881 ms; complete smoothing
 construction, including one Student-t critical value and 200 interval
-evaluations, costs 0.7369 ms, followed by 0.0670 / 8.3547 ms for compilation
-and publication. The exact 5,000×256 Gaussian estimate costs 8.3744 ms;
-complete density PlotSpec construction costs 8.3929 ms, followed by
-0.0720 / 10.2838 ms for compilation and publication. Minor estimate versus
+evaluations, costs 0.7480 ms, followed by 0.0693 / 8.4011 ms for compilation
+and publication. The compact-QR degree-three polynomial fit over the same
+10,000 pairs costs 1.5566 ms; full construction including 200 predictions,
+compilation and publication cost 1.6673 / 0.0395 / 7.7144 ms. The pre-compact
+implementation materialised a 10,000×10,000 Q matrix and measured about
+774 ms; that historical diagnostic is not a retained baseline. The exact
+5,000×256 Gaussian estimate costs 8.6374 ms; complete density PlotSpec
+construction costs 8.6647 ms, followed by 0.0747 / 10.3250 ms for compilation
+and publication. Minor estimate versus
 construction inversions are normal timing noise between separate windows.
-Contour extraction costs 1.2869 ms; complete construction, compilation and
-publication cost 1.3859 / 1.4133 / 26.0959 ms. The RGBA8 palette-table heatmap
-costs 1.4264 / 1.7887 / 7.2472 ms for the same three stages. Signed-power
-construction, compilation and publication cost 0.0147 / 0.1608 / 15.2433 ms.
+Contour extraction costs 1.2886 ms; complete construction, compilation and
+publication cost 1.3757 / 1.3980 / 26.1355 ms. The RGBA8 palette-table heatmap
+costs 1.4382 / 1.7657 / 7.2804 ms for the same three stages. Signed-power
+construction, compilation and publication cost 0.0161 / 0.1638 / 15.3094 ms.
 Polar construction, projection/guide compilation and publication cost
-0.0162 / 0.2317 / 16.5578 ms. This includes 128-segment retained rings and
+0.0175 / 0.2265 / 16.5970 ms. This includes 128-segment retained rings and
 does not measure a backend-specific polar primitive.
 These are same-machine regression evidence, not cross-machine
 performance claims.
