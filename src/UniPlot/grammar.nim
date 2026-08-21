@@ -754,6 +754,52 @@ proc densityPlot*(values: openArray[float64]; pointCount = 512;
     except ValueError as error:
       raise newException(PlotError, error.msg)
 
+proc violinPlot*(values: openArray[float64]; pointCount = 256;
+    bandwidth = 0.0; width = 0.8; color = "#3366cc80";
+    legend = ""): PlotSpec {.contractual.} =
+  ## Materialise one mirrored UniStatistics Gaussian KDE as a polygon.
+  require:
+    pointCount >= 2 and pointCount <= 100_000
+    bandwidth >= 0.0 and bandwidth.isFinite
+    width > 0.0 and width.isFinite
+  body:
+    if pointCount < 2 or pointCount > 100_000 or bandwidth < 0.0 or
+        not bandwidth.isFinite or width <= 0.0 or not width.isFinite:
+      raise newException(PlotError, "invalid violin plot configuration")
+    var finiteValues = newSeqOfCap[float64](values.len)
+    for value in values:
+      if value.isFinite: finiteValues.add value
+    if finiteValues.len < 2:
+      raise newException(PlotError,
+        "violin plot requires at least two finite observations")
+    try:
+      let estimate = statistics.kernelDensity(finiteValues, pointCount,
+        bandwidth)
+      var maximumDensity = 0.0
+      for density in estimate.density:
+        maximumDensity = max(maximumDensity, density)
+      if maximumDensity <= 0.0 or not maximumDensity.isFinite:
+        raise newException(PlotError,
+          "violin density must have a positive finite maximum")
+      var
+        horizontal = newSeqOfCap[float64](pointCount * 2)
+        vertical = newSeqOfCap[float64](pointCount * 2)
+      let halfWidth = width * 0.5
+      for index in 0 ..< pointCount:
+        horizontal.add(-halfWidth * estimate.density[index] / maximumDensity)
+        vertical.add(estimate.points[index])
+      for index in countdown(pointCount - 1, 0):
+        horizontal.add(halfWidth * estimate.density[index] / maximumDensity)
+        vertical.add(estimate.points[index])
+      var frame = initDataFrame()
+      frame.addColumn("violinWidth", horizontal)
+      frame.addColumn("value", vertical)
+      result = plot(frame)
+      result.geomPolygon(aes("violinWidth", "value"), color,
+        legend = legend)
+    except ValueError as error:
+      raise newException(PlotError, error.msg)
+
 proc barPlot*(categories: openArray[string]; values: openArray[float64];
     color = "#3366cc"; legend = ""): PlotSpec =
   var frame = initDataFrame()
