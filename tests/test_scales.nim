@@ -38,6 +38,24 @@ suite "scales":
   test "log scale rejects non-positive domains":
     expect PlotError: discard continuousScale(0, 10, 0, 1, skLog10)
 
+  test "symmetric log scales retain signs, zero and original-unit ticks":
+    let scale = continuousScale(-99, 99, 0, 100, skSymLog10)
+    check scale.map(-99) == 0
+    check abs(scale.map(-9) - 25) < 1e-5
+    check scale.map(0) == 50
+    check abs(scale.map(9) - 75) < 1e-5
+    check scale.map(99) == 100
+    let values = scale.ticks(3)
+    check values[0] == -99
+    check abs(values[1]) < 1e-15
+    check values[2] == 99
+
+    let extreme = continuousScale(-1e308, 1e308, 0, 1, skSymLog10)
+    check extreme.map(-1e308) == 0
+    check extreme.map(0) == 0.5
+    check extreme.map(1e308) == 1
+    check extreme.ticks(3).allIt(it.isFinite)
+
   test "band scale retains first category order":
     let scale = trainBand(["b", "a", "b"], 0, 100)
     check scale.domain == @["b", "a"]
