@@ -21,172 +21,256 @@
   "smoothing_grid_count": 200,
   "density_point_count": 5000,
   "density_grid_count": 256,
+  "contour_grid": "128x128",
+  "contour_level_count": 9,
+  "dense_grid": "256x256",
+  "power_point_count": 1000,
   "construction_snapshot": {
     "run_mean_ms": [
-      0.3385876,
-      0.360821,
-      0.34682929999999995
+      0.3218788,
+      0.322175,
+      0.3177916
     ],
-    "median_run_mean_ms": 0.34682929999999995
+    "median_run_mean_ms": 0.3218788
   },
   "compile": {
     "run_mean_ms": [
-      9.063829,
-      9.0314418,
-      9.3051
+      8.5541667,
+      8.7220084,
+      8.5628249
     ],
-    "median_run_mean_ms": 9.063829
+    "median_run_mean_ms": 8.5628249
   },
   "publication": {
     "run_mean_ms": [
-      8.0383542,
-      7.8395793,
-      8.276225100000001
+      7.5163874999999996,
+      7.5317211,
+      7.471246
     ],
-    "median_run_mean_ms": 8.0383542
+    "median_run_mean_ms": 7.5163874999999996
   },
   "image_mark_construction": {
     "run_mean_ms": [
-      0.0259584,
-      0.022504099999999996,
-      0.025679100000000003
+      0.0196125,
+      0.0202583,
+      0.020874999999999998
     ],
-    "median_run_mean_ms": 0.025679100000000003
+    "median_run_mean_ms": 0.0202583
   },
   "image_mark_compile": {
     "run_mean_ms": [
-      3.3283666000000003,
-      3.3007751,
-      3.4589999000000002
+      3.1446998999999995,
+      3.1769791,
+      3.1733292000000004
     ],
-    "median_run_mean_ms": 3.3283666000000003
+    "median_run_mean_ms": 3.1733292000000004
   },
   "image_mark_publication": {
     "run_mean_ms": [
-      7.3944206999999995,
-      7.3957418,
-      7.7084375
+      6.9956168,
+      7.028091699999999,
+      6.982558699999999
     ],
-    "median_run_mean_ms": 7.3957418
+    "median_run_mean_ms": 6.9956168
   },
   "temporal_construction": {
     "run_mean_ms": [
-      0.017279199999999998,
-      0.016179199999999998,
-      0.0168583
+      0.0132293,
+      0.0147209,
+      0.013966699999999999
     ],
-    "median_run_mean_ms": 0.0168583
+    "median_run_mean_ms": 0.013966699999999999
   },
   "temporal_compile": {
     "run_mean_ms": [
-      0.14314169999999998,
-      0.1326915,
-      0.14436659999999998
+      0.1322124,
+      0.1386332,
+      0.1343874
     ],
-    "median_run_mean_ms": 0.14314169999999998
+    "median_run_mean_ms": 0.1343874
   },
   "temporal_publication": {
     "run_mean_ms": [
-      13.881487700000001,
-      13.6035622,
-      14.7013167
+      13.7435,
+      13.0125833,
+      12.983783400000002
     ],
-    "median_run_mean_ms": 13.881487700000001
+    "median_run_mean_ms": 13.0125833
   },
   "histogram_selection": {
     "run_mean_ms": [
-      14.62975,
-      14.7665292,
-      15.581700200000002
+      14.371474999999998,
+      14.166658199999999,
+      14.4691668
     ],
-    "median_run_mean_ms": 14.7665292
+    "median_run_mean_ms": 14.371474999999998
   },
   "histogram_construction": {
     "run_mean_ms": [
-      16.6528751,
-      16.3705416,
-      16.4900877
+      15.693991599999999,
+      15.7362875,
+      15.9206708
     ],
-    "median_run_mean_ms": 16.4900877
+    "median_run_mean_ms": 15.7362875
   },
   "histogram_compile": {
     "run_mean_ms": [
-      0.0339917,
-      0.0283789,
-      0.029633200000000002
+      0.031174800000000003,
+      0.0303293,
+      0.0285791
     ],
-    "median_run_mean_ms": 0.029633200000000002
+    "median_run_mean_ms": 0.0303293
   },
   "histogram_publication": {
     "run_mean_ms": [
-      23.354387400000004,
-      23.373383299999997,
-      24.2877209
+      22.3636958,
+      22.4721125,
+      22.3240206
     ],
-    "median_run_mean_ms": 23.373383299999997
+    "median_run_mean_ms": 22.3636958
   },
   "smoothing_fit": {
     "run_mean_ms": [
-      0.6108708,
-      0.6239415,
-      0.6391376
+      0.5851082999999999,
+      0.5877417,
+      0.5932124000000001
     ],
-    "median_run_mean_ms": 0.6239415
+    "median_run_mean_ms": 0.5877417
   },
   "smoothing_construction": {
     "run_mean_ms": [
-      0.7510625,
-      0.7886167,
-      0.7906958000000001
+      0.7341249999999999,
+      0.7424000000000001,
+      0.7407584
     ],
-    "median_run_mean_ms": 0.7886167
+    "median_run_mean_ms": 0.7407584
   },
   "smoothing_compile": {
     "run_mean_ms": [
-      0.0706999,
-      0.07030840000000001,
-      0.0720832
+      0.0684124,
+      0.06772070000000001,
+      0.0668084
     ],
-    "median_run_mean_ms": 0.0706999
+    "median_run_mean_ms": 0.06772070000000001
   },
   "smoothing_publication": {
     "run_mean_ms": [
-      8.6175707,
-      8.793791599999999,
-      8.840412400000002
+      8.3256917,
+      8.2733292,
+      8.2374168
     ],
-    "median_run_mean_ms": 8.793791599999999
+    "median_run_mean_ms": 8.2733292
   },
   "density_estimate": {
     "run_mean_ms": [
-      8.693912699999998,
-      8.769546,
-      8.776462599999999
+      8.2701623,
+      8.2862669,
+      8.2781125
     ],
-    "median_run_mean_ms": 8.769546
+    "median_run_mean_ms": 8.2781125
   },
   "density_construction": {
     "run_mean_ms": [
-      8.8485125,
-      8.7760415,
-      8.9838541
+      8.295533500000001,
+      8.285466800000002,
+      8.301250199999998
     ],
-    "median_run_mean_ms": 8.8485125
+    "median_run_mean_ms": 8.295533500000001
   },
   "density_compile": {
     "run_mean_ms": [
-      0.0749126,
-      0.0763377,
-      0.07403770000000001
+      0.0731709,
+      0.0679834,
+      0.06903740000000001
     ],
-    "median_run_mean_ms": 0.0749126
+    "median_run_mean_ms": 0.06903740000000001
   },
   "density_publication": {
     "run_mean_ms": [
-      11.1120919,
-      10.865283300000002,
-      10.9609834
+      10.261208199999999,
+      10.2259125,
+      10.199341500000003
     ],
-    "median_run_mean_ms": 10.9609834
+    "median_run_mean_ms": 10.2259125
+  },
+  "contour_extraction": {
+    "run_mean_ms": [
+      1.2758832,
+      1.2856708000000001,
+      1.2659458999999997
+    ],
+    "median_run_mean_ms": 1.2758832
+  },
+  "contour_construction": {
+    "run_mean_ms": [
+      1.3693166,
+      1.3713498,
+      1.3583291
+    ],
+    "median_run_mean_ms": 1.3693166
+  },
+  "contour_compile": {
+    "run_mean_ms": [
+      1.3814167000000002,
+      1.3955373999999998,
+      1.3884332
+    ],
+    "median_run_mean_ms": 1.3884332
+  },
+  "contour_publication": {
+    "run_mean_ms": [
+      25.9435875,
+      25.902016700000004,
+      25.9037001
+    ],
+    "median_run_mean_ms": 25.9037001
+  },
+  "dense_construction": {
+    "run_mean_ms": [
+      1.4119417,
+      1.4180374999999998,
+      1.4113666
+    ],
+    "median_run_mean_ms": 1.4119417
+  },
+  "dense_compile": {
+    "run_mean_ms": [
+      1.758,
+      1.7685125,
+      1.7682749
+    ],
+    "median_run_mean_ms": 1.7682749
+  },
+  "dense_publication": {
+    "run_mean_ms": [
+      7.179175000000001,
+      7.2164084,
+      7.163479099999999
+    ],
+    "median_run_mean_ms": 7.179175000000001
+  },
+  "power_construction": {
+    "run_mean_ms": [
+      0.0145459,
+      0.014437499999999999,
+      0.013775200000000001
+    ],
+    "median_run_mean_ms": 0.014437499999999999
+  },
+  "power_compile": {
+    "run_mean_ms": [
+      0.1637791,
+      0.1633541,
+      0.1607209
+    ],
+    "median_run_mean_ms": 0.1633541
+  },
+  "power_publication": {
+    "run_mean_ms": [
+      15.1212832,
+      15.1064875,
+      15.106266699999999
+    ],
+    "median_run_mean_ms": 15.1064875
   }
 }
