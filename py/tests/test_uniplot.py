@@ -55,6 +55,19 @@ def test_symmetric_log_scales_round_trip_and_render():
     with pytest.raises(ValueError):
         plot.scale_x(99)
 
+def test_signed_power_scales_round_trip_and_render():
+    plot = (uniplot.Plot(480, 320)
+            .line([-2, -1, 0, 1, 2], [-2, -1, 0, 1, 2])
+            .scale_x_power(0.5)
+            .scale_y_power(2.0, reversed=True))
+    encoded = plot.to_json()
+    assert "skPower" in encoded
+    assert '"exponent":0.5' in encoded
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert uniplot.Plot.from_json(encoded, 480, 320).to_json() == encoded
+    with pytest.raises(ValueError):
+        plot.scale_x_power(0.0)
+
 def test_plot_grid_renders_svg_and_png():
     first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
     second = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3]).title("second")
