@@ -44,6 +44,28 @@ suite "plot compilation":
     expect PlotError:
       discard linearSmoothPlot([1.0, 1.0, 1.0], [1.0, 2.0, 3.0])
 
+  test "polynomial smoothing delegates a nonlinear fit to UniStatistics":
+    let spec = polynomialSmoothPlot(
+      [-2.0, -1.0, 0.0, 1.0, 2.0],
+      [9.0, 2.0, 1.0, 6.0, 17.0], degree = 2, pointCount = 17)
+    check spec.data.rowCount == 17
+    check spec.layers.len == 1
+    check spec.layers[0].mark == mkLine
+    check abs(spec.data.numeric("estimate")[8] - 1.0) < 1e-12
+    check spec.compileScene().nodes[^1].id > 0
+
+  test "polynomial smoothing rejects invalid degree and finite count":
+    expect PlotError:
+      discard polynomialSmoothPlot([0.0, 1.0], [0.0, 1.0], degree = 2)
+    when not defined(release) and not defined(danger):
+      expect PreConditionDefect:
+        discard polynomialSmoothPlot([0.0, 1.0, 2.0],
+          [0.0, 1.0, 4.0], degree = 0)
+    else:
+      expect PlotError:
+        discard polynomialSmoothPlot([0.0, 1.0, 2.0],
+          [0.0, 1.0, 4.0], degree = 0)
+
   test "density recipe materialises retained area and line":
     let spec = densityPlot([-2.0, -1.0, 0.0, 1.0, 2.0, NaN],
       pointCount = 65)
