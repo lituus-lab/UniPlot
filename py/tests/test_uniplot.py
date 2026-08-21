@@ -68,6 +68,20 @@ def test_signed_power_scales_round_trip_and_render():
     with pytest.raises(ValueError):
         plot.scale_x_power(0.0)
 
+def test_polar_coordinates_round_trip_and_render():
+    plot = (uniplot.Plot(480, 480)
+            .line([0, 1.5707963267948966, 3.141592653589793,
+                   4.71238898038469, 6.283185307179586],
+                  [1, 2, 1, 2, 1])
+            .polar())
+    encoded = plot.to_json()
+    assert "PolarCoordinates" in encoded
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert uniplot.Plot.from_json(encoded, 480, 480).to_json() == encoded
+    assert plot.cartesian() is plot
+    with pytest.raises(ValueError):
+        plot.coordinates(99)
+
 def test_plot_grid_renders_svg_and_png():
     first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
     second = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3]).title("second")
