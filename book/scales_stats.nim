@@ -97,6 +97,10 @@ nbText: """
 independently reverse the output direction. Logarithmic coordinates reject
 non-positive mapped values. Symmetric-logarithmic coordinates use
 `sign(x) * log10(1 + abs(x))`, retain zero and label ticks in original units.
+`scaleXPower(exponent)` and `scaleYPower(exponent)` add a configurable,
+strictly positive signed-power transform `sign(x) * abs(x)^exponent`.
+Fractional exponents therefore remain real and monotone across zero. The
+exponent participates in shared-axis compatibility and schema-v1 round trips.
 Categorical x coordinates remain linear; bars and areas reject a
 logarithmic y coordinate because their current semantic baseline is zero.
 

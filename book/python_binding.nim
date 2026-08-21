@@ -159,6 +159,8 @@ estimate into one retained polygon.
 places each group inside its categorical band.
 `Plot.scale_x` / `Plot.scale_y` accept `SCALE_LINEAR`, `SCALE_LOG10` or
 `SCALE_SYMLOG10` and an independent `reversed` flag.
+`Plot.scale_x_power(exponent)` / `Plot.scale_y_power(exponent)` configure the
+signed-power transform and retain the exponent through JSON round trips.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """
