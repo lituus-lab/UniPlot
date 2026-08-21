@@ -25,6 +25,8 @@ cdef extern from "UniPlot.h":
                          const char *, float)
     int uplot_add_raster(uplot_plot *, const uint8_t *, size_t, int, int, int,
                          double, double, double, double, int)
+    int uplot_add_raster_heatmap(uplot_plot *, int, int, const double *,
+                                 size_t, double, double, double, double, int)
     int uplot_add_image_mark(uplot_plot *, const uint8_t *, size_t, int, int,
                              int, double, double, double, double, int)
     int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
@@ -582,6 +584,32 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid contour input or non-empty plot")
+        return self
+
+    def raster_heatmap(self, int width, int height, values,
+                       double x_min, double x_max,
+                       double y_min, double y_max,
+                       int filter=RASTER_NEAREST):
+        values = list(values)
+        if width <= 0 or height <= 0 or len(values) != width * height:
+            raise ValueError("invalid raster heatmap dimensions")
+        cdef size_t count = len(values)
+        cdef double *items = <double *>malloc(count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if items == NULL:
+            raise MemoryError()
+        try:
+            for index in range(count):
+                items[index] = float(values[index])
+            status = uplot_add_raster_heatmap(self._handle, width, height,
+                items, count, x_min, x_max, y_min, y_max, filter)
+        finally:
+            free(items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid raster heatmap input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
