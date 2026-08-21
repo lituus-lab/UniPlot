@@ -5,6 +5,7 @@ import UniGlyph
 import UniImage/core as uimg
 from UniMath import sin
 import UniPlot
+import UniStatistics as statistics
 
 const Warmups = 3
 
@@ -72,6 +73,15 @@ proc main() =
   proc makeAutomaticHistogram(): PlotSpec =
     histogramPlot(histogramValues, hrFreedmanDiaconis, density = true,
       color = "#267a5e")
+  var smoothX = newSeq[float64](10_000)
+  var smoothY = newSeq[float64](10_000)
+  for index in 0 ..< smoothX.len:
+    smoothX[index] = float64(index) * 0.01
+    smoothY[index] = 1.5 + 0.42 * smoothX[index] +
+      0.8 * sin(float64(index) * 0.071)
+  proc makeSmoothSpec(): PlotSpec =
+    linearSmoothPlot(smoothX, smoothY, pointCount = 200,
+      confidenceLevel = 0.95)
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
@@ -86,6 +96,9 @@ proc main() =
     let warmHistogram = makeAutomaticHistogram().compileScene(
       Size(width: 800, height: 600))
     discard warmHistogram.renderImage(font)
+    discard statistics.linearRegressionDiagnostics(smoothX, smoothY)
+    let warmSmooth = makeSmoothSpec().compileScene(Size(width: 800, height: 600))
+    discard warmSmooth.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
@@ -93,6 +106,8 @@ proc main() =
     temporalPublicationStats: RunningStat
   var histogramSelectionStats, histogramConstructionStats,
     histogramCompileStats, histogramPublicationStats: RunningStat
+  var smoothFitStats, smoothConstructionStats, smoothCompileStats,
+    smoothPublicationStats: RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
     var started = getMonoTime()
@@ -144,6 +159,21 @@ proc main() =
     histogramPublicationStats.push elapsedMs(started)
     guard = guard xor int(histogramPixels.data[
       (iteration * 2371) mod histogramPixels.data.len])
+    started = getMonoTime()
+    let fitted = statistics.linearRegressionDiagnostics(smoothX, smoothY)
+    smoothFitStats.push elapsedMs(started)
+    guard = guard xor int(fitted.model.slope * 1_000_000.0)
+    started = getMonoTime()
+    let smoothSpec = makeSmoothSpec()
+    smoothConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let smoothScene = smoothSpec.compileScene(Size(width: 800, height: 600))
+    smoothCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let smoothPixels = smoothScene.renderImage(font)
+    smoothPublicationStats.push elapsedMs(started)
+    guard = guard xor int(smoothPixels.data[
+      (iteration * 3253) mod smoothPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
@@ -151,7 +181,9 @@ proc main() =
     "temporal_point_count": temporalX.len,
     "histogram_point_count": histogramValues.len,
     "histogram_rule": "Freedman-Diaconis",
-    "semantics": "separate PlotSpec construction, automatic histogram selection, retained-scene compilation and complete CPU publication",
+    "smoothing_point_count": smoothX.len,
+    "smoothing_grid_count": 200,
+    "semantics": "separate PlotSpec construction, statistical selection or fitting, retained-scene compilation and complete CPU publication",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
     "publication_mean_ms": publicationStats.mean,
@@ -165,6 +197,10 @@ proc main() =
     "histogram_construction_mean_ms": histogramConstructionStats.mean,
     "histogram_compile_mean_ms": histogramCompileStats.mean,
     "histogram_publication_mean_ms": histogramPublicationStats.mean,
+    "smoothing_fit_mean_ms": smoothFitStats.mean,
+    "smoothing_construction_mean_ms": smoothConstructionStats.mean,
+    "smoothing_compile_mean_ms": smoothCompileStats.mean,
+    "smoothing_publication_mean_ms": smoothPublicationStats.mean,
     "guard": guard})
 
 main()
