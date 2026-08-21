@@ -107,6 +107,11 @@ int uplot_add_linear_smooth(uplot_plot *, const double *x, const double *y,
 int uplot_add_density(uplot_plot *, const double *values, size_t count,
                       int point_count, double bandwidth,
                       const char *fill_color, const char *line_color);
+/* Build one retained mirrored Gaussian density polygon. bandwidth 0 selects
+ * the UniStatistics automatic rule. Samples are copied and caller-owned. */
+int uplot_add_violin(uplot_plot *, const double *values, size_t count,
+                     int point_count, double bandwidth, double width,
+                     const char *color);
 int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
                                 const double *values, size_t count,
                                 int aggregation, const char *color);
