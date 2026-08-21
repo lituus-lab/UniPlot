@@ -61,15 +61,16 @@ non-finite layout parameters and incompatible mappings are rejected rather than
 silently repaired.
 
 UniPlot 1.0 does not promise a complete clone of any single plotting library,
-facets, statistical smoothing, date-aware ticks, 3D scenes, volume rendering,
+nonlinear smoothers, 3D scenes, volume rendering,
 arbitrary shader injection, a GUI event loop, or a bundled WGPU runtime.
 Interactivity, picking, observables and streaming use explicit extension points
 and may grow without changing the CPU scene contract.
 
 ## The Uni* family
 
-UniPlot depends only on lower-level engines: UniMath, UniLinalg, UniColor,
-UniImage, UniVector and UniGlyph. Domain libraries such as UniGeom and UniGraph
+UniPlot depends only on lower-level engines: UniMath, UniAccurate,
+UniStatistics, UniLinalg, UniColor, UniImage, UniVector and UniGlyph. Domain
+libraries such as UniGeom and UniGraph
 may provide adapters that consume UniPlot; UniPlot never imports them. The
 [family overview](https://github.com/lituus-lab/.github) documents the shared
 architecture and contribution principles.

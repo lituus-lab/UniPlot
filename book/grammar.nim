@@ -236,6 +236,33 @@ to `DropMissing`; `capWidth = 0` retains only the vertical stem. Invalid cap
 widths are rejected by a contract in debug builds and by `PlotError` in
 release builds.
 
+## Linear smoothing
+
+`linearSmoothPlot` delegates fitting, leverage and Student-t intervals to
+UniStatistics. UniAccurate supplies the scale-separated centered norm, so
+extreme finite predictors do not force `Inf / Inf`. UniPlot only filters
+paired missing values and materialises an ordinary ribbon followed by a line.
+The resulting retained marks therefore render identically through CPU, SVG and
+WGPU.
+"""
+
+nbCode:
+  let smoothed = linearSmoothPlot(
+    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    [1.3, 1.8, 3.4, 3.7, 5.2, 5.8, 7.1], pointCount = 80,
+    confidenceLevel = 0.95, lineColor = "#2457c5",
+    bandColor = "#2457c540")
+  let smoothedSvg = smoothed.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(smoothedSvg,
+  "Linear fit and 95% mean-confidence band computed by UniStatistics.")
+
+nbText: """
+The recipe requires at least three finite pairs, a varying predictor, 2 to
+10,000 evaluation points, and a confidence level strictly between zero and
+one. Set `showConfidence = false` to materialise only the fitted line.
+
 ## Legends
 
 A non-empty `legend` argument names a layer. Calling `legend` on the plot

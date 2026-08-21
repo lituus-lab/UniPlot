@@ -134,6 +134,10 @@ int main(void) {
 - `uplot_add_automatic_histogram` selects equal-width numeric bins with one of
   the `UPLOT_HISTOGRAM_*` rules. The generated C figure uses
   Freedman–Diaconis density and therefore exercises the real ABI entry point.
+- `uplot_add_linear_smooth` copies aligned x/y arrays and materialises a
+  UniStatistics linear fit plus an optional mean-confidence ribbon on an empty
+  handle. Point count, confidence level, flags and colours are validated before
+  publication.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.
