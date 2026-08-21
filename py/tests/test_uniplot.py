@@ -272,6 +272,15 @@ def test_linear_smoothing_renders_and_validates_contracts():
     with pytest.raises(ValueError):
         configured.linear_smooth([1, 2, 3], [1, 2, 3])
 
+def test_polynomial_smoothing_renders_and_validates_contracts():
+    plot = uniplot.Plot().polynomial_smooth(
+        [-2, -1, 0, 1, 2], [9, 2, 1, 6, 17], degree=2, point_count=32)
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        uniplot.Plot().polynomial_smooth([0, 1], [0, 1], degree=2)
+    with pytest.raises(ValueError):
+        uniplot.Plot().polynomial_smooth([0, 1, 2], [0, 1, 4], degree=0)
+
 def test_density_renders_and_validates_contracts():
     plot = uniplot.Plot().density([-2, -1, 0, 1, 2], point_count=65)
     assert plot.svg(FONT).startswith(b"<svg")
