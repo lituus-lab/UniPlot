@@ -52,7 +52,8 @@ typedef enum {
 typedef enum {
   UPLOT_SCALE_LINEAR = 0,
   UPLOT_SCALE_LOG10 = 1,
-  UPLOT_SCALE_SYMLOG10 = 2
+  UPLOT_SCALE_SYMLOG10 = 2,
+  UPLOT_SCALE_POWER = 3
 } uplot_scale_kind;
 typedef enum {
   UPLOT_HISTOGRAM_AUTO = 0,
@@ -163,6 +164,8 @@ int uplot_set_x_axis_labels(uplot_plot *, int labels, int reversed);
 int uplot_set_y_axis_labels(uplot_plot *, int labels, int reversed);
 int uplot_set_x_scale(uplot_plot *, int scale, int reversed);
 int uplot_set_y_scale(uplot_plot *, int scale, int reversed);
+int uplot_set_x_power_scale(uplot_plot *, double exponent, int reversed);
+int uplot_set_y_power_scale(uplot_plot *, double exponent, int reversed);
 int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
                           const char *label);
 int uplot_clear_secondary_y(uplot_plot *);
