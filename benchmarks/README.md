@@ -18,14 +18,14 @@ data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources, a
 Freedman–Diaconis selection over 100,000 deterministic samples.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3225 / 8.7097 / 7.5714 ms for the retained
-raster construction / compile / publication phases, 0.0219 / 3.1761 / 7.0695
-ms for the 64-mark phases, and 0.0154 / 0.1315 / 13.0968 ms for temporal
+The current Apple M4 medians are 0.3264 / 8.5814 / 7.6160 ms for the retained
+raster construction / compile / publication phases, 0.0210 / 3.1816 / 7.0848
+ms for the 64-mark phases, and 0.0164 / 0.1320 / 13.0871 ms for temporal
 construction / compile / CPU publication. Temporal construction copies the
 two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 12.1510 ms;
-complete PlotSpec construction including the same selection costs 13.7087 ms,
-then scene compilation/publication costs 0.0278 / 22.8165 ms. Selection sorts
+UTC/duration formatting. Automatic histogram selection costs 14.2239 ms;
+complete PlotSpec construction including the same selection costs 15.8265 ms,
+then scene compilation/publication costs 0.0271 / 22.6440 ms. Selection sorts
 finite samples to compute exact type-7 quartiles; no linear-time approximation
 is substituted. These are same-machine regression evidence, not cross-machine
 performance claims.
