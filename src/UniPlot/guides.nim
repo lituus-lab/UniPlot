@@ -312,9 +312,10 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
       raise newException(PlotError,
         "tile layers require categorical x and y coordinates")
     if layer.mark == mkPolygon and
-        spec.data.columns[xMapping].kind != ckNumeric:
+        spec.data.columns[xMapping].kind != ckNumeric and
+        layer.mapping.xOffset.len == 0:
       raise newException(PlotError,
-        "polygon coordinates must reference numeric columns")
+        "categorical polygon coordinates require numeric x offsets")
     if spec.data.columns[xMapping].kind != result.xKind:
       raise newException(PlotError, "all x mappings must use the same column kind")
     if layer.mark in {mkRect, mkImage}:
@@ -498,6 +499,13 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           spec.data.columns[mapping].kind != ckNumeric):
         raise newException(PlotError,
           "size and alpha mappings must reference numeric columns")
+    if layer.mapping.xOffset.len > 0 and
+        (layer.mark != mkPolygon or
+        spec.data.columns[xMapping].kind != ckCategorical or
+        layer.mapping.xOffset notin spec.data.columns or
+        spec.data.columns[layer.mapping.xOffset].kind != ckNumeric):
+      raise newException(PlotError,
+        "x offsets require numeric categorical-polygon coordinates")
     if layer.mark in {mkArea, mkRibbon, mkPolygon} and
         (layer.mapping.color.len > 0 or
         layer.mapping.fill.len > 0 or
@@ -781,6 +789,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         spec.data.numeric(layer.mapping.xMin) else: @[]
       xUpperValues = if layer.mark in {mkRect, mkImage}:
         spec.data.numeric(layer.mapping.xMax) else: @[]
+      xOffsetValues = if layer.mapping.xOffset.len > 0:
+        spec.data.numeric(layer.mapping.xOffset) else: @[]
     var finiteColumns = if layer.mark in {mkRect, mkImage}:
       @[layer.mapping.xMin, layer.mapping.xMax] else: @[layer.mapping.x]
     if bounded:
@@ -794,6 +804,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       finiteColumns.add layer.mapping.y
     if layer.mapping.size.len > 0: finiteColumns.add layer.mapping.size
     if layer.mapping.alpha.len > 0: finiteColumns.add layer.mapping.alpha
+    if layer.mapping.xOffset.len > 0: finiteColumns.add layer.mapping.xOffset
     let paintMapping = if layer.mapping.fill.len > 0:
       layer.mapping.fill else: layer.mapping.color
     if paintMapping.len > 0 and
@@ -868,7 +879,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       elif xKind == ckNumeric:
         xScale.map(numericXs[row])
       else:
-        xBand.map(categoricalXs[row])
+        xBand.map(categoricalXs[row]) + (if xOffsetValues.len > 0:
+          float32(xOffsetValues[row]) * xBand.bandwidth else: 0'f32)
       if bounded:
         if lowerValues[row] > upperValues[row] or
             (layer.mark in {mkRect, mkImage} and

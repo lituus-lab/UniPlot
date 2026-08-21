@@ -122,6 +122,8 @@ proc aesNode(value: Aes): JsonNode =
     result["xMax"] = %value.xMax
   if value.image.len > 0:
     result["image"] = %value.image
+  if value.xOffset.len > 0:
+    result["xOffset"] = %value.xOffset
 
 proc decodeAes(node: JsonNode): Aes =
   for name in ["x", "y", "yMin", "yMax", "label", "color", "fill",
@@ -141,6 +143,8 @@ proc decodeAes(node: JsonNode): Aes =
     result.xMax = node.field("xMax", JString).getStr
   if node.hasKey("image"):
     result.image = node.field("image", JString).getStr
+  if node.hasKey("xOffset"):
+    result.xOffset = node.field("xOffset", JString).getStr
 
 proc dataNode(frame: DataFrame): JsonNode =
   var columns = newJArray()

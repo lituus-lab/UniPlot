@@ -110,6 +110,7 @@ type
 
   Aes* = object
     x*, y*: string
+    xOffset*: string
     xMin*, xMax*: string
     yMin*, yMax*: string
     yQ1*, yQ3*: string
@@ -272,10 +273,12 @@ proc plot*(data: DataFrame): PlotSpec =
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
     shape = ""; lineStyle = ""; fill = ""; xMin = ""; xMax = "";
-    yMin = ""; yMax = ""; yQ1 = ""; yQ3 = ""; image = ""): Aes =
+    yMin = ""; yMax = ""; yQ1 = ""; yQ3 = ""; image = "";
+    xOffset = ""): Aes =
   Aes(x: x, y: y, label: label, color: color, fill: fill, size: size,
     alpha: alpha, shape: shape, lineStyle: lineStyle, xMin: xMin, xMax: xMax,
-    yMin: yMin, yMax: yMax, yQ1: yQ1, yQ3: yQ3, image: image)
+    yMin: yMin, yMax: yMax, yQ1: yQ1, yQ3: yQ3, image: image,
+    xOffset: xOffset)
 
 proc addLayer*(spec: var PlotSpec; mark: MarkKind; mapping: Aes;
     color = "#3366cc"; size = 0'f32; legend = "";
@@ -797,6 +800,71 @@ proc violinPlot*(values: openArray[float64]; pointCount = 256;
       result = plot(frame)
       result.geomPolygon(aes("violinWidth", "value"), color,
         legend = legend)
+    except ValueError as error:
+      raise newException(PlotError, error.msg)
+
+proc violinPlot*(groups: openArray[string]; values: openArray[float64];
+    pointCount = 256; bandwidth = 0.0; width = 0.8;
+    color = "#3366cc80"; legend = ""): PlotSpec {.contractual.} =
+  ## Materialise first-seen groups as categorical mirrored KDE polygons.
+  require:
+    groups.len == values.len
+    pointCount >= 2 and pointCount <= 100_000
+    bandwidth >= 0.0 and bandwidth.isFinite
+    width > 0.0 and width <= 1.0 and width.isFinite
+  body:
+    if groups.len != values.len or pointCount < 2 or pointCount > 100_000 or
+        bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
+        width > 1.0 or not width.isFinite:
+      raise newException(PlotError, "invalid grouped violin input")
+    var samples = initOrderedTable[string, seq[float64]]()
+    for index in 0 ..< groups.len:
+      if groups[index].len == 0:
+        raise newException(PlotError, "violin groups must not be empty")
+      if values[index].isFinite:
+        if groups[index] notin samples: samples[groups[index]] = @[]
+        samples[groups[index]].add values[index]
+    if samples.len == 0:
+      raise newException(PlotError,
+        "grouped violin plots require finite observations")
+    var
+      category: seq[string]
+      offset, vertical: seq[float64]
+      groupIndex = 0
+    try:
+      for name, observations in samples:
+        if observations.len < 2:
+          raise newException(PlotError,
+            "each violin group requires at least two finite observations")
+        let estimate = statistics.kernelDensity(observations, pointCount,
+          bandwidth)
+        var maximumDensity = 0.0
+        for density in estimate.density:
+          maximumDensity = max(maximumDensity, density)
+        if maximumDensity <= 0.0 or not maximumDensity.isFinite:
+          raise newException(PlotError,
+            "violin density must have a positive finite maximum")
+        let halfWidth = width * 0.5
+        for index in 0 ..< pointCount:
+          category.add name
+          offset.add(-halfWidth * estimate.density[index] / maximumDensity)
+          vertical.add estimate.points[index]
+        for index in countdown(pointCount - 1, 0):
+          category.add name
+          offset.add(halfWidth * estimate.density[index] / maximumDensity)
+          vertical.add estimate.points[index]
+        inc groupIndex
+        if groupIndex < samples.len:
+          category.add name
+          offset.add NaN
+          vertical.add NaN
+      var frame = initDataFrame()
+      frame.addColumn("group", category)
+      frame.addColumn("violinOffset", offset)
+      frame.addColumn("value", vertical)
+      result = plot(frame)
+      result.geomPolygon(aes("group", "value", xOffset = "violinOffset"),
+        color, legend = legend)
     except ValueError as error:
       raise newException(PlotError, error.msg)
 
