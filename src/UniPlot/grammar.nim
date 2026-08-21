@@ -1078,3 +1078,37 @@ proc numericHeatmapPlot*(xBreaks, yBreaks, values: openArray[float64];
       yMin = "yMin", yMax = "yMax", fill = "value"), legend = legend)
     if legend.len > 0:
       result.legend()
+
+proc contourPlot*(xs, ys, values, levels: openArray[float64];
+    color = "#3366cc"; width = 0'f32; legend = ""): PlotSpec {.contractual.} =
+  ## Materialise rectilinear marching-squares contours as retained lines.
+  require:
+    xs.len >= 2 and ys.len >= 2
+    levels.len > 0
+    width >= 0 and width.isFinite
+  body:
+    if width < 0 or not width.isFinite:
+      raise newException(PlotError,
+        "contour line width must be finite and non-negative")
+    let segments = contourSegments(xs, ys, values, levels)
+    if segments.len == 0:
+      raise newException(PlotError,
+        "contour levels do not intersect any complete grid cell")
+    if segments.len > high(int) div 3:
+      raise newException(PlotError, "contour path is too large")
+    var
+      pathX = newSeqOfCap[float64](segments.len * 3)
+      pathY = newSeqOfCap[float64](segments.len * 3)
+    for segment in segments:
+      pathX.add segment.x0
+      pathY.add segment.y0
+      pathX.add segment.x1
+      pathY.add segment.y1
+      pathX.add NaN
+      pathY.add NaN
+    var frame = initDataFrame()
+    frame.addColumn("x", pathX)
+    frame.addColumn("y", pathY)
+    result = plot(frame)
+    result.geomLine(aes("x", "y"), color, width, legend,
+      missingValues = BreakOnMissing)
