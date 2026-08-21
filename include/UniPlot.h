@@ -117,6 +117,10 @@ int uplot_add_density(uplot_plot *, const double *values, size_t count,
 int uplot_add_violin(uplot_plot *, const double *values, size_t count,
                      int point_count, double bandwidth, double width,
                      const char *color);
+int uplot_add_grouped_violin(uplot_plot *, const char *const *groups,
+                             const double *values, size_t count,
+                             int point_count, double bandwidth, double width,
+                             const char *color);
 int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
                                 const double *values, size_t count,
                                 int aggregation, const char *color);

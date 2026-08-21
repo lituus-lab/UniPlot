@@ -478,6 +478,39 @@ proc uplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
+    values: ptr float64; count: csize_t; pointCount: cint;
+    bandwidth, width: float64; color: cstring): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or groups.isNil or values.isNil or count < 2 or
+      count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
+      bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
+      width > 1.0 or not width.isFinite or color.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputGroups = cast[ptr UncheckedArray[cstring]](groups)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+    var
+      copiedGroups = newSeqOfCap[string](int(count))
+      copiedValues = newSeqUninit[float64](int(count))
+    for index in 0 ..< int(count):
+      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      copiedGroups.add $inputGroups[index]
+      copiedValues[index] = inputValues[index]
+    let candidate = violinPlot(copiedGroups, copiedValues, int(pointCount),
+      bandwidth, width, $color)
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
