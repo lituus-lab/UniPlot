@@ -35,7 +35,8 @@ proc main() =
       for field in ["warmup_iterations", "source", "canvas", "filter",
           "semantics", "image_mark_count", "image_resource_count",
           "temporal_point_count", "histogram_point_count", "histogram_rule",
-          "smoothing_point_count", "smoothing_grid_count"]:
+          "smoothing_point_count", "smoothing_grid_count", "contour_grid",
+          "contour_level_count", "dense_grid", "power_point_count"]:
         if reports[run][field] != reports[0][field]:
           quit("benchmark invariant changed between runs: " & field, 1)
       for field in ["density_point_count", "density_grid_count"]:
@@ -69,6 +70,10 @@ proc main() =
     "smoothing_grid_count": first["smoothing_grid_count"],
     "density_point_count": first["density_point_count"],
     "density_grid_count": first["density_grid_count"],
+    "contour_grid": first["contour_grid"],
+    "contour_level_count": first["contour_level_count"],
+    "dense_grid": first["dense_grid"],
+    "power_point_count": first["power_point_count"],
     "construction_snapshot": phase("construction_snapshot_mean_ms"),
     "compile": phase("compile_mean_ms"),
     "publication": phase("publication_mean_ms"),
@@ -90,6 +95,16 @@ proc main() =
   result["density_construction"] = phase("density_construction_mean_ms")
   result["density_compile"] = phase("density_compile_mean_ms")
   result["density_publication"] = phase("density_publication_mean_ms")
+  result["contour_extraction"] = phase("contour_extraction_mean_ms")
+  result["contour_construction"] = phase("contour_construction_mean_ms")
+  result["contour_compile"] = phase("contour_compile_mean_ms")
+  result["contour_publication"] = phase("contour_publication_mean_ms")
+  result["dense_construction"] = phase("dense_construction_mean_ms")
+  result["dense_compile"] = phase("dense_compile_mean_ms")
+  result["dense_publication"] = phase("dense_publication_mean_ms")
+  result["power_construction"] = phase("power_construction_mean_ms")
+  result["power_compile"] = phase("power_compile_mean_ms")
+  result["power_publication"] = phase("power_publication_mean_ms")
   let encoded = pretty(result) & "\n"
   echo encoded
   writeFile(output, encoded)

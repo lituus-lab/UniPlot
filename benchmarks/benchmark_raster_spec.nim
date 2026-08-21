@@ -3,7 +3,7 @@
 import std/[json, monotimes, os, stats, strutils, times]
 import UniGlyph
 import UniImage/core as uimg
-from UniMath import sin
+from UniMath import cos, sin
 import UniPlot
 import UniStatistics as statistics
 
@@ -88,6 +88,33 @@ proc main() =
       float64((index * 37) mod 101) / 40.0 - 1.25
   proc makeDensitySpec(): PlotSpec =
     densityPlot(densityValues, pointCount = 256)
+  var
+    contourX = newSeq[float64](128)
+    contourY = newSeq[float64](128)
+    contourValues = newSeq[float64](128 * 128)
+  for index in 0 ..< 128:
+    contourX[index] = float64(index) / 12.7 - 5.0
+    contourY[index] = float64(index) / 12.7 - 5.0
+  for row in 0 ..< 128:
+    for column in 0 ..< 128:
+      contourValues[row * 128 + column] =
+        sin(contourX[column]) * cos(contourY[row])
+  let contourLevels = [-0.8, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8]
+  proc makeContourSpec(): PlotSpec =
+    contourPlot(contourX, contourY, contourValues, contourLevels)
+  var denseValues = newSeq[float64](256 * 256)
+  for row in 0 ..< 256:
+    for column in 0 ..< 256:
+      let
+        x = float64(column) / 25.5 - 5.0
+        y = float64(row) / 25.5 - 5.0
+      denseValues[row * 256 + column] = sin(x) * cos(y)
+  proc makeDenseSpec(): PlotSpec =
+    rasterHeatmapPlot(256, 256, denseValues, -5.0, 5.0, -5.0, 5.0)
+  proc makePowerSpec(): PlotSpec =
+    result = linePlot(temporalY, temporalY)
+    result.scaleXPower(0.5)
+    result.scaleYPower(2.0)
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
@@ -108,6 +135,13 @@ proc main() =
     discard statistics.kernelDensity(densityValues, 256)
     let warmDensity = makeDensitySpec().compileScene(Size(width: 800, height: 600))
     discard warmDensity.renderImage(font)
+    discard contourSegments(contourX, contourY, contourValues, contourLevels)
+    let warmContour = makeContourSpec().compileScene(Size(width: 800, height: 600))
+    discard warmContour.renderImage(font)
+    let warmDense = makeDenseSpec().compileScene(Size(width: 800, height: 600))
+    discard warmDense.renderImage(font)
+    let warmPower = makePowerSpec().compileScene(Size(width: 800, height: 600))
+    discard warmPower.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
@@ -119,6 +153,12 @@ proc main() =
     smoothPublicationStats: RunningStat
   var densityEstimateStats, densityConstructionStats, densityCompileStats,
     densityPublicationStats: RunningStat
+  var contourExtractionStats, contourConstructionStats, contourCompileStats,
+    contourPublicationStats: RunningStat
+  var denseConstructionStats, denseCompileStats, densePublicationStats:
+    RunningStat
+  var powerConstructionStats, powerCompileStats, powerPublicationStats:
+    RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
     var started = getMonoTime()
@@ -200,6 +240,44 @@ proc main() =
     densityPublicationStats.push elapsedMs(started)
     guard = guard xor int(densityPixels.data[
       (iteration * 4001) mod densityPixels.data.len])
+    started = getMonoTime()
+    let contourResult = contourSegments(contourX, contourY, contourValues,
+      contourLevels)
+    contourExtractionStats.push elapsedMs(started)
+    guard = guard xor contourResult.len
+    started = getMonoTime()
+    let contourSpec = makeContourSpec()
+    contourConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let contourScene = contourSpec.compileScene(Size(width: 800, height: 600))
+    contourCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let contourPixels = contourScene.renderImage(font)
+    contourPublicationStats.push elapsedMs(started)
+    guard = guard xor int(contourPixels.data[
+      (iteration * 4211) mod contourPixels.data.len])
+    started = getMonoTime()
+    let denseSpec = makeDenseSpec()
+    denseConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let denseScene = denseSpec.compileScene(Size(width: 800, height: 600))
+    denseCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let densePixels = denseScene.renderImage(font)
+    densePublicationStats.push elapsedMs(started)
+    guard = guard xor int(densePixels.data[
+      (iteration * 4513) mod densePixels.data.len])
+    started = getMonoTime()
+    let powerSpec = makePowerSpec()
+    powerConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let powerScene = powerSpec.compileScene(Size(width: 800, height: 600))
+    powerCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let powerPixels = powerScene.renderImage(font)
+    powerPublicationStats.push elapsedMs(started)
+    guard = guard xor int(powerPixels.data[
+      (iteration * 4789) mod powerPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
@@ -211,6 +289,8 @@ proc main() =
     "smoothing_grid_count": 200,
     "density_point_count": densityValues.len,
     "density_grid_count": 256,
+    "contour_grid": "128x128", "contour_level_count": contourLevels.len,
+    "dense_grid": "256x256", "power_point_count": temporalY.len,
     "semantics": "separate PlotSpec construction, statistical selection or fitting, retained-scene compilation and complete CPU publication",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
@@ -233,6 +313,16 @@ proc main() =
     "density_construction_mean_ms": densityConstructionStats.mean,
     "density_compile_mean_ms": densityCompileStats.mean,
     "density_publication_mean_ms": densityPublicationStats.mean,
+    "contour_extraction_mean_ms": contourExtractionStats.mean,
+    "contour_construction_mean_ms": contourConstructionStats.mean,
+    "contour_compile_mean_ms": contourCompileStats.mean,
+    "contour_publication_mean_ms": contourPublicationStats.mean,
+    "dense_construction_mean_ms": denseConstructionStats.mean,
+    "dense_compile_mean_ms": denseCompileStats.mean,
+    "dense_publication_mean_ms": densePublicationStats.mean,
+    "power_construction_mean_ms": powerConstructionStats.mean,
+    "power_compile_mean_ms": powerCompileStats.mean,
+    "power_publication_mean_ms": powerPublicationStats.mean,
     "guard": guard})
 
 main()
