@@ -459,6 +459,36 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_polynomial_smooth*(value: pointer;
+    valuesX, valuesY: ptr float64; count: csize_t; degree,
+    pointCount: cint; lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or valuesX.isNil or valuesY.isNil or count < 3 or
+      count > csize_t(high(int)) or degree < 1 or degree > 8 or
+      pointCount < 2 or pointCount > 10_000 or lineColor.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputX = cast[ptr UncheckedArray[float64]](valuesX)
+      inputY = cast[ptr UncheckedArray[float64]](valuesY)
+    var
+      copiedX = newSeqUninit[float64](int(count))
+      copiedY = newSeqUninit[float64](int(count))
+    for index in 0 ..< int(count):
+      copiedX[index] = inputX[index]
+      copiedY[index] = inputY[index]
+    let candidate = polynomialSmoothPlot(copiedX, copiedY, int(degree),
+      int(pointCount), $lineColor)
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
     pointCount: cint; bandwidth: float64;
     fillColor, lineColor: cstring): cint {.exportc, dynlib, cdecl.} =

@@ -81,6 +81,9 @@ int uplot_plot_from_json_status(const uint8_t *, size_t, int width, int height,
 int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *);
 int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
                    const char *color, float width);
+int uplot_add_polynomial_smooth(uplot_plot *, const double *, const double *,
+                                size_t, int degree, int point_count,
+                                const char *line_color);
 int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
                      const char *color, float radius);
 /* Pixels are copied. channels must be 1, 3, or 4 and length must equal
