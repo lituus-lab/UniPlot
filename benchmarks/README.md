@@ -16,23 +16,28 @@ complete 800×600 CPU publication. The same processes also measure 64
 data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources, a
 1,000-point line with UTC x labels and duration y labels, and automatic
 Freedman–Diaconis selection over 100,000 deterministic samples.
-It also separates a 10,000-point linear fit, construction of a 200-point
-confidence ribbon, retained-scene compilation and CPU publication.
+It also separates a 10,000-point linear fit and a Gaussian density estimate
+over 5,000 samples, their retained-spec construction, scene compilation and
+CPU publication.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3158 / 8.5804 / 7.4556 ms for the retained
-raster construction / compile / publication phases, 0.0184 / 3.1804 / 6.8959
-ms for the 64-mark phases, and 0.0122 / 0.1252 / 12.9326 ms for temporal
+The current Apple M4 medians are 0.3468 / 9.0638 / 8.0384 ms for the retained
+raster construction / compile / publication phases, 0.0257 / 3.3284 / 7.3957
+ms for the 64-mark phases, and 0.0169 / 0.1431 / 13.8815 ms for temporal
 construction / compile / CPU publication. Temporal construction copies the
 two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 14.1209 ms;
-complete PlotSpec construction including the same selection costs 15.4465 ms,
-then scene compilation/publication costs 0.0259 / 22.0283 ms. Selection sorts
+UTC/duration formatting. Automatic histogram selection costs 14.7665 ms;
+complete PlotSpec construction including the same selection costs 16.4901 ms,
+then scene compilation/publication costs 0.0296 / 23.3734 ms. Selection sorts
 finite samples to compute exact type-7 quartiles; no linear-time approximation
-is substituted. The range-safe linear fit costs 0.5763 ms; complete smoothing
+is substituted. The range-safe linear fit costs 0.6239 ms; complete smoothing
 construction, including one Student-t critical value and 200 interval
-evaluations, costs 0.7194 ms, followed by 0.0600 / 8.2010 ms for compilation
-and publication. These are same-machine regression evidence, not cross-machine
+evaluations, costs 0.7886 ms, followed by 0.0707 / 8.7938 ms for compilation
+and publication. The exact 5,000×256 Gaussian estimate costs 8.7695 ms;
+complete density PlotSpec construction costs 8.8485 ms, followed by
+0.0749 / 10.9610 ms for compilation and publication. Minor estimate versus
+construction inversions are normal timing noise between separate windows.
+These are same-machine regression evidence, not cross-machine
 performance claims.
 The exact samples are stored in
 `benchmarks/baselines/apple-m4-raster-spec.json`.
