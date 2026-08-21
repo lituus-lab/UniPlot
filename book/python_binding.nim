@@ -94,6 +94,8 @@ copying it.
 - `contour(x, y, values, levels, color="#3366cc", width=0)` copies a
   rectilinear row-major scalar grid and retains deterministic marching-squares
   lines. Coordinate and level vectors must be strictly increasing.
+- `raster_heatmap(width, height, values, x_min, x_max, y_min, y_max)` maps a
+  copied dense scalar matrix through UniColor and retains one RGBA8 raster.
 - `histogram(values, breaks, color="#3366cc", density=False)` builds numeric
   variable-width rectangles on an empty `Plot`; the last supplied boundary is
   included. With `density=True`, total rectangle area is one for a non-empty

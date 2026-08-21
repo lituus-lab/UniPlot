@@ -124,6 +124,9 @@ int main(void) {
 - `uplot_add_numeric_heatmap` copies explicit x/y boundary arrays and a
   row-major value matrix. The value count must equal the Cartesian cell count;
   finite values become variable-size numeric UniVector rectangles.
+- `uplot_add_raster_heatmap` copies a dense row-major scalar matrix, maps its
+  finite domain through UniColor and retains one RGBA8 raster. Non-finite cells
+  are transparent.
 - `uplot_add_histogram_breaks` copies samples and finite, strictly increasing
   boundaries into a categorical histogram on an empty handle. Values outside
   the supplied domain are excluded and the final boundary is included. Bars

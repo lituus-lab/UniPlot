@@ -91,7 +91,8 @@ silently claimed by the focused 1.0 publication contract.
       retained polygon geometry and UniStatistics.
 - [x] Rectilinear marching-squares contours in Nim, C and Python, materialised
       as backend-neutral retained line paths.
-- [ ] Dense raster/image heatmap recipes.
+- [x] Dense row-major raster heatmaps in Nim, C and Python through UniColor and
+      the shared owned-raster backend path.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [x] First-seen categorical two-dimensional aggregation with explicit absent
   cells and UniAccurate compensated sum/mean.

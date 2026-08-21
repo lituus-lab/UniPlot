@@ -442,6 +442,38 @@ UniColor guide. It is a vector-cell heatmap, not an image sampler. Generic
 retained rasters and data-mapped image marks are documented in the grammar
 chapter.
 
+## Dense raster heatmaps
+"""
+
+nbCode:
+  var denseValues = newSeq[float64](48 * 32)
+  for row in 0 ..< 32:
+    for column in 0 ..< 48:
+      let dx = float64(column) - 23.5
+      let dy = float64(row) - 15.5
+      denseValues[row * 48 + column] = dx * dx + dy * dy
+  var denseHeat = rasterHeatmapPlot(48, 32, denseValues,
+    0.0, 48.0, 0.0, 32.0)
+  denseHeat.labels(title = "Dense UniColor raster", x = "column", y = "row")
+  let denseHeatSvg = denseHeat.compileScene(Size(width: 720,
+      height: 420)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(denseHeatSvg,
+  "A 48 × 32 scalar matrix retained as one palette-mapped RGBA8 image.")
+
+nbText: """
+`rasterHeatmapPlot(width, height, values, xMin, xMax, yMin, yMax)` maps a
+row-major scalar matrix through the default ordered UniColor palette. The
+finite minimum and maximum define the colour domain; a constant matrix samples
+its midpoint. Non-finite cells become transparent and an entirely non-finite
+matrix is rejected. Row zero is the top image row and corresponds to `yMax`.
+
+Unlike `numericHeatmapPlot`, this recipe emits one owned raster instead of one
+UniVector rectangle per cell. Nearest-neighbour filtering is the default for
+cell boundaries, with the existing bilinear and box filters available. The
+current raster recipe intentionally has no automatic colour-bar guide.
+
 ## Rectilinear contours
 """
 
@@ -473,4 +505,4 @@ Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 10)
+validatePage("scales_stats.html", minSvg = 11)

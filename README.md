@@ -55,6 +55,8 @@ Gaussian density and violin recipes likewise reuse UniStatistics bandwidths
 and kernels, then materialise ordinary retained area, line and polygon marks.
 Rectilinear contours are extracted once with deterministic marching squares
 and retained as ordinary broken line paths for every renderer.
+Dense scalar matrices are palette-mapped through UniColor into owned RGBA8
+rasters before they cross the scene boundary.
 
 ## 1.0 contract
 
