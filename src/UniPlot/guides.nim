@@ -216,7 +216,8 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
       spec.xScaleSpec.labelKind != alkNumeric):
     raise newException(PlotError,
       "categorical x coordinates require numeric labels on a linear scale")
-  result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind)
+  result.xContinuous = initContinuousDomain(spec.xScaleSpec.kind,
+    spec.xScaleSpec.exponent)
   result.xBand = initBandDomain()
   let firstY = if spec.layers.len > 0:
     (if spec.layers[0].mark in {mkRect, mkImage}:
@@ -235,7 +236,8 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
       spec.yScaleSpec.labelKind != alkNumeric):
     raise newException(PlotError,
       "categorical y coordinates require numeric labels on a linear scale")
-  result.yContinuous = initContinuousDomain(spec.yScaleSpec.kind)
+  result.yContinuous = initContinuousDomain(spec.yScaleSpec.kind,
+    spec.yScaleSpec.exponent)
   result.yBand = initBandDomain()
   for reference in spec.references:
     if not reference.minimum.isFinite or not reference.maximum.isFinite or

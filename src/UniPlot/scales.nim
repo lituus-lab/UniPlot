@@ -9,6 +9,7 @@ type
     skLinear
     skLog10
     skSymLog10
+    skPower
 
   AxisLabelKind* = enum
     alkNumeric
@@ -17,11 +18,13 @@ type
 
   ContinuousScale* = object
     kind*: ScaleKind
+    exponent*: float64
     domainMin*, domainMax*: float64
     rangeMin*, rangeMax*: float32
 
   ContinuousDomain* = object
     kind*: ScaleKind
+    exponent: float64
     hasValues: bool
     minimum, maximum: float64
 
@@ -35,18 +38,23 @@ type
     seen: Table[string, bool]
 
 proc continuousScale*(domainMin, domainMax: float64; rangeMin,
-    rangeMax: float32; kind = skLinear): ContinuousScale =
+    rangeMax: float32; kind = skLinear; exponent = 1.0): ContinuousScale =
   if not domainMin.isFinite or not domainMax.isFinite or domainMin == domainMax:
     raise newException(PlotError, "scale domain must be finite and non-degenerate")
   if not rangeMin.isFinite or not rangeMax.isFinite:
     raise newException(PlotError, "scale range must be finite")
   if kind == skLog10 and (domainMin <= 0 or domainMax <= 0):
     raise newException(PlotError, "logarithmic domains must be positive")
-  ContinuousScale(kind: kind, domainMin: domainMin, domainMax: domainMax,
+  if kind == skPower and (not exponent.isFinite or exponent <= 0.0):
+    raise newException(PlotError, "power exponents must be finite and positive")
+  ContinuousScale(kind: kind, exponent: exponent,
+    domainMin: domainMin, domainMax: domainMax,
     rangeMin: rangeMin, rangeMax: rangeMax)
 
-proc initContinuousDomain*(kind = skLinear): ContinuousDomain =
-  ContinuousDomain(kind: kind)
+proc initContinuousDomain*(kind = skLinear; exponent = 1.0): ContinuousDomain =
+  if kind == skPower and (not exponent.isFinite or exponent <= 0.0):
+    raise newException(PlotError, "power exponents must be finite and positive")
+  ContinuousDomain(kind: kind, exponent: exponent)
 
 proc addValues*(domain: var ContinuousDomain; values: openArray[float64]) =
   for value in values:
@@ -61,7 +69,7 @@ proc addValues*(domain: var ContinuousDomain; values: openArray[float64]) =
 
 proc merge*(domain: var ContinuousDomain; other: ContinuousDomain) =
   ## Merge an accumulated domain with another domain of the same scale kind.
-  if domain.kind != other.kind:
+  if domain.kind != other.kind or domain.exponent != other.exponent:
     raise newException(PlotError, "cannot merge different scale kinds")
   if other.hasValues:
     domain.addValues([other.minimum, other.maximum])
@@ -77,7 +85,7 @@ proc train*(domain: ContinuousDomain; rangeMin,
     lo -= pad
     hi += pad
     if domain.kind == skLog10: lo = max(lo, domain.minimum * 0.5)
-  continuousScale(lo, hi, rangeMin, rangeMax, domain.kind)
+  continuousScale(lo, hi, rangeMin, rangeMax, domain.kind, domain.exponent)
 
 proc fittedBounds*(domain: ContinuousDomain): tuple[minimum, maximum: float64] =
   ## Return the finite, non-degenerate bounds produced by automatic training.
@@ -92,7 +100,8 @@ proc train*(domain: ContinuousDomain; rangeMin, rangeMax: float32;
   if domain.minimum < domainMin or domain.maximum > domainMax:
     raise newException(PlotError,
       "explicit scale domain must contain every rendered value")
-  continuousScale(domainMin, domainMax, rangeMin, rangeMax, domain.kind)
+  continuousScale(domainMin, domainMax, rangeMin, rangeMax, domain.kind,
+    domain.exponent)
 
 proc interpolationRatio(value, first, last: float64): float64 =
   let
@@ -113,29 +122,38 @@ proc interpolate(first, last, ratio: float64): float64 =
   if not result.isFinite:
     raise newException(PlotError, "scale interpolation is not finite")
 
-proc transformed(kind: ScaleKind; value: float64): float64 =
+proc transformed(kind: ScaleKind; value, exponent: float64): float64 =
   case kind
   of skLinear: value
   of skLog10: log10(value)
   of skSymLog10:
     let magnitude = log1p(abs(value)) / ln(10.0)
     if value < 0.0: -magnitude else: magnitude
+  of skPower:
+    let magnitude = pow(abs(value), exponent)
+    if value < 0.0: -magnitude else: magnitude
 
-proc inverseTransformed(kind: ScaleKind; value: float64): float64 =
+proc inverseTransformed(kind: ScaleKind; value, exponent: float64): float64 =
   case kind
   of skLinear: value
   of skLog10: pow(10.0, value)
   of skSymLog10:
     let magnitude = expm1(abs(value) * ln(10.0))
     if value < 0.0: -magnitude else: magnitude
+  of skPower:
+    let magnitude = pow(abs(value), 1.0 / exponent)
+    if value < 0.0: -magnitude else: magnitude
 
 proc map*(scale: ContinuousScale; value: float64): float32 =
   if not value.isFinite or (scale.kind == skLog10 and value <= 0):
     raise newException(PlotError, "value is outside the scale domain")
   let
-    a = scale.kind.transformed(scale.domainMin)
-    b = scale.kind.transformed(scale.domainMax)
-    v = scale.kind.transformed(value)
+    a = scale.kind.transformed(scale.domainMin, scale.exponent)
+    b = scale.kind.transformed(scale.domainMax, scale.exponent)
+    v = scale.kind.transformed(value, scale.exponent)
+  if not a.isFinite or not b.isFinite or not v.isFinite:
+    raise newException(PlotError, "scale transform is not finite")
+  let
     t = interpolationRatio(v, a, b)
     mapped = interpolate(float64(scale.rangeMin), float64(scale.rangeMax), t)
   result = float32(mapped)
@@ -143,8 +161,8 @@ proc map*(scale: ContinuousScale; value: float64): float32 =
     raise newException(PlotError, "mapped coordinate is not finite")
 
 proc trainContinuous*(values: openArray[float64]; rangeMin, rangeMax: float32;
-    kind = skLinear): ContinuousScale =
-  var domain = initContinuousDomain(kind)
+    kind = skLinear; exponent = 1.0): ContinuousScale =
+  var domain = initContinuousDomain(kind, exponent)
   domain.addValues(values)
   domain.train(rangeMin, rangeMax)
 
@@ -156,8 +174,9 @@ proc ticks*(scale: ContinuousScale; count = 5): seq[float64] =
       elif i == count - 1: scale.domainMax
       else:
         scale.kind.inverseTransformed(interpolate(
-          scale.kind.transformed(scale.domainMin),
-          scale.kind.transformed(scale.domainMax), t))
+          scale.kind.transformed(scale.domainMin, scale.exponent),
+          scale.kind.transformed(scale.domainMax, scale.exponent), t),
+          scale.exponent)
     if not value.isFinite:
       raise newException(PlotError, "scale tick is not finite")
     if result.len == 0 or value != result[^1]: result.add value

@@ -60,6 +60,7 @@ type
 
   AxisScaleSpec* = object
     kind*: ScaleKind
+    exponent*: float64
     labelKind*: AxisLabelKind
     reversed*: bool
     domain*: AxisDomainSpec
@@ -269,7 +270,9 @@ proc plot*(data: DataFrame): PlotSpec =
     legendSpec: LegendSpec(position: lpRight), categoricalColors: okabeIto(),
     continuousColors: continuous.get,
     mappedSizeRange: AestheticRange(minimum: 2, maximum: 10),
-    mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1))
+    mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1),
+    xScaleSpec: AxisScaleSpec(exponent: 1.0),
+    yScaleSpec: AxisScaleSpec(exponent: 1.0))
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
     shape = ""; lineStyle = ""; fill = ""; xMin = ""; xMax = "";
@@ -442,36 +445,68 @@ proc scaleX*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric x transform and the direction of numeric or
   ## categorical x coordinates.
   spec.xScaleSpec.kind = kind
+  spec.xScaleSpec.exponent = 1.0
   spec.xScaleSpec.labelKind = alkNumeric
   spec.xScaleSpec.reversed = reversed
 
 proc scaleY*(spec: var PlotSpec; kind = skLinear; reversed = false) =
   ## Configure the numeric y transform and coordinate direction.
   spec.yScaleSpec.kind = kind
+  spec.yScaleSpec.exponent = 1.0
   spec.yScaleSpec.labelKind = alkNumeric
   spec.yScaleSpec.reversed = reversed
+
+proc scaleXPower*(spec: var PlotSpec; exponent: float64;
+    reversed = false) {.contractual.} =
+  ## Configure a monotone signed-power x transform.
+  require:
+    exponent > 0.0 and exponent.isFinite
+  body:
+    if exponent <= 0.0 or not exponent.isFinite:
+      raise newException(PlotError, "power exponents must be finite and positive")
+    spec.xScaleSpec.kind = skPower
+    spec.xScaleSpec.exponent = exponent
+    spec.xScaleSpec.labelKind = alkNumeric
+    spec.xScaleSpec.reversed = reversed
+
+proc scaleYPower*(spec: var PlotSpec; exponent: float64;
+    reversed = false) {.contractual.} =
+  ## Configure a monotone signed-power y transform.
+  require:
+    exponent > 0.0 and exponent.isFinite
+  body:
+    if exponent <= 0.0 or not exponent.isFinite:
+      raise newException(PlotError, "power exponents must be finite and positive")
+    spec.yScaleSpec.kind = skPower
+    spec.yScaleSpec.exponent = exponent
+    spec.yScaleSpec.labelKind = alkNumeric
+    spec.yScaleSpec.reversed = reversed
 
 proc scaleXUtc*(spec: var PlotSpec; reversed = false) =
   ## Interpret numeric x values as POSIX seconds and label them in UTC.
   spec.xScaleSpec.kind = skLinear
+  spec.xScaleSpec.exponent = 1.0
   spec.xScaleSpec.labelKind = alkUtcDateTime
   spec.xScaleSpec.reversed = reversed
 
 proc scaleYUtc*(spec: var PlotSpec; reversed = false) =
   ## Interpret numeric y values as POSIX seconds and label them in UTC.
   spec.yScaleSpec.kind = skLinear
+  spec.yScaleSpec.exponent = 1.0
   spec.yScaleSpec.labelKind = alkUtcDateTime
   spec.yScaleSpec.reversed = reversed
 
 proc scaleXDuration*(spec: var PlotSpec; reversed = false) =
   ## Interpret numeric x values as signed elapsed seconds.
   spec.xScaleSpec.kind = skLinear
+  spec.xScaleSpec.exponent = 1.0
   spec.xScaleSpec.labelKind = alkDuration
   spec.xScaleSpec.reversed = reversed
 
 proc scaleYDuration*(spec: var PlotSpec; reversed = false) =
   ## Interpret numeric y values as signed elapsed seconds.
   spec.yScaleSpec.kind = skLinear
+  spec.yScaleSpec.exponent = 1.0
   spec.yScaleSpec.labelKind = alkDuration
   spec.yScaleSpec.reversed = reversed
 
