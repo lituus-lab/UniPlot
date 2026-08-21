@@ -427,6 +427,31 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
+    pointCount: cint; bandwidth: float64;
+    fillColor, lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or values.isNil or count < 2 or
+      count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
+      fillColor.isNil or lineColor.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let input = cast[ptr UncheckedArray[float64]](values)
+    var copied = newSeqUninit[float64](int(count))
+    for index in 0 ..< copied.len:
+      copied[index] = input[index]
+    let candidate = densityPlot(copied, int(pointCount), bandwidth,
+      $fillColor, $lineColor)
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
