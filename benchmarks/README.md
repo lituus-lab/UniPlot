@@ -18,25 +18,31 @@ data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources, a
 Freedman–Diaconis selection over 100,000 deterministic samples.
 It also separates a 10,000-point linear fit and a Gaussian density estimate
 over 5,000 samples, their retained-spec construction, scene compilation and
-CPU publication.
+CPU publication. The same report now measures nine-level marching squares on
+a 128×128 grid, a 256×256 dense raster heatmap and a 1,000-point signed-power
+line.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3468 / 9.0638 / 8.0384 ms for the retained
-raster construction / compile / publication phases, 0.0257 / 3.3284 / 7.3957
-ms for the 64-mark phases, and 0.0169 / 0.1431 / 13.8815 ms for temporal
+The current Apple M4 medians are 0.3219 / 8.5628 / 7.5164 ms for the retained
+raster construction / compile / publication phases, 0.0203 / 3.1733 / 6.9956
+ms for the 64-mark phases, and 0.0140 / 0.1344 / 13.0126 ms for temporal
 construction / compile / CPU publication. Temporal construction copies the
 two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 14.7665 ms;
-complete PlotSpec construction including the same selection costs 16.4901 ms,
-then scene compilation/publication costs 0.0296 / 23.3734 ms. Selection sorts
+UTC/duration formatting. Automatic histogram selection costs 14.3715 ms;
+complete PlotSpec construction including the same selection costs 15.7363 ms,
+then scene compilation/publication costs 0.0303 / 22.3637 ms. Selection sorts
 finite samples to compute exact type-7 quartiles; no linear-time approximation
-is substituted. The range-safe linear fit costs 0.6239 ms; complete smoothing
+is substituted. The range-safe linear fit costs 0.5877 ms; complete smoothing
 construction, including one Student-t critical value and 200 interval
-evaluations, costs 0.7886 ms, followed by 0.0707 / 8.7938 ms for compilation
-and publication. The exact 5,000×256 Gaussian estimate costs 8.7695 ms;
-complete density PlotSpec construction costs 8.8485 ms, followed by
-0.0749 / 10.9610 ms for compilation and publication. Minor estimate versus
+evaluations, costs 0.7408 ms, followed by 0.0677 / 8.2733 ms for compilation
+and publication. The exact 5,000×256 Gaussian estimate costs 8.2781 ms;
+complete density PlotSpec construction costs 8.2955 ms, followed by
+0.0690 / 10.2259 ms for compilation and publication. Minor estimate versus
 construction inversions are normal timing noise between separate windows.
+Contour extraction costs 1.2759 ms; complete construction, compilation and
+publication cost 1.3693 / 1.3884 / 25.9037 ms. The RGBA8 palette-table heatmap
+costs 1.4119 / 1.7683 / 7.1792 ms for the same three stages. Signed-power
+construction, compilation and publication cost 0.0144 / 0.1634 / 15.1065 ms.
 These are same-machine regression evidence, not cross-machine
 performance claims.
 The exact samples are stored in

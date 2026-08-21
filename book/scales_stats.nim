@@ -472,6 +472,8 @@ row-major scalar matrix through the default ordered UniColor palette. The
 finite minimum and maximum define the colour domain; a constant matrix samples
 its midpoint. Non-finite cells become transparent and an entirely non-finite
 matrix is rejected. Row zero is the top image row and corresponds to `yMax`.
+UniColor prepares the 256-entry RGBA8 lookup table once per construction;
+pixels then perform only range-safe normalization and table lookup.
 
 Unlike `numericHeatmapPlot`, this recipe emits one owned raster instead of one
 UniVector rectangle per cell. Nearest-neighbour filtering is the default for
