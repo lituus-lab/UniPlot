@@ -113,6 +113,29 @@ suite "plot compilation":
         discard violinPlot([1.0, 2.0], width = 0.0)
     expect PlotError: discard violinPlot([NaN, Inf])
 
+  test "grouped violins retain first-seen categorical placement":
+    let spec = violinPlot(
+      ["beta", "alpha", "beta", "alpha", "beta", "alpha"],
+      [-1.0, 2.0, 0.0, 3.0, 1.0, 4.0], pointCount = 33)
+    check spec.layers.len == 1
+    check spec.layers[0].mark == mkPolygon
+    check spec.layers[0].mapping.xOffset == "violinOffset"
+    check spec.data.categorical("group")[0] == "beta"
+    let scene = spec.compileScene(Size(width: 480, height: 320))
+    check scene.nodes.countIt(it.kind == snPath and it.id != 0) == 2
+
+  test "grouped violins validate aligned and sufficient groups":
+    when not defined(release) and not defined(danger):
+      expect PreConditionDefect:
+        discard violinPlot(["a"], [1.0, 2.0])
+    else:
+      expect PlotError:
+        discard violinPlot(["a"], [1.0, 2.0])
+    expect PlotError:
+      discard violinPlot(["a", "b", "b"], [1.0, 2.0, 3.0])
+    expect PlotError:
+      discard violinPlot(["a", "a"], [NaN, Inf])
+
   test "layers compile in deterministic order":
     let scene = sample().compileScene(Size(width: 640, height: 400))
     check scene.size.width == 640

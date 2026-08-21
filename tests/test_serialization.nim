@@ -42,6 +42,12 @@ suite "PlotSpec JSON schema":
     check restored.layers[0].mark == mkPolygon
     check restored.toJson == encoded
 
+    let grouped = violinPlot(["b", "a", "b", "a"],
+      [1.0, 3.0, 2.0, 4.0], pointCount = 17)
+    let groupedRestored = fromJson(grouped.toJson)
+    check groupedRestored.layers[0].mapping.xOffset == "violinOffset"
+    check groupedRestored.toJson == grouped.toJson
+
   test "numeric rectangle bounds round trip as optional mappings":
     var frame = initDataFrame()
     frame.addColumn("left", [0.0])
