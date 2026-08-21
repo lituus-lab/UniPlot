@@ -39,6 +39,8 @@ cdef extern from "UniPlot.h":
     int uplot_add_linear_smooth(uplot_plot *, const double *, const double *,
                                 size_t, int, double, int, const char *,
                                 const char *)
+    int uplot_add_density(uplot_plot *, const double *, size_t, int, double,
+                          const char *, const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -437,6 +439,32 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid linear smoothing input or non-empty plot")
+        return self
+
+    def density(self, values, int point_count=512, double bandwidth=0.0,
+                fill_color="#3366cc40", line_color="#3366cc"):
+        values = list(values)
+        if len(values) < 2:
+            raise ValueError("density requires at least two observations")
+        cdef size_t count = len(values)
+        cdef double *items = <double *>malloc(count * sizeof(double))
+        cdef bytes encoded_fill = str(fill_color).encode("utf-8")
+        cdef bytes encoded_line = str(line_color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if items == NULL:
+            raise MemoryError()
+        try:
+            for index in range(count):
+                items[index] = float(values[index])
+            status = uplot_add_density(self._handle, items, count,
+                point_count, bandwidth, encoded_fill, encoded_line)
+        finally:
+            free(items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid density input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
