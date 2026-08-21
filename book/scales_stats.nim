@@ -438,13 +438,39 @@ the frame but omitted by the mark's missing-value policy. At least one finite
 cell is needed to train the default continuous colour guide.
 
 The recipe produces ordinary numeric `geomRect` paths and a continuous
-UniColor guide. It is a vector-cell heatmap, not an image sampler: dense raster
-heatmap recipes and contour estimation remain separate roadmap items. Generic
+UniColor guide. It is a vector-cell heatmap, not an image sampler. Generic
 retained rasters and data-mapped image marks are documented in the grammar
 chapter.
+
+## Rectilinear contours
+"""
+
+nbCode:
+  let contourValues = [0.0, 1.0, 2.0, 1.0, 2.0, 3.0, 2.0, 3.0, 4.0]
+  var contours = contourPlot([0.0, 1.0, 2.0], [0.0, 1.0, 2.0],
+    contourValues, [1.0, 2.0, 3.0], width = 2)
+  contours.labels(title = "Rectilinear marching squares", x = "x", y = "y")
+  let contourSvg = contours.compileScene(Size(width: 720, height: 420)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(contourSvg,
+  "Three contour levels extracted once and shared by every backend.")
+
+nbText: """
+`contourSegments(xs, ys, values, levels)` accepts finite, strictly increasing
+rectilinear coordinates and a row-major scalar grid. It skips a cell if any of
+its four samples is non-finite. Ambiguous saddle cells use their finite centre
+value as a deterministic asymptotic decider. Levels are also finite and
+strictly increasing.
+
+`contourPlot` materialises every extracted segment as a retained `geomLine`
+path separated by explicit missing rows. The CPU, SVG, PNG and WGPU backends
+therefore consume identical contour geometry; no backend reruns the statistic.
+The current recipe uses one line style for all requested levels. Filled
+contours remain outside the 1.0 contract.
 
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
 nbSave
-validatePage("scales_stats.html", minSvg = 9)
+validatePage("scales_stats.html", minSvg = 10)

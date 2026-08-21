@@ -53,6 +53,8 @@ statistics. Type-7 quantiles and range-safe means delegate to UniStatistics,
 keeping CPU and GPU output equivalent without a second implementation.
 Gaussian density and violin recipes likewise reuse UniStatistics bandwidths
 and kernels, then materialise ordinary retained area, line and polygon marks.
+Rectilinear contours are extracted once with deterministic marching squares
+and retained as ordinary broken line paths for every renderer.
 
 ## 1.0 contract
 

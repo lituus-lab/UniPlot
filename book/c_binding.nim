@@ -144,6 +144,9 @@ int main(void) {
   mirrored retained polygon with an explicit positive width.
 - `uplot_add_grouped_violin` copies aligned group/value arrays, retains
   first-seen categories and places one mirrored density inside each band.
+- `uplot_add_contours` copies rectilinear x/y coordinates, a row-major scalar
+  grid and ordered levels, then retains deterministic marching-squares lines.
+  Cells containing a non-finite sample are skipped.
 - `uplot_set_x_scale` / `uplot_set_y_scale` select linear, base-10 logarithmic
   or fixed-unit symmetric-logarithmic coordinates and may reverse direction.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves

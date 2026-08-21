@@ -89,7 +89,9 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Gaussian kernel density plots in Nim, C and Python through UniStatistics.
 - [x] Single and first-seen grouped violin plots in Nim, C and Python through
       retained polygon geometry and UniStatistics.
-- [ ] Contours and raster/image heatmaps.
+- [x] Rectilinear marching-squares contours in Nim, C and Python, materialised
+      as backend-neutral retained line paths.
+- [ ] Dense raster/image heatmap recipes.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [x] First-seen categorical two-dimensional aggregation with explicit absent
   cells and UniAccurate compensated sum/mean.
