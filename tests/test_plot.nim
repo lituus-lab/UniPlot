@@ -64,6 +64,29 @@ suite "plot compilation":
         discard densityPlot([1.0, 2.0], pointCount = 1)
     expect PlotError: discard densityPlot([NaN, Inf])
 
+  test "polygon layers preserve ordered vertices and explicit gaps":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 2.0, 1.0, NaN, 3.0, 5.0, 4.0])
+    frame.addColumn("y", [0.0, 0.0, 2.0, NaN, 0.0, 0.0, 2.0])
+    var spec = plot(frame)
+    spec.geomPolygon(aes("x", "y"), missingValues = BreakOnMissing)
+    let scene = spec.compileScene(Size(width: 480, height: 320))
+    check scene.nodes.countIt(it.kind == snPath and it.id != 0) == 2
+
+  test "polygon layers reject incomplete finite segments":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 1.0])
+    frame.addColumn("y", [0.0, 1.0])
+    var spec = plot(frame)
+    spec.geomPolygon(aes("x", "y"))
+    expect PlotError: discard spec.compileScene(Size(width: 320, height: 240))
+    var categorical = initDataFrame()
+    categorical.addColumn("x", ["a", "b", "c"])
+    categorical.addColumn("y", [0.0, 1.0, 0.0])
+    var categoricalSpec = plot(categorical)
+    categoricalSpec.geomPolygon(aes("x", "y"))
+    expect PlotError: discard categoricalSpec.compileScene()
+
   test "layers compile in deterministic order":
     let scene = sample().compileScene(Size(width: 640, height: 400))
     check scene.size.width == 640

@@ -31,6 +31,17 @@ proc completeSpec(): PlotSpec =
   result.applyTheme(darkTheme())
 
 suite "PlotSpec JSON schema":
+  test "polygon marks round trip without changing earlier enum codes":
+    var frame = initDataFrame()
+    frame.addColumn("x", [0.0, 2.0, 1.0])
+    frame.addColumn("y", [0.0, 0.0, 2.0])
+    var spec = plot(frame)
+    spec.geomPolygon(aes("x", "y"), color = "#22446688")
+    let encoded = spec.toJson
+    let restored = fromJson(encoded)
+    check restored.layers[0].mark == mkPolygon
+    check restored.toJson == encoded
+
   test "numeric rectangle bounds round trip as optional mappings":
     var frame = initDataFrame()
     frame.addColumn("left", [0.0])
