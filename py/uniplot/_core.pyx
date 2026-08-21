@@ -41,6 +41,8 @@ cdef extern from "UniPlot.h":
                                 const char *)
     int uplot_add_density(uplot_plot *, const double *, size_t, int, double,
                           const char *, const char *)
+    int uplot_add_violin(uplot_plot *, const double *, size_t, int, double,
+                         double, const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -465,6 +467,31 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid density input or non-empty plot")
+        return self
+
+    def violin(self, values, int point_count=256, double bandwidth=0.0,
+                double width=0.8, color="#3366cc80"):
+        values = list(values)
+        if len(values) < 2:
+            raise ValueError("violin requires at least two observations")
+        cdef size_t count = len(values)
+        cdef double *items = <double *>malloc(count * sizeof(double))
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if items == NULL:
+            raise MemoryError()
+        try:
+            for index in range(count):
+                items[index] = float(values[index])
+            status = uplot_add_violin(self._handle, items, count,
+                point_count, bandwidth, width, encoded_color)
+        finally:
+            free(items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid violin input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
