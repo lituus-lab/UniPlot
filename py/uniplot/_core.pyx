@@ -43,6 +43,8 @@ cdef extern from "UniPlot.h":
                           const char *, const char *)
     int uplot_add_violin(uplot_plot *, const double *, size_t, int, double,
                          double, const char *)
+    int uplot_add_grouped_violin(uplot_plot *, const char **, const double *,
+                                 size_t, int, double, double, const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -497,6 +499,40 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid violin input or non-empty plot")
+        return self
+
+    def grouped_violin(self, groups, values, int point_count=256,
+                       double bandwidth=0.0, double width=0.8,
+                       color="#3366cc80"):
+        groups = list(groups)
+        values = list(values)
+        if len(groups) != len(values) or len(groups) < 2:
+            raise ValueError("groups and values must have equal lengths")
+        cdef list encoded_groups = [str(group).encode("utf-8")
+                                    for group in groups]
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t count = len(values)
+        cdef const char **group_items = <const char **>malloc(
+            count * sizeof(const char *))
+        cdef double *number_items = <double *>malloc(count * sizeof(double))
+        cdef size_t index
+        cdef int status
+        if group_items == NULL or number_items == NULL:
+            free(group_items); free(number_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                group_items[index] = encoded_groups[index]
+                number_items[index] = float(values[index])
+            status = uplot_add_grouped_violin(
+                self._handle, group_items, number_items, count, point_count,
+                bandwidth, width, encoded_color)
+        finally:
+            free(group_items); free(number_items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid grouped violin input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
