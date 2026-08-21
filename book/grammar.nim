@@ -286,6 +286,29 @@ At least two finite observations are required. `bandwidth = 0` selects the
 automatic rule; any explicit bandwidth must be finite and positive. The
 evaluation grid accepts between 2 and 100,000 points.
 
+## Violin density
+
+`violinPlot` reuses the same UniStatistics estimate, normalises its maximum to
+the requested visual width and mirrors the ordered curve into one retained
+polygon. It does not introduce a backend-specific density renderer.
+"""
+
+nbCode:
+  let violin = violinPlot(
+    [-2.4, -2.0, -1.7, -1.1, -0.8, 0.6, 0.9, 1.2, 1.7, 2.1, 2.5],
+    pointCount = 160, width = 0.8, color = "#267a5e99")
+  let violinSvg = violin.compileScene(
+    Size(width: 560, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(violinSvg,
+  "Mirrored Gaussian density materialised as one retained polygon.")
+
+nbText: """
+The version-1 recipe represents one sample distribution with observations on
+the y axis. Width is finite, positive and unitless. Grouped categorical
+placement remains an explicit future grammar extension rather than an
+implicit screen-coordinate offset.
+
 ## Legends
 
 A non-empty `legend` argument names a layer. Calling `legend` on the plot

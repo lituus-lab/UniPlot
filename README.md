@@ -51,6 +51,8 @@ common < data < scales < stats < grammar < scene < guides < render < c_api
 Backends consume the scene. They never participate in scale training, layout or
 statistics. Type-7 quantiles and range-safe means delegate to UniStatistics,
 keeping CPU and GPU output equivalent without a second implementation.
+Gaussian density and violin recipes likewise reuse UniStatistics bandwidths
+and kernels, then materialise ordinary retained area, line and polygon marks.
 
 ## 1.0 contract
 

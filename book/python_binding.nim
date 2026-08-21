@@ -148,6 +148,8 @@ same UniStatistics fit as Nim and C. It returns the plot for chaining and may
 disable the retained confidence ribbon with `show_confidence=False`.
 `Plot.density(values, point_count=512, bandwidth=0)` builds the corresponding
 UniStatistics Gaussian density area and outline.
+`Plot.violin(values, point_count=256, bandwidth=0, width=0.8)` mirrors that
+estimate into one retained polygon.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """

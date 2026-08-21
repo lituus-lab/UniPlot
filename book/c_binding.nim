@@ -140,6 +140,8 @@ int main(void) {
   publication.
 - `uplot_add_density` copies samples and materialises a Gaussian density area
   plus outline. Bandwidth zero selects the UniStatistics automatic rule.
+- `uplot_add_violin` copies samples and materialises the same estimate as one
+  mirrored retained polygon with an explicit positive width.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.
