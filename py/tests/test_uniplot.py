@@ -43,6 +43,18 @@ def test_temporal_axis_labels_round_trip_and_render():
     assert plot.x_axis_labels(uniplot.AXIS_NUMERIC) is plot
     assert plot.y_axis_labels(uniplot.AXIS_NUMERIC) is plot
 
+def test_symmetric_log_scales_round_trip_and_render():
+    plot = (uniplot.Plot(480, 320)
+            .line([-99, -9, 0, 9, 99], [-99, -9, 0, 9, 99])
+            .scale_x(uniplot.SCALE_SYMLOG10)
+            .scale_y(uniplot.SCALE_SYMLOG10, reversed=True))
+    encoded = plot.to_json()
+    assert "skSymLog10" in encoded
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert uniplot.Plot.from_json(encoded, 480, 320).to_json() == encoded
+    with pytest.raises(ValueError):
+        plot.scale_x(99)
+
 def test_plot_grid_renders_svg_and_png():
     first = uniplot.Plot().line([0, 1, 2], [1, 3, 2]).title("first")
     second = uniplot.Plot().scatter([0, 1, 2], [2, 1, 3]).title("second")
