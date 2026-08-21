@@ -233,6 +233,17 @@ def test_linear_smoothing_renders_and_validates_contracts():
     with pytest.raises(ValueError):
         configured.linear_smooth([1, 2, 3], [1, 2, 3])
 
+def test_density_renders_and_validates_contracts():
+    plot = uniplot.Plot().density([-2, -1, 0, 1, 2], point_count=65)
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        uniplot.Plot().density([1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().density([1, 2], point_count=1)
+    configured = uniplot.Plot().title("configured")
+    with pytest.raises(ValueError):
+        configured.density([1, 2, 3])
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
