@@ -56,6 +56,10 @@ typedef enum {
   UPLOT_SCALE_POWER = 3
 } uplot_scale_kind;
 typedef enum {
+  UPLOT_COORD_CARTESIAN = 0,
+  UPLOT_COORD_POLAR = 1
+} uplot_coordinate_kind;
+typedef enum {
   UPLOT_HISTOGRAM_AUTO = 0,
   UPLOT_HISTOGRAM_SQUARE_ROOT = 1,
   UPLOT_HISTOGRAM_STURGES = 2,
@@ -166,6 +170,8 @@ int uplot_set_x_scale(uplot_plot *, int scale, int reversed);
 int uplot_set_y_scale(uplot_plot *, int scale, int reversed);
 int uplot_set_x_power_scale(uplot_plot *, double exponent, int reversed);
 int uplot_set_y_power_scale(uplot_plot *, double exponent, int reversed);
+/* Polar x values are radians in [0, 2*pi]; y values are non-negative radii. */
+int uplot_set_coordinates(uplot_plot *, int coordinates);
 int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
                           const char *label);
 int uplot_clear_secondary_y(uplot_plot *);
