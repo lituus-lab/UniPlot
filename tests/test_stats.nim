@@ -240,6 +240,23 @@ suite "statistics":
     expect PlotError:
       discard numericHeatmapPlot([-1e308, 1e308], [0.0, 1.0], [1.0])
 
+  test "dense heatmaps retain palette-mapped RGBA rasters":
+    let heat = rasterHeatmapPlot(2, 2,
+      [-1e308, 0.0, 1e308, NaN], 0.0, 2.0, 10.0, 20.0)
+    check heat.rasters.len == 1
+    check heat.rasters[0].image.width == 2
+    check heat.rasters[0].image.height == 2
+    check heat.rasters[0].image.channels == 4
+    check heat.rasters[0].image.data[3] == 255
+    check heat.rasters[0].image.data[15] == 0
+    discard heat.compileScene()
+    let constant = rasterHeatmapPlot(1, 1, [4.0], 0.0, 1.0, 0.0, 1.0)
+    check constant.rasters[0].image.data[3] == 255
+    expect PlotError:
+      discard rasterHeatmapPlot(2, 2, [1.0], 0.0, 1.0, 0.0, 1.0)
+    expect PlotError:
+      discard rasterHeatmapPlot(1, 1, [NaN], 0.0, 1.0, 0.0, 1.0)
+
   test "marching squares extracts plane and saddle contours deterministically":
     let plane = contourSegments([0.0, 1.0], [0.0, 1.0],
       [0.0, 1.0, 1.0, 2.0], [1.0])
