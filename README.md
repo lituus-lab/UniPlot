@@ -15,7 +15,7 @@ rendering engines.
 ## What is inside
 
 - typed columns, rows and finite-value filtering;
-- linear, logarithmic and categorical scales;
+- linear, logarithmic, symmetric-logarithmic and categorical scales;
 - CSS colour styling through UniColor;
 - categorical colour mappings backed by immutable UniColor palettes;
 - numeric colour and fill mappings with UniColor ramps and color bars;

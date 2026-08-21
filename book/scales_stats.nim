@@ -24,18 +24,21 @@ nbCode:
 
   let linear = continuousScale(0.0, 100.0, 70'f32, 670'f32)
   let logarithmic = continuousScale(1.0, 1000.0, 0'f32, 1'f32, skLog10)
+  let symmetric = continuousScale(-99.0, 99.0, 0'f32, 1'f32, skSymLog10)
   let trained = trainContinuous([4.0, NaN, 8.0, 15.0], 0'f32, 300'f32)
 
   echo "linear 25 -> ", linear.map(25)
   echo "linear ticks -> ", linear.ticks(5)
   echo "log ticks -> ", logarithmic.ticks(4)
+  echo "symmetric-log ticks -> ", symmetric.ticks(3)
   echo "trained domain -> ", trained.domainMin, " .. ", trained.domainMax
   echo "scientific label -> ", tickLabel(0.0000123)
 
 nbText: """
 `ContinuousScale` maps a finite domain into a float32 range. `skLinear` uses
 ordinary interpolation; `skLog10` requires a positive domain and positive
-mapped values. `trainContinuous` ignores non-finite samples and pads a constant
+mapped values; `skSymLog10` accepts every finite sign. `trainContinuous`
+ignores non-finite samples and pads a constant
 domain. `ticks` requires at least two ticks; `tickLabel` selects compact or
 scientific notation.
 
@@ -90,9 +93,11 @@ non-numeric.
 """
 
 nbText: """
-`scaleX` and `scaleY` select `skLinear` or `skLog10` and independently reverse
-the output direction. Logarithmic coordinates reject non-positive mapped
-values. Categorical x coordinates remain linear; bars and areas reject a
+`scaleX` and `scaleY` select `skLinear`, `skLog10` or `skSymLog10` and
+independently reverse the output direction. Logarithmic coordinates reject
+non-positive mapped values. Symmetric-logarithmic coordinates use
+`sign(x) * log10(1 + abs(x))`, retain zero and label ticks in original units.
+Categorical x coordinates remain linear; bars and areas reject a
 logarithmic y coordinate because their current semantic baseline is zero.
 
 `xLimits(minimum, maximum)` and `yLimits(minimum, maximum)` fix a numeric

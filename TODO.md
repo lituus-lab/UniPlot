@@ -77,7 +77,8 @@ silently claimed by the focused 1.0 publication contract.
 - [x] Logarithmic transformed and reversed Cartesian axes.
 - [x] Deterministic UTC date/time and signed-duration axes using the numeric
   retained-scene path defined by ADR-0010.
-- [ ] Additional numeric transforms and polar coordinates.
+- [x] Fixed-unit symmetric-logarithmic numeric transforms in Nim, C and Python.
+- [ ] Configurable power transforms and polar coordinates.
 - [x] Error bars and ribbons with explicit numeric bounds and missing-value
       policies.
 - [x] Grouped box plots with type-7 quartiles, Tukey whiskers and outliers in
