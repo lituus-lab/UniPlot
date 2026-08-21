@@ -96,6 +96,12 @@ int uplot_add_numeric_histogram(uplot_plot *, const double *values,
 int uplot_add_automatic_histogram(uplot_plot *, const double *values,
                                   size_t value_count, int rule, int density,
                                   const char *color);
+/* Build a retained linear fit and optional mean-confidence ribbon. Inputs are
+ * copied; the caller retains ownership of both arrays. */
+int uplot_add_linear_smooth(uplot_plot *, const double *x, const double *y,
+                            size_t count, int point_count,
+                            double confidence_level, int show_confidence,
+                            const char *line_color, const char *band_color);
 int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
                                 const double *values, size_t count,
                                 int aggregation, const char *color);

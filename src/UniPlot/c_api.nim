@@ -395,6 +395,38 @@ proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
+    count: csize_t; pointCount: cint; confidenceLevel: float64;
+    showConfidence: cint; lineColor, bandColor: cstring): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or valuesX.isNil or valuesY.isNil or count < 3 or
+      count > csize_t(high(int)) or pointCount < 2 or pointCount > 10_000 or
+      showConfidence notin [cint(0), cint(1)] or lineColor.isNil or
+      bandColor.isNil:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputX = cast[ptr UncheckedArray[float64]](valuesX)
+      inputY = cast[ptr UncheckedArray[float64]](valuesY)
+    var
+      copiedX = newSeqUninit[float64](int(count))
+      copiedY = newSeqUninit[float64](int(count))
+    for index in 0 ..< int(count):
+      copiedX[index] = inputX[index]
+      copiedY[index] = inputY[index]
+    let candidate = linearSmoothPlot(copiedX, copiedY, int(pointCount),
+      confidenceLevel, showConfidence == 1, $lineColor, $bandColor)
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
