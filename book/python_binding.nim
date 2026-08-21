@@ -150,6 +150,8 @@ disable the retained confidence ribbon with `show_confidence=False`.
 UniStatistics Gaussian density area and outline.
 `Plot.violin(values, point_count=256, bandwidth=0, width=0.8)` mirrors that
 estimate into one retained polygon.
+`Plot.grouped_violin(groups, values, ...)` retains first-seen categories and
+places each group inside its categorical band.
 `Plot.scale_x` / `Plot.scale_y` accept `SCALE_LINEAR`, `SCALE_LOG10` or
 `SCALE_SYMLOG10` and an independent `reversed` flag.
 

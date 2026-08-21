@@ -304,10 +304,27 @@ nbRawHtml svgFigure(violinSvg,
   "Mirrored Gaussian density materialised as one retained polygon.")
 
 nbText: """
-The version-1 recipe represents one sample distribution with observations on
-the y axis. Width is finite, positive and unitless. Grouped categorical
-placement remains an explicit future grammar extension rather than an
-implicit screen-coordinate offset.
+The single-sample recipe represents observations on the y axis. Width is
+finite, positive and unitless. The grouped overload uses first-seen categories
+and numeric `xOffset` values expressed as fractions of band width, never
+implicit backend pixels.
+"""
+
+nbCode:
+  let groupedViolin = violinPlot(
+    ["control", "treated", "control", "treated", "control", "treated"],
+    [-1.2, 0.4, -0.2, 1.3, 0.8, 2.1], pointCount = 96,
+    color = "#d65f2d99")
+  let groupedViolinSvg = groupedViolin.compileScene(
+    Size(width: 640, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(groupedViolinSvg,
+  "First-seen grouped violins placed in categorical band coordinates.")
+
+nbText: """
+Each rendered group requires at least two finite observations. Missing values
+are ignored; empty group names and groups with fewer than two retained values
+are rejected before publication.
 
 ## Legends
 

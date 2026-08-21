@@ -142,6 +142,8 @@ int main(void) {
   plus outline. Bandwidth zero selects the UniStatistics automatic rule.
 - `uplot_add_violin` copies samples and materialises the same estimate as one
   mirrored retained polygon with an explicit positive width.
+- `uplot_add_grouped_violin` copies aligned group/value arrays, retains
+  first-seen categories and places one mirrored density inside each band.
 - `uplot_set_x_scale` / `uplot_set_y_scale` select linear, base-10 logarithmic
   or fixed-unit symmetric-logarithmic coordinates and may reverse direction.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves

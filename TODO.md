@@ -87,9 +87,9 @@ silently claimed by the focused 1.0 publication contract.
   Nim, C and Python.
 - [x] Variable-size numeric vector-cell heatmaps in Nim, C and Python.
 - [x] Gaussian kernel density plots in Nim, C and Python through UniStatistics.
-- [x] Single-distribution violin plots in Nim, C and Python through retained
-      polygon geometry and UniStatistics.
-- [ ] Grouped violins, contours and raster/image heatmaps.
+- [x] Single and first-seen grouped violin plots in Nim, C and Python through
+      retained polygon geometry and UniStatistics.
+- [ ] Contours and raster/image heatmaps.
 - [x] Type-7 quantiles and reusable descriptive summaries with Tukey whiskers.
 - [x] First-seen categorical two-dimensional aggregation with explicit absent
   cells and UniAccurate compensated sum/mean.
