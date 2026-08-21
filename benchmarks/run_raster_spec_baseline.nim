@@ -36,7 +36,8 @@ proc main() =
           "semantics", "image_mark_count", "image_resource_count",
           "temporal_point_count", "histogram_point_count", "histogram_rule",
           "smoothing_point_count", "smoothing_grid_count", "contour_grid",
-          "contour_level_count", "dense_grid", "power_point_count"]:
+          "contour_level_count", "dense_grid", "power_point_count",
+          "polar_point_count"]:
         if reports[run][field] != reports[0][field]:
           quit("benchmark invariant changed between runs: " & field, 1)
       for field in ["density_point_count", "density_grid_count"]:
@@ -74,6 +75,7 @@ proc main() =
     "contour_level_count": first["contour_level_count"],
     "dense_grid": first["dense_grid"],
     "power_point_count": first["power_point_count"],
+    "polar_point_count": first["polar_point_count"],
     "construction_snapshot": phase("construction_snapshot_mean_ms"),
     "compile": phase("compile_mean_ms"),
     "publication": phase("publication_mean_ms"),
@@ -105,6 +107,9 @@ proc main() =
   result["power_construction"] = phase("power_construction_mean_ms")
   result["power_compile"] = phase("power_compile_mean_ms")
   result["power_publication"] = phase("power_publication_mean_ms")
+  result["polar_construction"] = phase("polar_construction_mean_ms")
+  result["polar_compile"] = phase("polar_compile_mean_ms")
+  result["polar_publication"] = phase("polar_publication_mean_ms")
   let encoded = pretty(result) & "\n"
   echo encoded
   writeFile(output, encoded)

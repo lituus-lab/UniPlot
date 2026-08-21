@@ -3,7 +3,7 @@
 import std/[json, monotimes, os, stats, strutils, times]
 import UniGlyph
 import UniImage/core as uimg
-from UniMath import cos, sin
+from UniMath import PI, cos, sin
 import UniPlot
 import UniStatistics as statistics
 
@@ -115,6 +115,15 @@ proc main() =
     result = linePlot(temporalY, temporalY)
     result.scaleXPower(0.5)
     result.scaleYPower(2.0)
+  var polarAngle = newSeq[float64](1_000)
+  var polarRadius = newSeq[float64](1_000)
+  for index in 0 ..< polarAngle.len:
+    polarAngle[index] = 2.0 * PI * float64(index) /
+      float64(polarAngle.len - 1)
+    polarRadius[index] = 2.0 + 0.75 * sin(6.0 * polarAngle[index])
+  proc makePolarSpec(): PlotSpec =
+    result = linePlot(polarAngle, polarRadius)
+    result.coordPolar()
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
@@ -142,6 +151,8 @@ proc main() =
     discard warmDense.renderImage(font)
     let warmPower = makePowerSpec().compileScene(Size(width: 800, height: 600))
     discard warmPower.renderImage(font)
+    let warmPolar = makePolarSpec().compileScene(Size(width: 800, height: 600))
+    discard warmPolar.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
@@ -158,6 +169,8 @@ proc main() =
   var denseConstructionStats, denseCompileStats, densePublicationStats:
     RunningStat
   var powerConstructionStats, powerCompileStats, powerPublicationStats:
+    RunningStat
+  var polarConstructionStats, polarCompileStats, polarPublicationStats:
     RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
@@ -278,6 +291,17 @@ proc main() =
     powerPublicationStats.push elapsedMs(started)
     guard = guard xor int(powerPixels.data[
       (iteration * 4789) mod powerPixels.data.len])
+    started = getMonoTime()
+    let polarSpec = makePolarSpec()
+    polarConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let polarScene = polarSpec.compileScene(Size(width: 800, height: 600))
+    polarCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let polarPixels = polarScene.renderImage(font)
+    polarPublicationStats.push elapsedMs(started)
+    guard = guard xor int(polarPixels.data[
+      (iteration * 4999) mod polarPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
@@ -291,6 +315,7 @@ proc main() =
     "density_grid_count": 256,
     "contour_grid": "128x128", "contour_level_count": contourLevels.len,
     "dense_grid": "256x256", "power_point_count": temporalY.len,
+    "polar_point_count": polarAngle.len,
     "semantics": "separate PlotSpec construction, statistical selection or fitting, retained-scene compilation and complete CPU publication",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
@@ -323,6 +348,9 @@ proc main() =
     "power_construction_mean_ms": powerConstructionStats.mean,
     "power_compile_mean_ms": powerCompileStats.mean,
     "power_publication_mean_ms": powerPublicationStats.mean,
+    "polar_construction_mean_ms": polarConstructionStats.mean,
+    "polar_compile_mean_ms": polarCompileStats.mean,
+    "polar_publication_mean_ms": polarPublicationStats.mean,
     "guard": guard})
 
 main()
