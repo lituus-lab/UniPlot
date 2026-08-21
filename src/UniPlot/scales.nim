@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[math, strformat, strutils, tables, times]
+import std/[strformat, strutils, tables, times]
+import UniMath
 import UniPlot/common
 
 type
   ScaleKind* = enum
     skLinear
     skLog10
+    skSymLog10
 
   AxisLabelKind* = enum
     alkNumeric
@@ -111,13 +113,29 @@ proc interpolate(first, last, ratio: float64): float64 =
   if not result.isFinite:
     raise newException(PlotError, "scale interpolation is not finite")
 
+proc transformed(kind: ScaleKind; value: float64): float64 =
+  case kind
+  of skLinear: value
+  of skLog10: log10(value)
+  of skSymLog10:
+    let magnitude = log1p(abs(value)) / ln(10.0)
+    if value < 0.0: -magnitude else: magnitude
+
+proc inverseTransformed(kind: ScaleKind; value: float64): float64 =
+  case kind
+  of skLinear: value
+  of skLog10: pow(10.0, value)
+  of skSymLog10:
+    let magnitude = expm1(abs(value) * ln(10.0))
+    if value < 0.0: -magnitude else: magnitude
+
 proc map*(scale: ContinuousScale; value: float64): float32 =
   if not value.isFinite or (scale.kind == skLog10 and value <= 0):
     raise newException(PlotError, "value is outside the scale domain")
   let
-    a = if scale.kind == skLog10: log10(scale.domainMin) else: scale.domainMin
-    b = if scale.kind == skLog10: log10(scale.domainMax) else: scale.domainMax
-    v = if scale.kind == skLog10: log10(value) else: value
+    a = scale.kind.transformed(scale.domainMin)
+    b = scale.kind.transformed(scale.domainMax)
+    v = scale.kind.transformed(value)
     t = interpolationRatio(v, a, b)
     mapped = interpolate(float64(scale.rangeMin), float64(scale.rangeMax), t)
   result = float32(mapped)
@@ -134,11 +152,14 @@ proc ticks*(scale: ContinuousScale; count = 5): seq[float64] =
   if count < 2: raise newException(PlotError, "tick count must be at least two")
   for i in 0 ..< count:
     let t = float64(i) / float64(count - 1)
-    let value = if scale.kind == skLinear:
-        interpolate(scale.domainMin, scale.domainMax, t)
+    let value = if i == 0: scale.domainMin
+      elif i == count - 1: scale.domainMax
       else:
-        pow(10.0, log10(scale.domainMin) + t *
-          (log10(scale.domainMax) - log10(scale.domainMin)))
+        scale.kind.inverseTransformed(interpolate(
+          scale.kind.transformed(scale.domainMin),
+          scale.kind.transformed(scale.domainMax), t))
+    if not value.isFinite:
+      raise newException(PlotError, "scale tick is not finite")
     if result.len == 0 or value != result[^1]: result.add value
   if result.len == 1 and scale.domainMax != result[0]:
     result.add scale.domainMax
