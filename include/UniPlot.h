@@ -121,6 +121,13 @@ int uplot_add_grouped_violin(uplot_plot *, const char *const *groups,
                              const double *values, size_t count,
                              int point_count, double bandwidth, double width,
                              const char *color);
+/* Extract retained marching-squares contours from a row-major rectilinear
+ * grid. All arrays are copied and remain caller-owned. */
+int uplot_add_contours(uplot_plot *, const double *x, size_t x_count,
+                       const double *y, size_t y_count,
+                       const double *values, size_t value_count,
+                       const double *levels, size_t level_count,
+                       const char *color, double width);
 int uplot_add_grouped_aggregate(uplot_plot *, const char *const *groups,
                                 const double *values, size_t count,
                                 int aggregation, const char *color);

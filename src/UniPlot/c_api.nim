@@ -511,6 +511,47 @@ proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
+    ys: ptr float64; yCount: csize_t; values: ptr float64;
+    valueCount: csize_t; levels: ptr float64; levelCount: csize_t;
+    color: cstring; width: float64): cint {.exportc, dynlib, cdecl.} =
+  if value.isNil or xs.isNil or ys.isNil or values.isNil or levels.isNil or
+      color.isNil or xCount < 2 or yCount < 2 or levelCount == 0 or
+      xCount > csize_t(high(int)) or yCount > csize_t(high(int)) or
+      valueCount > csize_t(high(int)) or levelCount > csize_t(high(int)) or
+      xCount > csize_t(high(int)) div yCount or valueCount != xCount * yCount or
+      width < 0.0 or not width.isFinite or width > float64(high(float32)):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let h = handle(value)
+    if not h.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let
+      inputXs = cast[ptr UncheckedArray[float64]](xs)
+      inputYs = cast[ptr UncheckedArray[float64]](ys)
+      inputValues = cast[ptr UncheckedArray[float64]](values)
+      inputLevels = cast[ptr UncheckedArray[float64]](levels)
+    var
+      copiedXs = newSeqUninit[float64](int(xCount))
+      copiedYs = newSeqUninit[float64](int(yCount))
+      copiedValues = newSeqUninit[float64](int(valueCount))
+      copiedLevels = newSeqUninit[float64](int(levelCount))
+    for index in 0 ..< copiedXs.len: copiedXs[index] = inputXs[index]
+    for index in 0 ..< copiedYs.len: copiedYs[index] = inputYs[index]
+    for index in 0 ..< copiedValues.len:
+      copiedValues[index] = inputValues[index]
+    for index in 0 ..< copiedLevels.len:
+      copiedLevels[index] = inputLevels[index]
+    let candidate = contourPlot(copiedXs, copiedYs, copiedValues,
+      copiedLevels, $color, float32(width))
+    h.spec = candidate
+    h.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
