@@ -35,6 +35,7 @@ from ._core import (
     RASTER_NEAREST,
     SCALE_LINEAR,
     SCALE_LOG10,
+    SCALE_POWER,
     SCALE_SYMLOG10,
     Plot,
     abi_version,
@@ -58,7 +59,7 @@ __all__ = [
     "MARKER_PLUS", "MARKER_SQUARE", "MARKER_TRIANGLE", "Plot",
     "MISSING_BREAK", "MISSING_DROP", "MISSING_REJECT",
     "RASTER_BILINEAR", "RASTER_BOX", "RASTER_NEAREST",
-    "SCALE_LINEAR", "SCALE_LOG10", "SCALE_SYMLOG10",
+    "SCALE_LINEAR", "SCALE_LOG10", "SCALE_POWER", "SCALE_SYMLOG10",
     "abi_version", "facet_matrix_png", "facet_matrix_svg", "facet_png",
     "facet_svg", "grid_png", "grid_svg", "version", "__version__",
 ]

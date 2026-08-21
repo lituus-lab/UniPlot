@@ -74,6 +74,8 @@ cdef extern from "UniPlot.h":
     int uplot_set_y_axis_labels(uplot_plot *, int, int)
     int uplot_set_x_scale(uplot_plot *, int, int)
     int uplot_set_y_scale(uplot_plot *, int, int)
+    int uplot_set_x_power_scale(uplot_plot *, double, int)
+    int uplot_set_y_power_scale(uplot_plot *, double, int)
     int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
     int uplot_clear_secondary_y(uplot_plot *)
     int uplot_annotate_text(uplot_plot *, double, double, const char *,
@@ -138,6 +140,7 @@ AXIS_DURATION = 2
 SCALE_LINEAR = 0
 SCALE_LOG10 = 1
 SCALE_SYMLOG10 = 2
+SCALE_POWER = 3
 HISTOGRAM_AUTO = 0
 HISTOGRAM_SQUARE_ROOT = 1
 HISTOGRAM_STURGES = 2
@@ -701,6 +704,18 @@ cdef class Plot:
     def scale_y(self, int kind=SCALE_LINEAR, bint reversed=False):
         if uplot_set_y_scale(self._handle, kind, int(reversed)) != 0:
             raise ValueError("invalid y scale")
+        return self
+
+    def scale_x_power(self, double exponent, bint reversed=False):
+        if uplot_set_x_power_scale(
+                self._handle, exponent, int(reversed)) != 0:
+            raise ValueError("invalid x power scale")
+        return self
+
+    def scale_y_power(self, double exponent, bint reversed=False):
+        if uplot_set_y_power_scale(
+                self._handle, exponent, int(reversed)) != 0:
+            raise ValueError("invalid y power scale")
         return self
 
     def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
