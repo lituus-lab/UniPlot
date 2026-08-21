@@ -87,6 +87,32 @@ suite "plot compilation":
     categoricalSpec.geomPolygon(aes("x", "y"))
     expect PlotError: discard categoricalSpec.compileScene()
 
+  test "violin recipe mirrors a UniStatistics density into a polygon":
+    let spec = violinPlot([-2.0, -1.0, 0.0, 1.0, 2.0, NaN],
+      pointCount = 65, width = 0.8)
+    check spec.data.rowCount == 130
+    check spec.layers.len == 1
+    check spec.layers[0].mark == mkPolygon
+    let horizontal = spec.data.numeric("violinWidth")
+    let vertical = spec.data.numeric("value")
+    for index in 0 ..< 65:
+      let mirror = horizontal.len - 1 - index
+      check abs(horizontal[index] + horizontal[mirror]) < 1e-15
+      check vertical[index] == vertical[mirror]
+    check abs(horizontal.min + 0.4) < 1e-15
+    check abs(horizontal.max - 0.4) < 1e-15
+    check spec.compileScene(Size(width: 480, height: 320)).nodes.anyIt(
+      it.kind == snPath and it.id != 0)
+
+  test "violin recipe validates configuration and finite sample count":
+    when not defined(release) and not defined(danger):
+      expect PreConditionDefect:
+        discard violinPlot([1.0, 2.0], width = 0.0)
+    else:
+      expect PlotError:
+        discard violinPlot([1.0, 2.0], width = 0.0)
+    expect PlotError: discard violinPlot([NaN, Inf])
+
   test "layers compile in deterministic order":
     let scene = sample().compileScene(Size(width: 640, height: 400))
     check scene.size.width == 640
