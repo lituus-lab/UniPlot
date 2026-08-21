@@ -45,6 +45,9 @@ cdef extern from "UniPlot.h":
                          double, const char *)
     int uplot_add_grouped_violin(uplot_plot *, const char **, const double *,
                                  size_t, int, double, double, const char *)
+    int uplot_add_contours(uplot_plot *, const double *, size_t,
+                           const double *, size_t, const double *, size_t,
+                           const double *, size_t, const char *, double)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -533,6 +536,52 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid grouped violin input or non-empty plot")
+        return self
+
+    def contour(self, x, y, values, levels, color="#3366cc",
+                double width=0.0):
+        x = list(x)
+        y = list(y)
+        values = list(values)
+        levels = list(levels)
+        if len(x) < 2 or len(y) < 2 or len(levels) == 0 or \
+                len(values) != len(x) * len(y):
+            raise ValueError("invalid rectilinear contour dimensions")
+        cdef size_t x_count = len(x)
+        cdef size_t y_count = len(y)
+        cdef size_t value_count = len(values)
+        cdef size_t level_count = len(levels)
+        cdef double *x_items = <double *>malloc(x_count * sizeof(double))
+        cdef double *y_items = <double *>malloc(y_count * sizeof(double))
+        cdef double *value_items = <double *>malloc(
+            value_count * sizeof(double))
+        cdef double *level_items = <double *>malloc(
+            level_count * sizeof(double))
+        cdef bytes encoded_color = str(color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if x_items == NULL or y_items == NULL or value_items == NULL or \
+                level_items == NULL:
+            free(x_items); free(y_items); free(value_items); free(level_items)
+            raise MemoryError()
+        try:
+            for index in range(x_count):
+                x_items[index] = float(x[index])
+            for index in range(y_count):
+                y_items[index] = float(y[index])
+            for index in range(value_count):
+                value_items[index] = float(values[index])
+            for index in range(level_count):
+                level_items[index] = float(levels[index])
+            status = uplot_add_contours(self._handle, x_items, x_count,
+                y_items, y_count, value_items, value_count, level_items,
+                level_count, encoded_color, width)
+        finally:
+            free(x_items); free(y_items); free(value_items); free(level_items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid contour input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
