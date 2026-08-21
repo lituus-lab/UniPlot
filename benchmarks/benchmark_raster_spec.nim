@@ -82,6 +82,12 @@ proc main() =
   proc makeSmoothSpec(): PlotSpec =
     linearSmoothPlot(smoothX, smoothY, pointCount = 200,
       confidenceLevel = 0.95)
+  var densityValues = newSeq[float64](5_000)
+  for index in 0 ..< densityValues.len:
+    densityValues[index] = 0.7 * sin(float64(index) * 0.031) +
+      float64((index * 37) mod 101) / 40.0 - 1.25
+  proc makeDensitySpec(): PlotSpec =
+    densityPlot(densityValues, pointCount = 256)
   for discardIndex in 0 ..< Warmups:
     let warmScene = makeSpec().compileScene(Size(width: 800, height: 600))
     discard warmScene.renderImage(font)
@@ -99,6 +105,9 @@ proc main() =
     discard statistics.linearRegressionDiagnostics(smoothX, smoothY)
     let warmSmooth = makeSmoothSpec().compileScene(Size(width: 800, height: 600))
     discard warmSmooth.renderImage(font)
+    discard statistics.kernelDensity(densityValues, 256)
+    let warmDensity = makeDensitySpec().compileScene(Size(width: 800, height: 600))
+    discard warmDensity.renderImage(font)
   var snapshotStats, compileStats, publicationStats: RunningStat
   var markConstructionStats, markCompileStats, markPublicationStats:
     RunningStat
@@ -108,6 +117,8 @@ proc main() =
     histogramCompileStats, histogramPublicationStats: RunningStat
   var smoothFitStats, smoothConstructionStats, smoothCompileStats,
     smoothPublicationStats: RunningStat
+  var densityEstimateStats, densityConstructionStats, densityCompileStats,
+    densityPublicationStats: RunningStat
   var guard = 0
   for iteration in 0 ..< iterations:
     var started = getMonoTime()
@@ -174,6 +185,21 @@ proc main() =
     smoothPublicationStats.push elapsedMs(started)
     guard = guard xor int(smoothPixels.data[
       (iteration * 3253) mod smoothPixels.data.len])
+    started = getMonoTime()
+    let densityEstimate = statistics.kernelDensity(densityValues, 256)
+    densityEstimateStats.push elapsedMs(started)
+    guard = guard xor int(densityEstimate.density[128] * 1_000_000.0)
+    started = getMonoTime()
+    let densitySpec = makeDensitySpec()
+    densityConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let densityScene = densitySpec.compileScene(Size(width: 800, height: 600))
+    densityCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let densityPixels = densityScene.renderImage(font)
+    densityPublicationStats.push elapsedMs(started)
+    guard = guard xor int(densityPixels.data[
+      (iteration * 4001) mod densityPixels.data.len])
   echo $(%*{"provider": "UniPlot-raster-spec", "iterations": iterations,
     "warmup_iterations": Warmups, "source": "512x512 RGBA8",
     "canvas": "800x600", "filter": "bilinear",
@@ -183,6 +209,8 @@ proc main() =
     "histogram_rule": "Freedman-Diaconis",
     "smoothing_point_count": smoothX.len,
     "smoothing_grid_count": 200,
+    "density_point_count": densityValues.len,
+    "density_grid_count": 256,
     "semantics": "separate PlotSpec construction, statistical selection or fitting, retained-scene compilation and complete CPU publication",
     "construction_snapshot_mean_ms": snapshotStats.mean,
     "compile_mean_ms": compileStats.mean,
@@ -201,6 +229,10 @@ proc main() =
     "smoothing_construction_mean_ms": smoothConstructionStats.mean,
     "smoothing_compile_mean_ms": smoothCompileStats.mean,
     "smoothing_publication_mean_ms": smoothPublicationStats.mean,
+    "density_estimate_mean_ms": densityEstimateStats.mean,
+    "density_construction_mean_ms": densityConstructionStats.mean,
+    "density_compile_mean_ms": densityCompileStats.mean,
+    "density_publication_mean_ms": densityPublicationStats.mean,
     "guard": guard})
 
 main()

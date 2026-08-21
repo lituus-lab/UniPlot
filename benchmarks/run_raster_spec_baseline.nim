@@ -38,6 +38,9 @@ proc main() =
           "smoothing_point_count", "smoothing_grid_count"]:
         if reports[run][field] != reports[0][field]:
           quit("benchmark invariant changed between runs: " & field, 1)
+      for field in ["density_point_count", "density_grid_count"]:
+        if reports[run][field] != reports[0][field]:
+          quit("benchmark invariant changed between runs: " & field, 1)
   proc phase(field: string): JsonNode =
     var values = newSeq[float64](runs)
     for run in 0 ..< runs: values[run] = reports[run][field].getFloat
@@ -64,6 +67,8 @@ proc main() =
     "histogram_rule": first["histogram_rule"],
     "smoothing_point_count": first["smoothing_point_count"],
     "smoothing_grid_count": first["smoothing_grid_count"],
+    "density_point_count": first["density_point_count"],
+    "density_grid_count": first["density_grid_count"],
     "construction_snapshot": phase("construction_snapshot_mean_ms"),
     "compile": phase("compile_mean_ms"),
     "publication": phase("publication_mean_ms"),
@@ -81,6 +86,10 @@ proc main() =
   result["smoothing_construction"] = phase("smoothing_construction_mean_ms")
   result["smoothing_compile"] = phase("smoothing_compile_mean_ms")
   result["smoothing_publication"] = phase("smoothing_publication_mean_ms")
+  result["density_estimate"] = phase("density_estimate_mean_ms")
+  result["density_construction"] = phase("density_construction_mean_ms")
+  result["density_compile"] = phase("density_compile_mean_ms")
+  result["density_publication"] = phase("density_publication_mean_ms")
   let encoded = pretty(result) & "\n"
   echo encoded
   writeFile(output, encoded)
