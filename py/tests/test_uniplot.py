@@ -221,6 +221,18 @@ def test_automatic_histogram_rules_render_and_validate_contracts():
     with pytest.raises(ValueError):
         raster.automatic_histogram([1, 2], uniplot.HISTOGRAM_AUTO)
 
+def test_linear_smoothing_renders_and_validates_contracts():
+    plot = uniplot.Plot().linear_smooth(
+        [1, 2, 3, 4, 5], [1.2, 1.9, 3.2, 3.9, 5.1], point_count=32)
+    assert plot.svg(FONT).startswith(b"<svg")
+    with pytest.raises(ValueError):
+        uniplot.Plot().linear_smooth([1, 2], [1, 2])
+    with pytest.raises(ValueError):
+        uniplot.Plot().linear_smooth([1, 2, 3], [1, 2, 3], point_count=1)
+    configured = uniplot.Plot().title("configured")
+    with pytest.raises(ValueError):
+        configured.linear_smooth([1, 2, 3], [1, 2, 3])
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
