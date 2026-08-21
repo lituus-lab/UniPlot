@@ -409,6 +409,20 @@ int main(void) {
     assert(uplot_add_linear_smooth(smooth, smooth_x, smooth_y, 5, 1, 0.95,
       1, "#3366cc", "#3366cc40") == UPLOT_ERR_ARGUMENT);
     uplot_plot_free(smooth);
+
+    const double nonlinear_y[] = {9, 2, 1, 6, 17};
+    const double nonlinear_x[] = {-2, -1, 0, 1, 2};
+    smooth = uplot_plot_new(320, 240);
+    assert(smooth != NULL);
+    assert(uplot_add_polynomial_smooth(smooth, nonlinear_x, nonlinear_y, 5,
+      2, 32, "#3366cc") == UPLOT_OK);
+    assert(uplot_render_svg(smooth, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    uplot_plot_free(smooth);
+    assert(uplot_add_polynomial_smooth(NULL, nonlinear_x, nonlinear_y, 5,
+      2, 32, "#3366cc") == UPLOT_ERR_ARGUMENT);
   }
   {
     const double density_values[] = {-2, -1, 0, 1, 2};
