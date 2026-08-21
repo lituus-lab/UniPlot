@@ -56,6 +56,21 @@ suite "scales":
     check extreme.map(1e308) == 1
     check extreme.ticks(3).allIt(it.isFinite)
 
+  test "signed power scales map negative and positive values monotonically":
+    let square = continuousScale(-2, 2, 0, 100, skPower, 2.0)
+    check square.map(-2) == 0
+    check abs(square.map(-1) - 37.5) < 1e-5
+    check square.map(0) == 50
+    check abs(square.map(1) - 62.5) < 1e-5
+    check square.map(2) == 100
+    check square.ticks(3) == @[-2.0, 0.0, 2.0]
+    let root = continuousScale(-4, 4, 0, 100, skPower, 0.5)
+    check root.map(-4) == 0
+    check root.map(0) == 50
+    check root.map(4) == 100
+    expect PlotError:
+      discard continuousScale(-1, 1, 0, 1, skPower, 0.0)
+
   test "band scale retains first category order":
     let scale = trainBand(["b", "a", "b"], 0, 100)
     check scale.domain == @["b", "a"]

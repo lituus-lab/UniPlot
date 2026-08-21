@@ -318,6 +318,20 @@ suite "plot compilation":
     check abs((positions[0].x - positions[1].x) -
       (positions[1].x - positions[2].x)) < 0.01
 
+  test "numeric axes support configurable signed power transforms":
+    var frame = initDataFrame()
+    frame.addColumn("x", [-2.0, -1.0, 0.0, 1.0, 2.0])
+    frame.addColumn("y", [-2.0, -1.0, 0.0, 1.0, 2.0])
+    var spec = plot(frame)
+    spec.geomPoint(aes("x", "y"))
+    spec.scaleXPower(2.0)
+    spec.scaleYPower(0.5, reversed = true)
+    discard spec.compileScene()
+    when defined(release) or defined(danger):
+      expect PlotError: spec.scaleXPower(0.0)
+    else:
+      expect PreConditionDefect: spec.scaleXPower(0.0)
+
   test "temporal axes retain numeric geometry with semantic labels":
     var frame = initDataFrame()
     frame.addColumn("when", [1_704_067_200.0, 1_704_067_260.0])

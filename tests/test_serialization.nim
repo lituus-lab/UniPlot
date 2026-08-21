@@ -107,6 +107,16 @@ suite "PlotSpec JSON schema":
     check encoded["yScale"]["kind"].getStr == "skSymLog10"
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "signed power transforms retain their exponents":
+    var spec = completeSpec()
+    spec.scaleXPower(0.5, reversed = true)
+    spec.scaleYPower(3.0)
+    let encoded = spec.toJsonNode
+    check encoded["xScale"]["kind"].getStr == "skPower"
+    check encoded["xScale"]["exponent"].getFloat == 0.5
+    check encoded["yScale"]["exponent"].getFloat == 3.0
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "temporal label kinds round trip as additive scale semantics":
     var spec = completeSpec()
     spec.scaleXUtc(reversed = true)
