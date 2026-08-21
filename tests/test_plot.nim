@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[sequtils, tables, unittest]
+import std/[sequtils, strutils, tables, unittest]
 when not defined(release) and not defined(danger):
   import contracts
 import UniColor
@@ -365,8 +365,13 @@ suite "plot compilation":
     spec.scaleYDuration(reversed = true)
     let scene = spec.compileScene(Size(width: 480, height: 320))
     let labels = scene.nodes.filterIt(it.kind == snText).mapIt(it.text)
+    let utcLabels = scene.nodes.filterIt(
+      it.kind == snText and it.text.startsWith("2024-01-01"))
     check "2024-01-01 00:00:00" in labels
     check "30:00" in labels
+    check utcLabels.len >= 2
+    check utcLabels[0].anchor == textStart
+    check utcLabels[^1].anchor == textEnd
     check not spec.xScaleSpec.reversed
     check spec.yScaleSpec.reversed
 
