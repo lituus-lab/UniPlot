@@ -16,18 +16,23 @@ complete 800×600 CPU publication. The same processes also measure 64
 data-mapped image marks backed by four snapshotted 16×16 RGBA8 resources, a
 1,000-point line with UTC x labels and duration y labels, and automatic
 Freedman–Diaconis selection over 100,000 deterministic samples.
+It also separates a 10,000-point linear fit, construction of a 200-point
+confidence ribbon, retained-scene compilation and CPU publication.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3264 / 8.5814 / 7.6160 ms for the retained
-raster construction / compile / publication phases, 0.0210 / 3.1816 / 7.0848
-ms for the 64-mark phases, and 0.0164 / 0.1320 / 13.0871 ms for temporal
+The current Apple M4 medians are 0.3158 / 8.5804 / 7.4556 ms for the retained
+raster construction / compile / publication phases, 0.0184 / 3.1804 / 6.8959
+ms for the 64-mark phases, and 0.0122 / 0.1252 / 12.9326 ms for temporal
 construction / compile / CPU publication. Temporal construction copies the
 two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 14.2239 ms;
-complete PlotSpec construction including the same selection costs 15.8265 ms,
-then scene compilation/publication costs 0.0271 / 22.6440 ms. Selection sorts
+UTC/duration formatting. Automatic histogram selection costs 14.1209 ms;
+complete PlotSpec construction including the same selection costs 15.4465 ms,
+then scene compilation/publication costs 0.0259 / 22.0283 ms. Selection sorts
 finite samples to compute exact type-7 quartiles; no linear-time approximation
-is substituted. These are same-machine regression evidence, not cross-machine
+is substituted. The range-safe linear fit costs 0.5763 ms; complete smoothing
+construction, including one Student-t critical value and 200 interval
+evaluations, costs 0.7194 ms, followed by 0.0600 / 8.2010 ms for compilation
+and publication. These are same-machine regression evidence, not cross-machine
 performance claims.
 The exact samples are stored in
 `benchmarks/baselines/apple-m4-raster-spec.json`.
