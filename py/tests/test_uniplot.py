@@ -268,6 +268,19 @@ def test_violin_renders_and_validates_contracts():
     with pytest.raises(ValueError):
         configured.violin([1, 2, 3])
 
+def test_grouped_violin_renders_and_validates_contracts():
+    plot = uniplot.Plot().grouped_violin(
+        ["beta", "alpha", "beta", "alpha", "beta", "alpha"],
+        [-1, 2, 0, 3, 1, 4], point_count=33)
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert "xOffset" in plot.to_json()
+    with pytest.raises(ValueError):
+        uniplot.Plot().grouped_violin(["a"], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().grouped_violin(["a", "b"], [1, 2])
+    with pytest.raises(ValueError):
+        uniplot.Plot().grouped_violin(["a", "a"], [1, 2], width=1.1)
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
