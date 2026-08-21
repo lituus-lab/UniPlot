@@ -4,6 +4,7 @@ import std/[algorithm, tables]
 import contracts
 import UniAccurate
 import UniMath
+import UniStatistics as statistics
 import UniPlot/common
 
 type HistogramBin* = object
@@ -50,10 +51,7 @@ proc finiteSorted(values: openArray[float64]): seq[float64] =
     if value.isFinite: result.add value
   result.sort()
 
-func quantileSorted(values: openArray[float64]; probability: float64):
-    float64
-func stableMean(values: openArray[float64]; minimum,
-    maximum: float64): float64
+func quantileSorted(values: openArray[float64]; probability: float64): float64
 proc histogramBreaks*(values, breaks: openArray[float64]):
     seq[HistogramBin]
 
@@ -100,7 +98,7 @@ proc histogramBinCount*(values: openArray[float64]; rule = hrAuto): int =
   of hrRice:
     result = boundedBinCount(2.0 * cubeRoot, sampleCount)
   of hrScott:
-    let mean = stableMean(finite, finite[0], finite[^1])
+    let mean = statistics.mean(finite)
     var squares = newSeqOfCap[float64](sampleCount)
     for value in finite:
       let deviation = value - mean
@@ -154,22 +152,7 @@ proc histogram*(values: openArray[float64]; rule: HistogramRule):
   histogramBreaks(values, breaks)
 
 func quantileSorted(values: openArray[float64]; probability: float64): float64 =
-  if values.len == 1: return values[0]
-  let
-    position = probability * float64(values.high)
-    lower = int(floor(position))
-    upper = int(ceil(position))
-    fraction = position - float64(lower)
-  values[lower] * (1.0 - fraction) + values[upper] * fraction
-
-func stableMean(values: openArray[float64]; minimum,
-    maximum: float64): float64 =
-  let magnitude = max(abs(minimum), abs(maximum))
-  if magnitude == 0: return 0
-  var normalized = newSeqOfCap[float64](values.len)
-  for value in values: normalized.add value / magnitude
-  neumaierSum(normalized, assumeFinite = true) / float64(values.len) *
-    magnitude
+  statistics.quantile(values, probability)
 
 proc aggregateFinite(values: openArray[float64]; kind: AggregationKind):
     tuple[value: float64; count: int] =
@@ -182,12 +165,7 @@ proc aggregateFinite(values: openArray[float64]; kind: AggregationKind):
       result.value = neumaierSum(values, assumeFinite = true)
   of agMean:
     if values.len > 0:
-      var minimum = values[0]
-      var maximum = values[0]
-      for value in values:
-        minimum = min(minimum, value)
-        maximum = max(maximum, value)
-      result.value = stableMean(values, minimum, maximum)
+      result.value = statistics.mean(values)
   of agMinimum:
     if values.len > 0:
       result.value = values[0]
@@ -237,7 +215,7 @@ proc summarize*(values: openArray[float64]; whiskerLength = 1.5):
     result.median = quantileSorted(finite, 0.5)
     result.thirdQuartile = quantileSorted(finite, 0.75)
     result.maximum = finite[^1]
-    result.mean = stableMean(finite, result.minimum, result.maximum)
+    result.mean = statistics.mean(finite)
     let
       spread = result.thirdQuartile - result.firstQuartile
       lowerFence = result.firstQuartile - whiskerLength * spread
