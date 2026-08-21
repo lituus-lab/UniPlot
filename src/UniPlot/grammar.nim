@@ -719,6 +719,35 @@ proc linearSmoothPlot*(x, y: openArray[float64]; pointCount = 100;
     except ValueError as error:
       raise newException(PlotError, error.msg)
 
+proc densityPlot*(values: openArray[float64]; pointCount = 512;
+    bandwidth = 0.0; fillColor = "#3366cc40";
+    lineColor = "#3366cc"; legend = ""): PlotSpec {.contractual.} =
+  ## Materialise a UniStatistics Gaussian KDE as retained area and line marks.
+  require:
+    pointCount >= 2 and pointCount <= 100_000
+    bandwidth >= 0.0 and bandwidth.isFinite
+  body:
+    if pointCount < 2 or pointCount > 100_000 or bandwidth < 0.0 or
+        not bandwidth.isFinite:
+      raise newException(PlotError, "invalid density plot configuration")
+    var finiteValues = newSeqOfCap[float64](values.len)
+    for value in values:
+      if value.isFinite: finiteValues.add value
+    if finiteValues.len < 2:
+      raise newException(PlotError,
+        "density plot requires at least two finite observations")
+    try:
+      let estimate = statistics.kernelDensity(finiteValues, pointCount,
+        bandwidth)
+      var frame = initDataFrame()
+      frame.addColumn("x", estimate.points)
+      frame.addColumn("density", estimate.density)
+      result = plot(frame)
+      result.geomArea(aes("x", "density"), fillColor)
+      result.geomLine(aes("x", "density"), lineColor, legend = legend)
+    except ValueError as error:
+      raise newException(PlotError, error.msg)
+
 proc barPlot*(categories: openArray[string]; values: openArray[float64];
     color = "#3366cc"; legend = ""): PlotSpec =
   var frame = initDataFrame()
