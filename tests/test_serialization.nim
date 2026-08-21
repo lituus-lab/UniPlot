@@ -213,6 +213,17 @@ suite "PlotSpec JSON schema":
     check encoded["yScale"]["categories"].len == 3
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "polar coordinates are optional and round trip in schema v1":
+    var spec = completeSpec()
+    let cartesian = spec.toJsonNode
+    check not cartesian.hasKey("coordinates")
+    spec.coordPolar()
+    let encoded = spec.toJsonNode
+    check encoded["coordinates"].getStr == "PolarCoordinates"
+    let restored = encoded.fromJsonNode
+    check restored.coordinates == PolarCoordinates
+    check restored.toJsonNode == encoded
+
   test "non-finite data uses explicit portable tokens":
     var frame = initDataFrame()
     frame.addColumn("x", [0.0, 1.0, 2.0])

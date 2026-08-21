@@ -285,3 +285,13 @@ suite "plot composition":
     expect PlotError:
       discard compileGrid([spec, spec], 2,
         Size(width: 1, height: 100), gap = 1)
+
+  test "independent grids may mix coordinates but shared axes may not":
+    let cartesian = sampleSpec("#3366cc")
+    var polar = sampleSpec("#d1495b")
+    polar.coordPolar()
+    check compileGrid([cartesian, polar], 2,
+      Size(width: 800, height: 400)).nodes.len > 0
+    expect PlotError:
+      discard compileGrid([cartesian, polar], 2,
+        Size(width: 800, height: 400), sharedX = true)

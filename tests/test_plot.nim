@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[sequtils, unittest]
+import std/[sequtils, tables, unittest]
 when not defined(release) and not defined(danger):
   import contracts
 import UniColor
 import UniImage/core as uimg
+import UniMath
 import UniPlot
 
 proc sample(): PlotSpec =
@@ -907,6 +908,56 @@ suite "plot compilation":
     var mapped = plot(frame)
     mapped.geomLine(aes("x", "y", lineStyle = "style"), width = 2)
     check mapped.compileScene().nodes[^1].id > 0
+
+  test "polar coordinates project radians into retained scene geometry":
+    var frame = initDataFrame()
+    frame.addColumn("angle", [0.0, PI / 2.0, PI, 3.0 * PI / 2.0])
+    frame.addColumn("radius", [1.0, 1.0, 1.0, 1.0])
+    frame.addColumn("label", ["north", "east", "south", "west"])
+    var spec = plot(frame)
+    spec.geomText(aes("angle", "radius", label = "label"))
+    spec.coordPolar()
+    let scene = spec.compileScene(Size(width: 500, height: 500))
+    var positions: Table[string, Point]
+    for node in scene.nodes:
+      if node.kind == snText and node.text in ["north", "east", "south", "west"]:
+        positions[node.text] = node.position
+    check positions.len == 4
+    check positions["north"].y < positions["east"].y
+    check positions["east"].x > positions["north"].x
+    check positions["south"].y > positions["east"].y
+    check positions["west"].x < positions["north"].x
+
+    spec.scaleX(skLinear, reversed = true)
+    let reversedScene = spec.compileScene(Size(width: 500, height: 500))
+    for node in reversedScene.nodes:
+      if node.kind == snText and node.text == "east":
+        check node.position.x < positions["north"].x
+
+  test "polar coordinates reject undefined and negative geometry":
+    var frame = initDataFrame()
+    frame.addColumn("angle", [0.0])
+    frame.addColumn("radius", [-1.0])
+    var negative = plot(frame)
+    negative.geomPoint(aes("angle", "radius"))
+    negative.coordPolar()
+    expect PlotError: discard negative.compileScene()
+
+    frame = initDataFrame()
+    frame.addColumn("angle", [0.0])
+    frame.addColumn("radius", [1.0])
+    var unsupported = plot(frame)
+    unsupported.geomBar(aes("angle", "radius"))
+    unsupported.coordPolar()
+    expect PlotError: discard unsupported.compileScene()
+
+    var categoricalFrame = initDataFrame()
+    categoricalFrame.addColumn("angle", ["north"])
+    categoricalFrame.addColumn("radius", [1.0])
+    var categorical = plot(categoricalFrame)
+    categorical.geomPoint(aes("angle", "radius"))
+    categorical.coordPolar()
+    expect PlotError: discard categorical.compileScene()
 
   test "shape and line-style mappings reject incompatible columns":
     var frame = initDataFrame()
