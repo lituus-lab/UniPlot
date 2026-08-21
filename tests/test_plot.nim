@@ -17,6 +17,32 @@ proc sample(): PlotSpec =
   result.labels(title = "Sample")
 
 suite "plot compilation":
+  test "linear smoothing materialises a confidence ribbon and line":
+    let spec = linearSmoothPlot(
+      [1.0, 2.0, NaN, 3.0, 4.0, 5.0],
+      [1.2, 1.9, 99.0, 3.2, 3.9, 5.1], pointCount = 5)
+    check spec.data.rowCount == 5
+    check spec.layers.len == 2
+    check spec.layers[0].mark == mkRibbon
+    check spec.layers[1].mark == mkLine
+    check abs(spec.data.numeric("estimate")[2] - 3.06) < 1e-14
+    check abs(spec.data.numeric("confidenceLower")[2] -
+      2.8162431710673901) < 2e-13
+    let scene = spec.compileScene(Size(width: 480, height: 320))
+    check scene.nodes.anyIt(it.kind == snPath)
+
+  test "linear smoothing validates contracts and finite pairs":
+    when not defined(release) and not defined(danger):
+      expect PreConditionDefect:
+        discard linearSmoothPlot([1.0, 2.0], [1.0], pointCount = 4)
+    else:
+      expect PlotError:
+        discard linearSmoothPlot([1.0, 2.0], [1.0], pointCount = 4)
+    expect PlotError:
+      discard linearSmoothPlot([1.0, NaN, 3.0], [1.0, 2.0, Inf])
+    expect PlotError:
+      discard linearSmoothPlot([1.0, 1.0, 1.0], [1.0, 2.0, 3.0])
+
   test "layers compile in deterministic order":
     let scene = sample().compileScene(Size(width: 640, height: 400))
     check scene.size.width == 640
