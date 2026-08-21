@@ -174,6 +174,10 @@ int main(void) {
   assert(uplot_set_y_axis_labels(plot, UPLOT_AXIS_NUMERIC, 0) == UPLOT_OK);
   assert(uplot_set_x_scale(plot, UPLOT_SCALE_SYMLOG10, 0) == UPLOT_OK);
   assert(uplot_set_y_scale(plot, UPLOT_SCALE_SYMLOG10, 1) == UPLOT_OK);
+  assert(uplot_set_x_power_scale(plot, 0.5, 1) == UPLOT_OK);
+  assert(uplot_set_y_power_scale(plot, 2.0, 0) == UPLOT_OK);
+  assert(uplot_set_x_power_scale(plot, 0.0, 0) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_y_power_scale(NULL, 2.0, 0) == UPLOT_ERR_ARGUMENT);
   assert(uplot_set_x_scale(NULL, UPLOT_SCALE_LINEAR, 0) ==
          UPLOT_ERR_ARGUMENT);
   assert(uplot_set_x_scale(plot, 99, 0) == UPLOT_ERR_ARGUMENT);
