@@ -154,6 +154,9 @@ int main(void) {
   or fixed-unit symmetric-logarithmic coordinates and may reverse direction.
 - `uplot_set_x_power_scale` / `uplot_set_y_power_scale` configure a positive
   signed-power exponent without changing the existing scale setter ABI.
+- `uplot_set_coordinates(plot, UPLOT_COORD_POLAR)` treats x values as radians
+  in `[0, 2*pi]` and y values as non-negative radii. Set
+  `UPLOT_COORD_CARTESIAN` to restore Cartesian projection.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.

@@ -104,6 +104,39 @@ exponent participates in shared-axis compatibility and schema-v1 round trips.
 Categorical x coordinates remain linear; bars and areas reject a
 logarithmic y coordinate because their current semantic baseline is zero.
 
+## Polar coordinates
+"""
+
+nbCode:
+  import UniMath
+
+  var polarFrame = initDataFrame()
+  polarFrame.addColumn("angle", [0.0, PI / 4.0, PI / 2.0, 3.0 * PI / 4.0,
+    PI, 5.0 * PI / 4.0, 3.0 * PI / 2.0, 7.0 * PI / 4.0, 2.0 * PI])
+  polarFrame.addColumn("radius", [1.0, 2.0, 1.4, 2.6, 1.2, 2.2, 1.5, 2.8,
+    1.0])
+  var polarSpec = plot(polarFrame)
+  polarSpec.geomLine(aes("angle", "radius"), color = "#3366cc", width = 2)
+  polarSpec.geomPoint(aes("angle", "radius"), color = "#d1495b", radius = 4)
+  polarSpec.coordPolar()
+  polarSpec.labels(title = "Retained polar projection", x = "angle (rad)",
+    y = "radius")
+  let polarSvg = polarSpec.compileScene(Size(width: 720, height: 520)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(polarSvg,
+  "Radians projected clockwise from twelve o'clock onto retained paths.")
+
+nbText: """
+`coordPolar()` fixes the angular contract to `[0, 2*pi]`, trains the radial
+domain from zero, and emits eight spokes plus numeric radial rings. Reversing
+the x scale reverses angular direction. Point, line and text layers plus text
+and arrow annotations are supported in 1.0. Retained rasters, references,
+secondary axes, categorical coordinates and bounded/area-like marks are
+rejected explicitly because they do not yet have a defined polar geometry.
+`coordCartesian()` restores ordinary projection. The optional coordinate kind
+round-trips through schema-v1 JSON; Cartesian documents remain unchanged.
+
 `xLimits(minimum, maximum)` and `yLimits(minimum, maximum)` fix a numeric
 domain. Limits are finite and strictly increasing, and must contain all marks,
 uncertainty bounds, baselines and reference annotations. UniPlot rejects a

@@ -161,6 +161,8 @@ places each group inside its categorical band.
 `SCALE_SYMLOG10` and an independent `reversed` flag.
 `Plot.scale_x_power(exponent)` / `Plot.scale_y_power(exponent)` configure the
 signed-power transform and retain the exponent through JSON round trips.
+`Plot.polar()` selects radians clockwise from twelve o'clock and non-negative
+radii; `Plot.cartesian()` restores the default coordinate system.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """

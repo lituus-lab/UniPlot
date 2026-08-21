@@ -16,6 +16,7 @@ rendering engines.
 
 - typed columns, rows and finite-value filtering;
 - linear, logarithmic, symmetric-logarithmic, signed-power and categorical scales;
+- retained polar coordinates for numeric line, point, text and annotations;
 - CSS colour styling through UniColor;
 - categorical colour mappings backed by immutable UniColor palettes;
 - numeric colour and fill mappings with UniColor ramps and color bars;
@@ -24,7 +25,7 @@ rendering engines.
 - explicit drop, break and reject policies for non-finite mapped values;
 - numeric size and alpha mappings with explicit output ranges;
 - line, point, bar, area and text layers, plus histogram recipes;
-- Cartesian axes, ticks, labels, titles and themes;
+- Cartesian and polar guides, ticks, labels, titles and themes;
 - explicit layer-derived legends with deterministic layout;
 - an inspectable retained scene shared by SVG and raster rendering;
 - deterministic SVG and PNG export;
@@ -57,6 +58,9 @@ Rectilinear contours are extracted once with deterministic marching squares
 and retained as ordinary broken line paths for every renderer.
 Dense scalar matrices are palette-mapped through UniColor into owned RGBA8
 rasters before they cross the scene boundary.
+Polar plots project numeric radians and non-negative radii into retained
+UniVector paths before rendering, so CPU, SVG and WGPU consume identical
+geometry.
 
 ## 1.0 contract
 

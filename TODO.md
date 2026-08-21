@@ -79,7 +79,8 @@ silently claimed by the focused 1.0 publication contract.
   retained-scene path defined by ADR-0010.
 - [x] Fixed-unit symmetric-logarithmic numeric transforms in Nim, C and Python.
 - [x] Configurable signed-power numeric transforms in Nim, C and Python.
-- [ ] Polar coordinates.
+- [x] Retained polar coordinates for numeric line, point, text and annotations
+  in Nim, C and Python, with common CPU/SVG/WGPU scene geometry.
 - [x] Error bars and ribbons with explicit numeric bounds and missing-value
       policies.
 - [x] Grouped box plots with type-7 quartiles, Tukey whiskers and outliers in
