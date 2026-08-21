@@ -667,6 +667,26 @@ proc uplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
   setAxisLabels(value, labels, reversed, false)
 
+proc setAxisScale(value: pointer; kind, reversed: cint; xAxis: bool): cint =
+  if value.isNil or kind < cint(low(ScaleKind).ord) or
+      kind > cint(high(ScaleKind).ord) or reversed notin [0.cint, 1.cint]:
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let hnd = handle(value)
+    if xAxis: hnd.spec.scaleX(ScaleKind(kind), reversed == 1)
+    else: hnd.spec.scaleY(ScaleKind(kind), reversed == 1)
+    UPLOT_OK
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
+proc uplot_set_x_scale*(value: pointer; kind, reversed: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  setAxisScale(value, kind, reversed, true)
+
+proc uplot_set_y_scale*(value: pointer; kind, reversed: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  setAxisScale(value, kind, reversed, false)
+
 proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
     label: cstring): cint {.exportc, dynlib, cdecl.} =
   if value.isNil or label.isNil or not scale.isFinite or scale == 0 or

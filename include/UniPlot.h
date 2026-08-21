@@ -50,6 +50,11 @@ typedef enum {
   UPLOT_AXIS_DURATION = 2
 } uplot_axis_labels;
 typedef enum {
+  UPLOT_SCALE_LINEAR = 0,
+  UPLOT_SCALE_LOG10 = 1,
+  UPLOT_SCALE_SYMLOG10 = 2
+} uplot_scale_kind;
+typedef enum {
   UPLOT_HISTOGRAM_AUTO = 0,
   UPLOT_HISTOGRAM_SQUARE_ROOT = 1,
   UPLOT_HISTOGRAM_STURGES = 2,
@@ -139,6 +144,8 @@ int uplot_set_title(uplot_plot *, const char *title);
  * Unix epoch; duration means signed elapsed seconds. */
 int uplot_set_x_axis_labels(uplot_plot *, int labels, int reversed);
 int uplot_set_y_axis_labels(uplot_plot *, int labels, int reversed);
+int uplot_set_x_scale(uplot_plot *, int scale, int reversed);
+int uplot_set_y_scale(uplot_plot *, int scale, int reversed);
 int uplot_set_secondary_y(uplot_plot *, double scale, double offset,
                           const char *label);
 int uplot_clear_secondary_y(uplot_plot *);
