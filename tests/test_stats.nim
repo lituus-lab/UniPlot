@@ -269,3 +269,17 @@ suite "statistics":
     else:
       expect PreConditionDefect:
         discard contourSegments([0.0], [0.0, 1.0], [0.0], [1.0])
+
+  test "contour recipe retains separated line segments":
+    let spec = contourPlot([0.0, 1.0], [0.0, 1.0],
+      [0.0, 1.0, 1.0, 2.0], [0.5, 1.5], width = 2)
+    check spec.layers.len == 1
+    check spec.layers[0].mark == mkLine
+    check spec.layers[0].missingValues == BreakOnMissing
+    check spec.data.numeric("x").len == 6
+    check spec.data.numeric("x")[2].isNaN
+    check spec.data.numeric("x")[5].isNaN
+    discard spec.compileScene()
+    expect PlotError:
+      discard contourPlot([0.0, 1.0], [0.0, 1.0],
+        [0.0, 1.0, 1.0, 2.0], [3.0])
