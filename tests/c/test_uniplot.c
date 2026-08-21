@@ -172,6 +172,15 @@ int main(void) {
   uplot_buffer_free(svg, svg_len);
   assert(uplot_set_x_axis_labels(plot, UPLOT_AXIS_NUMERIC, 0) == UPLOT_OK);
   assert(uplot_set_y_axis_labels(plot, UPLOT_AXIS_NUMERIC, 0) == UPLOT_OK);
+  assert(uplot_set_x_scale(plot, UPLOT_SCALE_SYMLOG10, 0) == UPLOT_OK);
+  assert(uplot_set_y_scale(plot, UPLOT_SCALE_SYMLOG10, 1) == UPLOT_OK);
+  assert(uplot_set_x_scale(NULL, UPLOT_SCALE_LINEAR, 0) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_x_scale(plot, 99, 0) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_y_scale(plot, UPLOT_SCALE_LINEAR, 2) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_x_scale(plot, UPLOT_SCALE_LINEAR, 0) == UPLOT_OK);
+  assert(uplot_set_y_scale(plot, UPLOT_SCALE_LINEAR, 0) == UPLOT_OK);
   assert(uplot_clear_annotations(plot) == UPLOT_OK);
   assert(uplot_clear_annotations(NULL) == UPLOT_ERR_ARGUMENT);
 
