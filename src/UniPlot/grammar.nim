@@ -3,6 +3,7 @@
 import std/tables
 import UniColor
 import UniImage/core as ucore
+import UniStatistics as statistics
 from UniVector import MarkerShape, CircleMarker, SquareMarker, TriangleMarker,
   DiamondMarker, PlusMarker, CrossMarker
 import contracts
@@ -653,6 +654,68 @@ proc scatterPlot*(x, y: openArray[float64]; color = "#3366cc";
   frame.addColumn("x", x); frame.addColumn("y", y)
   result = plot(frame); result.geomPoint(aes("x", "y"), color,
     legend = legend)
+
+proc linearSmoothPlot*(x, y: openArray[float64]; pointCount = 100;
+    confidenceLevel = 0.95; showConfidence = true;
+    lineColor = "#3366cc"; bandColor = "#3366cc40";
+    legend = ""): PlotSpec {.contractual.} =
+  ## Fit a linear smoother and materialise its mean-confidence band.
+  require:
+    x.len == y.len
+    pointCount >= 2 and pointCount <= 10_000
+    confidenceLevel > 0.0 and confidenceLevel < 1.0 and
+      confidenceLevel.isFinite
+  body:
+    if x.len != y.len or pointCount < 2 or pointCount > 10_000 or
+        not confidenceLevel.isFinite or confidenceLevel <= 0.0 or
+        confidenceLevel >= 1.0:
+      raise newException(PlotError, "invalid linear smoothing input")
+    var
+      finiteX = newSeqOfCap[float64](x.len)
+      finiteY = newSeqOfCap[float64](y.len)
+    for index in 0 ..< x.len:
+      if x[index].isFinite and y[index].isFinite:
+        finiteX.add x[index]
+        finiteY.add y[index]
+    if finiteX.len < 3:
+      raise newException(PlotError,
+        "linear smoothing requires at least three finite pairs")
+    var minimumX = finiteX[0]
+    var maximumX = finiteX[0]
+    for value in finiteX:
+      minimumX = min(minimumX, value)
+      maximumX = max(maximumX, value)
+    if minimumX == maximumX:
+      raise newException(PlotError,
+        "linear smoothing predictor must not be constant")
+    try:
+      let fit = statistics.linearRegressionDiagnostics(finiteX, finiteY)
+      var
+        grid = newSeq[float64](pointCount)
+        estimate = newSeq[float64](pointCount)
+        lower = newSeq[float64](pointCount)
+        upper = newSeq[float64](pointCount)
+      for index in 0 ..< pointCount:
+        let fraction = float64(index) / float64(pointCount - 1)
+        grid[index] = minimumX * (1.0 - fraction) + maximumX * fraction
+        let prediction = statistics.predictLinear(fit, grid[index],
+          confidenceLevel)
+        estimate[index] = prediction.estimate
+        lower[index] = prediction.confidenceLower
+        upper[index] = prediction.confidenceUpper
+      var frame = initDataFrame()
+      frame.addColumn("x", grid)
+      frame.addColumn("estimate", estimate)
+      if showConfidence:
+        frame.addColumn("confidenceLower", lower)
+        frame.addColumn("confidenceUpper", upper)
+      result = plot(frame)
+      if showConfidence:
+        result.geomRibbon(aes("x", "estimate", yMin = "confidenceLower",
+          yMax = "confidenceUpper"), bandColor)
+      result.geomLine(aes("x", "estimate"), lineColor, legend = legend)
+    except ValueError as error:
+      raise newException(PlotError, error.msg)
 
 proc barPlot*(categories: openArray[string]; values: openArray[float64];
     color = "#3366cc"; legend = ""): PlotSpec =
