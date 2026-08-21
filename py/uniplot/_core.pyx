@@ -65,6 +65,8 @@ cdef extern from "UniPlot.h":
     int uplot_set_title(uplot_plot *, const char *)
     int uplot_set_x_axis_labels(uplot_plot *, int, int)
     int uplot_set_y_axis_labels(uplot_plot *, int, int)
+    int uplot_set_x_scale(uplot_plot *, int, int)
+    int uplot_set_y_scale(uplot_plot *, int, int)
     int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
     int uplot_clear_secondary_y(uplot_plot *)
     int uplot_annotate_text(uplot_plot *, double, double, const char *,
@@ -126,6 +128,9 @@ RASTER_BOX = 2
 AXIS_NUMERIC = 0
 AXIS_UTC_DATETIME = 1
 AXIS_DURATION = 2
+SCALE_LINEAR = 0
+SCALE_LOG10 = 1
+SCALE_SYMLOG10 = 2
 HISTOGRAM_AUTO = 0
 HISTOGRAM_SQUARE_ROOT = 1
 HISTOGRAM_STURGES = 2
@@ -574,6 +579,16 @@ cdef class Plot:
 
     def scale_y_duration(self, bint reversed=False):
         return self.y_axis_labels(AXIS_DURATION, reversed)
+
+    def scale_x(self, int kind=SCALE_LINEAR, bint reversed=False):
+        if uplot_set_x_scale(self._handle, kind, int(reversed)) != 0:
+            raise ValueError("invalid x scale")
+        return self
+
+    def scale_y(self, int kind=SCALE_LINEAR, bint reversed=False):
+        if uplot_set_y_scale(self._handle, kind, int(reversed)) != 0:
+            raise ValueError("invalid y scale")
+        return self
 
     def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
         cdef bytes encoded = str(label).encode("utf-8")
