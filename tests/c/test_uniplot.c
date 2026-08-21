@@ -185,6 +185,16 @@ int main(void) {
          UPLOT_ERR_ARGUMENT);
   assert(uplot_set_x_scale(plot, UPLOT_SCALE_LINEAR, 0) == UPLOT_OK);
   assert(uplot_set_y_scale(plot, UPLOT_SCALE_LINEAR, 0) == UPLOT_OK);
+  assert(uplot_set_coordinates(plot, UPLOT_COORD_POLAR) == UPLOT_OK);
+  uint8_t *polar_json = NULL;
+  size_t polar_json_len = 0;
+  assert(uplot_plot_to_json(plot, &polar_json, &polar_json_len) == UPLOT_OK);
+  assert(contains_bytes(polar_json, polar_json_len, "PolarCoordinates"));
+  uplot_buffer_free(polar_json, polar_json_len);
+  assert(uplot_set_coordinates(plot, 99) == UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_coordinates(NULL, UPLOT_COORD_POLAR) ==
+         UPLOT_ERR_ARGUMENT);
+  assert(uplot_set_coordinates(plot, UPLOT_COORD_CARTESIAN) == UPLOT_OK);
   assert(uplot_clear_annotations(plot) == UPLOT_OK);
   assert(uplot_clear_annotations(NULL) == UPLOT_ERR_ARGUMENT);
 
