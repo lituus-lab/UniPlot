@@ -92,6 +92,15 @@ suite "PlotSpec JSON schema":
     check encoded["yScale"]["secondary"]["scale"].getFloat == 1.8
     check fromJsonNode(encoded).toJsonNode == encoded
 
+  test "symmetric logarithmic transforms round trip additively":
+    var spec = completeSpec()
+    spec.scaleX(skSymLog10, reversed = true)
+    spec.scaleY(skSymLog10)
+    let encoded = spec.toJsonNode
+    check encoded["xScale"]["kind"].getStr == "skSymLog10"
+    check encoded["yScale"]["kind"].getStr == "skSymLog10"
+    check fromJsonNode(encoded).toJsonNode == encoded
+
   test "temporal label kinds round trip as additive scale semantics":
     var spec = completeSpec()
     spec.scaleXUtc(reversed = true)
