@@ -387,6 +387,20 @@ int main(void) {
       1, "#3366cc", "#3366cc40") == UPLOT_ERR_ARGUMENT);
     uplot_plot_free(smooth);
   }
+  {
+    const double density_values[] = {-2, -1, 0, 1, 2};
+    uplot_plot *density = uplot_plot_new(320, 240);
+    assert(density != NULL);
+    assert(uplot_add_density(density, density_values, 5, 65, 0.0,
+      "#3366cc40", "#3366cc") == UPLOT_OK);
+    assert(uplot_render_svg(density, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    uplot_plot_free(density);
+    assert(uplot_add_density(NULL, density_values, 5, 65, 0.0,
+      "#3366cc40", "#3366cc") == UPLOT_ERR_ARGUMENT);
+  }
 
   uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
   assert(invalid_automatic != NULL);
