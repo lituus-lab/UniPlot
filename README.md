@@ -36,7 +36,7 @@ rendering engines.
 ## Architecture
 
 ```text
-data -> mappings -> statistics -> scales -> guides -> scene -> backend
+data -> mappings -> UniStatistics-backed recipes -> scales -> guides -> scene -> backend
                                                      |-> SVG
                                                      |-> raster/PNG
                                                      `-> optional WGPU
@@ -49,7 +49,8 @@ common < data < scales < stats < grammar < scene < guides < render < c_api
 ```
 
 Backends consume the scene. They never participate in scale training, layout or
-statistics. This keeps CPU and future GPU output semantically equivalent.
+statistics. Type-7 quantiles and range-safe means delegate to UniStatistics,
+keeping CPU and GPU output equivalent without a second implementation.
 
 ## 1.0 contract
 

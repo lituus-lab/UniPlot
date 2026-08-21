@@ -3,7 +3,7 @@
 UniPlot separates the meaning of a plot from the device that draws it.
 
 ```text
-data -> mappings -> statistics -> scales -> guides -> scene -> backend
+data -> mappings -> UniStatistics-backed recipes -> scales -> guides -> scene -> backend
                                                      |-> SVG
                                                      |-> raster/PNG
                                                      `-> optional WGPU

@@ -11,6 +11,10 @@ nbText: """
 High-level plots train scales automatically. The public low-level API supports
 custom guides, adapters and inspection.
 
+Plot recipes filter retained data according to UniPlot policy, then delegate
+type-7 quantiles and range-safe means to UniStatistics. Histogram geometry and
+box-plot layer construction remain UniPlot responsibilities.
+
 ## Continuous scales
 """
 
