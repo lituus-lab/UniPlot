@@ -489,6 +489,36 @@ int main(void) {
       UPLOT_ERR_ARGUMENT);
     uplot_plot_free(contour);
   }
+  {
+    const double heat_values[] = {-1, 0, 1, NAN};
+    const double missing_heat[] = {NAN};
+    uplot_plot *heat = uplot_plot_new(320, 240);
+    assert(heat != NULL);
+    assert(uplot_add_raster_heatmap(heat, 2, 2, heat_values, 4,
+      0.0, 2.0, 10.0, 20.0, UPLOT_RASTER_NEAREST) == UPLOT_OK);
+    assert(uplot_render_svg(heat, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    assert(uplot_add_raster_heatmap(heat, 2, 2, heat_values, 4,
+      0.0, 2.0, 10.0, 20.0, UPLOT_RASTER_NEAREST) ==
+      UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(heat);
+    heat = uplot_plot_new(320, 240);
+    assert(heat != NULL);
+    assert(uplot_add_raster_heatmap(heat, 2, 2, NULL, 4,
+      0.0, 2.0, 10.0, 20.0, UPLOT_RASTER_NEAREST) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_raster_heatmap(heat, 2, 2, heat_values, 3,
+      0.0, 2.0, 10.0, 20.0, UPLOT_RASTER_NEAREST) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_raster_heatmap(heat, 1, 1, missing_heat, 1,
+      0.0, 1.0, 0.0, 1.0, UPLOT_RASTER_NEAREST) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_raster_heatmap(heat, 2, 2, heat_values, 4,
+      0.0, 2.0, 10.0, 20.0, 99) == UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(heat);
+  }
 
   uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
   assert(invalid_automatic != NULL);
