@@ -297,6 +297,21 @@ def test_contours_render_and_validate_rectilinear_grids():
     with pytest.raises(ValueError):
         uniplot.Plot().contour([0, 1], [0, 1], [0, 1, 1, 2], [3])
 
+def test_dense_raster_heatmaps_render_and_validate_matrices():
+    plot = uniplot.Plot().raster_heatmap(
+        2, 2, [-1, 0, 1, float("nan")], 0, 2, 10, 20)
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.raster_heatmap(1, 1, [1], 0, 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster_heatmap(2, 2, [1], 0, 2, 0, 2)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster_heatmap(
+            1, 1, [float("nan")], 0, 1, 0, 1)
+    with pytest.raises(ValueError):
+        uniplot.Plot().raster_heatmap(1, 1, [1], 0, 1, 0, 1, filter=99)
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
