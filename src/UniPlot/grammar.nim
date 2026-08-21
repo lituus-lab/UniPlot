@@ -12,6 +12,10 @@ import UniPlot/[common, data, scales, stats]
 export MarkerShape
 
 type
+  CoordinateKind* = enum
+    CartesianCoordinates
+    PolarCoordinates
+
   MarkKind* = enum
     mkLine
     mkPoint
@@ -152,6 +156,7 @@ type
     continuousColors*: Palette
     mappedSizeRange*, mappedAlphaRange*: AestheticRange
     xScaleSpec*, yScaleSpec*: AxisScaleSpec
+    coordinates*: CoordinateKind
     secondaryYSpec*: SecondaryAxisSpec
     references*: seq[Reference]
     annotations*: seq[Annotation]
@@ -273,6 +278,15 @@ proc plot*(data: DataFrame): PlotSpec =
     mappedAlphaRange: AestheticRange(minimum: 0.2, maximum: 1),
     xScaleSpec: AxisScaleSpec(exponent: 1.0),
     yScaleSpec: AxisScaleSpec(exponent: 1.0))
+
+proc coordPolar*(spec: var PlotSpec) =
+  ## Interpret numeric x as radians and numeric y as radial distance.
+  ## Zero radians is at twelve o'clock; positive angles advance clockwise.
+  spec.coordinates = PolarCoordinates
+
+proc coordCartesian*(spec: var PlotSpec) =
+  ## Restore ordinary Cartesian projection without changing axis settings.
+  spec.coordinates = CartesianCoordinates
 
 proc aes*(x, y: string; label = ""; color = ""; size = ""; alpha = "";
     shape = ""; lineStyle = ""; fill = ""; xMin = ""; xMax = "";

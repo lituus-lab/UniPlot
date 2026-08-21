@@ -41,6 +41,21 @@ proc segmentPath(a, b: Point; width: float32): Path =
     Point(x: b.x + nx, y: b.y + ny), Point(x: b.x - nx, y: b.y - ny),
     Point(x: a.x - nx, y: a.y - ny)])
 
+proc polarPoint(area: Bounds; xScale, yScale: ContinuousScale;
+    angle, radius: float64): Point =
+  let
+    mappedAngle = xScale.map(angle)
+    mappedRadius = yScale.map(radius)
+    theta = 2.0 * PI * float64((mappedAngle - area.xMin) / area.width)
+    radialRatio = (area.yMax - mappedRadius) / area.height
+    screenRadius = min(area.width, area.height) * 0.5'f32 * radialRatio
+    center = Point(x: (area.xMin + area.xMax) * 0.5'f32,
+      y: (area.yMin + area.yMax) * 0.5'f32)
+  result = Point(x: center.x + screenRadius * float32(sin(theta)),
+    y: center.y - screenRadius * float32(cos(theta)))
+  if not result.x.isFinite or not result.y.isFinite:
+    raise newException(PlotError, "polar projection is not finite")
+
 proc arrowPath(startPoint, endPoint: Point; width,
     requestedHeadSize: float32): Path =
   let
@@ -118,6 +133,15 @@ proc linePath(points: openArray[Point]; width: float32;
     result.lineTo(points[i].x, points[i].y)
   result = result.preparePath().strokeToPath(
     lineStrokeStyle(width, lineStyle))
+
+proc ringPath(center: Point; radius, width: float32): Path =
+  const steps = 128
+  var points = newSeqOfCap[Point](steps + 1)
+  for index in 0 .. steps:
+    let angle = 2.0 * PI * float64(index) / float64(steps)
+    points.add Point(x: center.x + radius * float32(sin(angle)),
+      y: center.y - radius * float32(cos(angle)))
+  linePath(points, width, SolidLine)
 
 proc errorBarPath(lower, upper: Point; capWidth, width: float32): Path =
   result = newPath()
@@ -392,6 +416,18 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
   if includeZero and spec.yScaleSpec.kind == skLog10:
     raise newException(PlotError,
       "bar and area layers require a linear y scale with a zero baseline")
+  if spec.coordinates == PolarCoordinates:
+    for layer in spec.layers:
+      for value in spec.data.numeric(layer.mapping.y):
+        if value.isFinite and value < 0.0:
+          raise newException(PlotError,
+            "polar radii must be non-negative")
+    for annotation in spec.annotations:
+      if annotation.y < 0.0 or
+          (annotation.kind == akArrow and annotation.yEnd < 0.0):
+        raise newException(PlotError,
+          "polar annotation radii must be non-negative")
+    result.yContinuous.addValues([0.0])
 
 proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     height: 500)): Scene =
@@ -419,6 +455,32 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       not spec.mappedAlphaRange.maximum.isFinite:
     raise newException(PlotError,
       "alpha range must be finite, ordered and within [0, 1]")
+  if spec.coordinates == PolarCoordinates:
+    if spec.rasters.len > 0 or spec.references.len > 0 or
+        spec.imageResources.len > 0 or spec.secondaryYSpec.enabled:
+      raise newException(PlotError,
+        "polar coordinates do not support rasters, references, image resources or secondary axes")
+    if spec.xScaleSpec.kind != skLinear or
+        spec.xScaleSpec.labelKind != alkNumeric or
+        spec.yScaleSpec.labelKind != alkNumeric:
+      raise newException(PlotError,
+        "polar coordinates require a linear numeric angle axis and numeric radial labels")
+    if spec.xScaleSpec.domain.configured and
+        (spec.xScaleSpec.domain.minimum != 0.0 or
+        spec.xScaleSpec.domain.maximum != 2.0 * PI):
+      raise newException(PlotError,
+        "polar angular limits must remain [0, 2*pi]")
+    if spec.yScaleSpec.kind == skLog10:
+      raise newException(PlotError,
+        "polar radii cannot use a logarithmic scale because radius zero is required")
+    if spec.yScaleSpec.domain.configured and
+        spec.yScaleSpec.domain.minimum != 0.0:
+      raise newException(PlotError,
+        "explicit polar radial limits must start at zero")
+    for layer in spec.layers:
+      if layer.mark notin {mkLine, mkPoint, mkText}:
+        raise newException(PlotError,
+          "polar coordinates currently support line, point and text marks")
   var usesContinuousColors = false
   var imageResourceIndices = initTable[string, int]()
   for index, resource in spec.imageResources:
@@ -597,6 +659,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   let
     xKind = domains.xKind
     yKind = domains.yKind
+  if spec.coordinates == PolarCoordinates and
+      (xKind != ckNumeric or yKind != ckNumeric):
+    raise newException(PlotError,
+      "polar coordinates require numeric angle and radius columns")
   var xScale: ContinuousScale
   var xBand: BandScale
   var yScale: ContinuousScale
@@ -612,7 +678,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if xKind == ckNumeric and spec.xScaleSpec.categories.configured:
     raise newException(PlotError,
       "categorical x domain cannot be applied to numeric coordinates")
-  if xKind == ckNumeric and spec.xScaleSpec.domain.configured:
+  if xKind == ckNumeric and spec.coordinates == PolarCoordinates:
+    xScale = domains.xContinuous.train(xRangeMin, xRangeMax, 0.0, 2.0 * PI)
+  elif xKind == ckNumeric and spec.xScaleSpec.domain.configured:
     xScale = domains.xContinuous.train(xRangeMin, xRangeMax,
       spec.xScaleSpec.domain.minimum, spec.xScaleSpec.domain.maximum)
   elif xKind == ckNumeric:
@@ -635,6 +703,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
   if yKind == ckNumeric and spec.yScaleSpec.domain.configured:
     yScale = domains.yContinuous.train(yRangeMin, yRangeMax,
       spec.yScaleSpec.domain.minimum, spec.yScaleSpec.domain.maximum)
+  elif yKind == ckNumeric and spec.coordinates == PolarCoordinates:
+    let radialBounds = domains.yContinuous.fittedBounds
+    yScale = domains.yContinuous.train(yRangeMin, yRangeMax, 0.0,
+      if radialBounds.maximum > 0.0: radialBounds.maximum else: 1.0)
   elif yKind == ckNumeric:
     yScale = domains.yContinuous.trainAxis(yRangeMin, yRangeMax,
       spec.yScaleSpec.labelKind)
@@ -671,7 +743,39 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       resized = urotate.rotate(resized, urotate.flipV)
     result.addImage(resized, pixelX, pixelY, id = nodeId)
     inc nodeId
-  if xKind == ckNumeric:
+  if spec.coordinates == PolarCoordinates:
+    let
+      center = Point(x: (area.xMin + area.xMax) * 0.5'f32,
+        y: (area.yMin + area.yMax) * 0.5'f32)
+      outerRadius = min(area.width, area.height) * 0.5'f32
+    for index in 0 ..< 8:
+      let
+        angle = float64(index) * PI / 4.0
+        edge = polarPoint(area, xScale, yScale, angle, yScale.domainMax)
+        labelPoint = Point(x: center.x + (edge.x - center.x) * 1.08'f32,
+          y: center.y + (edge.y - center.y) * 1.08'f32)
+        label = case index
+          of 0: "0"
+          of 1: "pi/4"
+          of 2: "pi/2"
+          of 3: "3pi/4"
+          of 4: "pi"
+          of 5: "5pi/4"
+          of 6: "3pi/2"
+          else: "7pi/4"
+      result.addPath(segmentPath(center, edge, 1), spec.theme.gridColor)
+      result.addText(label, labelPoint, 11, spec.theme.foreground,
+        anchor = textMiddle)
+    for value in yScale.axisTicks(spec.yScaleSpec.labelKind):
+      if value < 0.0: continue
+      let mapped = yScale.map(value)
+      let radius = outerRadius * (area.yMax - mapped) / area.height
+      if radius > 0.0:
+        result.addPath(ringPath(center, radius, 1), spec.theme.gridColor)
+      result.addText(yScale.axisTickLabel(value, spec.yScaleSpec.labelKind),
+        Point(x: center.x + 4, y: center.y - radius - 3), 11,
+        spec.theme.foreground)
+  elif xKind == ckNumeric:
     for value in xScale.axisTicks(spec.xScaleSpec.labelKind):
       let x = xScale.map(value)
       result.addPath(segmentPath(Point(x: x, y: area.yMin),
@@ -683,7 +787,9 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
     for value in xBand.domain:
       result.addText(value, Point(x: xBand.map(value), y: area.yMax + 20), 11,
         spec.theme.foreground, anchor = textMiddle)
-  if yKind == ckNumeric:
+  if spec.coordinates == PolarCoordinates:
+    discard
+  elif yKind == ckNumeric:
     for value in yScale.axisTicks(spec.yScaleSpec.labelKind):
       let y = yScale.map(value)
       result.addPath(segmentPath(Point(x: area.xMin, y: y),
@@ -916,7 +1022,10 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       else:
         let y = if yKind == ckNumeric: yScale.map(ys[row]) else:
           yBand.map(categoricalYs[row])
-        points.add Point(x: x, y: y)
+        points.add(if spec.coordinates == PolarCoordinates:
+          polarPoint(area, xScale, yScale, numericXs[row], ys[row])
+        else:
+          Point(x: x, y: y))
       if layer.mark in {mkLine, mkArea, mkRibbon, mkPolygon}:
         breakBefore.add pendingBreak
       pendingBreak = false
@@ -1097,16 +1206,20 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         result.addImage(resized, pixelX, pixelY, id = nodeId)
         inc nodeId
   for annotation in spec.annotations:
-    let startPoint = Point(x: xScale.map(annotation.x),
-      y: yScale.map(annotation.y))
+    let startPoint = if spec.coordinates == PolarCoordinates:
+      polarPoint(area, xScale, yScale, annotation.x, annotation.y)
+    else:
+      Point(x: xScale.map(annotation.x), y: yScale.map(annotation.y))
     case annotation.kind
     of akText:
       result.addText(annotation.text, startPoint, annotation.size,
         annotation.color, nodeId)
       inc nodeId
     of akArrow:
-      let endPoint = Point(x: xScale.map(annotation.xEnd),
-        y: yScale.map(annotation.yEnd))
+      let endPoint = if spec.coordinates == PolarCoordinates:
+        polarPoint(area, xScale, yScale, annotation.xEnd, annotation.yEnd)
+      else:
+        Point(x: xScale.map(annotation.xEnd), y: yScale.map(annotation.yEnd))
       result.addPath(arrowPath(startPoint, endPoint, annotation.size,
         annotation.headSize), annotation.color, nodeId)
       inc nodeId

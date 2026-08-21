@@ -246,6 +246,8 @@ proc toJsonNode*(spec: PlotSpec): JsonNode =
     "yScale": yScale,
     "references": references
   }
+  if spec.coordinates != CartesianCoordinates:
+    result["coordinates"] = %($spec.coordinates)
   if spec.annotations.len > 0:
     var annotations = newJArray()
     for annotation in spec.annotations:
@@ -321,6 +323,8 @@ proc fromJsonNode*(root: JsonNode): PlotSpec =
   if root.field("version", JInt).getInt != PlotSpecSchemaVersion:
     raise fail("unsupported schema version")
   result = plot(root.field("data", JObject).decodeData)
+  if root.hasKey("coordinates"):
+    result.coordinates = enumValue[CoordinateKind](root, "coordinates")
   result.layers.setLen(0)
   for node in root.field("layers", JArray):
     let mark = enumValue[MarkKind](node, "mark")

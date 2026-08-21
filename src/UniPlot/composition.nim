@@ -108,6 +108,7 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
     yDomain = initContinuousDomain()
     yBand = initBandDomain()
     initialized = false
+    coordinates = CartesianCoordinates
     xCoordinateKind, yCoordinateKind = ckNumeric
     xKind = skLinear
     yKind = skLinear
@@ -120,6 +121,7 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
   for spec in specs:
     let domains = collectAxisDomains(spec)
     if not initialized:
+      coordinates = spec.coordinates
       xKind = spec.xScaleSpec.kind
       xExponent = spec.xScaleSpec.exponent
       xLabelKind = spec.xScaleSpec.labelKind
@@ -133,6 +135,9 @@ proc shareDomains(specs: openArray[PlotSpec]; shareX,
       xDomain = initContinuousDomain(xKind, xExponent)
       yDomain = initContinuousDomain(yKind, yExponent)
       initialized = true
+    if (shareX or shareY) and spec.coordinates != coordinates:
+      raise newException(PlotError,
+        "shared axes require matching coordinate systems")
     if shareX:
       if domains.xKind != xCoordinateKind:
         raise newException(PlotError,
