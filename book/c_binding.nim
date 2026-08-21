@@ -150,6 +150,8 @@ int main(void) {
 - `uplot_add_contours` copies rectilinear x/y coordinates, a row-major scalar
   grid and ordered levels, then retains deterministic marching-squares lines.
   Cells containing a non-finite sample are skipped.
+- `uplot_add_polynomial_smooth` copies aligned samples, fits degree 1 through
+  8 through UniStatistics/UniLinalg QR, and retains the sampled line.
 - `uplot_set_x_scale` / `uplot_set_y_scale` select linear, base-10 logarithmic
   or fixed-unit symmetric-logarithmic coordinates and may reverse direction.
 - `uplot_set_x_power_scale` / `uplot_set_y_power_scale` configure a positive

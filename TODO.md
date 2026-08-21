@@ -108,7 +108,9 @@ silently claimed by the focused 1.0 publication contract.
   histogram bin selection through UniMath, including C and Python bindings.
 - [x] Range-safe linear smoothing with Student-t mean-confidence intervals in
   Nim, C and Python through UniStatistics and UniAccurate.
-- [ ] Nonlinear smoothing, multi-column or windowed grouped transforms.
+- [x] Degree-1..8 normalized polynomial smoothing in Nim, C and Python through
+  UniStatistics and UniLinalg QR.
+- [ ] Multi-column or windowed grouped transforms.
 - [x] Reference lines and reference bands in numeric data coordinates.
 - [x] Plain data-coordinate text annotations and arrows in Nim, C and Python.
 - [ ] Rich multi-style text runs after UniGlyph exposes run-level styling.

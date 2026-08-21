@@ -24,7 +24,8 @@ rendering engines.
 - solid, dashed, dotted, dot-dash and long-dash line styles;
 - explicit drop, break and reject policies for non-finite mapped values;
 - numeric size and alpha mappings with explicit output ranges;
-- line, point, bar, area and text layers, plus histogram recipes;
+- line, point, bar, area and text layers, plus histogram and linear/polynomial
+  smoothing recipes;
 - Cartesian and polar guides, ticks, labels, titles and themes;
 - explicit layer-derived legends with deterministic layout;
 - an inspectable retained scene shared by SVG and raster rendering;

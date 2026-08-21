@@ -540,6 +540,30 @@ therefore consume identical contour geometry; no backend reruns the statistic.
 The current recipe uses one line style for all requested levels. Filled
 contours remain outside the 1.0 contract.
 
+## Polynomial smoothing
+"""
+
+nbCode:
+  let curveX = [-2.0, -1.0, 0.0, 1.0, 2.0]
+  let curveY = [9.0, 2.0, 1.0, 6.0, 17.0]
+  var curve = polynomialSmoothPlot(curveX, curveY, degree = 2,
+    pointCount = 128, lineColor = "#d1495b")
+  curve.geomPoint(aes("x", "estimate"), color = "#3366cc", radius = 2)
+  curve.labels(title = "Normalized quadratic smoothing", x = "x", y = "fit")
+  let curveSvg = curve.compileScene(Size(width: 720, height: 420)).toSvg(
+    loadTtf("../../tests/DejaVuSans.ttf"))
+
+nbRawHtml svgFigure(curveSvg,
+  "A degree-two UniStatistics QR fit materialised as retained line geometry.")
+
+nbText: """
+`polynomialSmoothPlot` filters aligned finite pairs, fits degree 1 through 8
+with `UniStatistics.polynomialRegression`, and samples the owned normalized
+model onto 2 through 10,000 points. UniStatistics maps x into `[-1, 1]` and
+delegates least squares to UniLinalg QR; UniPlot only creates the retained
+line. Unlike `linearSmoothPlot`, this descriptive nonlinear recipe does not
+claim a confidence band.
+
 Next: [Scenes and rendering](scene_rendering.html).
 """
 
