@@ -82,6 +82,8 @@ proc main() =
   proc makeSmoothSpec(): PlotSpec =
     linearSmoothPlot(smoothX, smoothY, pointCount = 200,
       confidenceLevel = 0.95)
+  proc makePolynomialSpec(): PlotSpec =
+    polynomialSmoothPlot(smoothX, smoothY, degree = 3, pointCount = 200)
   var densityValues = newSeq[float64](5_000)
   for index in 0 ..< densityValues.len:
     densityValues[index] = 0.7 * sin(float64(index) * 0.031) +
@@ -141,6 +143,10 @@ proc main() =
     discard statistics.linearRegressionDiagnostics(smoothX, smoothY)
     let warmSmooth = makeSmoothSpec().compileScene(Size(width: 800, height: 600))
     discard warmSmooth.renderImage(font)
+    discard statistics.polynomialRegression(smoothX, smoothY, 3)
+    let warmPolynomial = makePolynomialSpec().compileScene(
+      Size(width: 800, height: 600))
+    discard warmPolynomial.renderImage(font)
     discard statistics.kernelDensity(densityValues, 256)
     let warmDensity = makeDensitySpec().compileScene(Size(width: 800, height: 600))
     discard warmDensity.renderImage(font)
@@ -162,6 +168,8 @@ proc main() =
     histogramCompileStats, histogramPublicationStats: RunningStat
   var smoothFitStats, smoothConstructionStats, smoothCompileStats,
     smoothPublicationStats: RunningStat
+  var polynomialFitStats, polynomialConstructionStats, polynomialCompileStats,
+    polynomialPublicationStats: RunningStat
   var densityEstimateStats, densityConstructionStats, densityCompileStats,
     densityPublicationStats: RunningStat
   var contourExtractionStats, contourConstructionStats, contourCompileStats,
@@ -239,6 +247,22 @@ proc main() =
     guard = guard xor int(smoothPixels.data[
       (iteration * 3253) mod smoothPixels.data.len])
     started = getMonoTime()
+    let polynomialFit = statistics.polynomialRegression(smoothX, smoothY, 3)
+    polynomialFitStats.push elapsedMs(started)
+    guard = guard xor int(polynomialFit.coefficients[0] * 1_000_000.0)
+    started = getMonoTime()
+    let polynomialSpec = makePolynomialSpec()
+    polynomialConstructionStats.push elapsedMs(started)
+    started = getMonoTime()
+    let polynomialScene = polynomialSpec.compileScene(
+      Size(width: 800, height: 600))
+    polynomialCompileStats.push elapsedMs(started)
+    started = getMonoTime()
+    let polynomialPixels = polynomialScene.renderImage(font)
+    polynomialPublicationStats.push elapsedMs(started)
+    guard = guard xor int(polynomialPixels.data[
+      (iteration * 3631) mod polynomialPixels.data.len])
+    started = getMonoTime()
     let densityEstimate = statistics.kernelDensity(densityValues, 256)
     densityEstimateStats.push elapsedMs(started)
     guard = guard xor int(densityEstimate.density[128] * 1_000_000.0)
@@ -311,6 +335,7 @@ proc main() =
     "histogram_rule": "Freedman-Diaconis",
     "smoothing_point_count": smoothX.len,
     "smoothing_grid_count": 200,
+    "polynomial_degree": 3,
     "density_point_count": densityValues.len,
     "density_grid_count": 256,
     "contour_grid": "128x128", "contour_level_count": contourLevels.len,
@@ -334,6 +359,10 @@ proc main() =
     "smoothing_construction_mean_ms": smoothConstructionStats.mean,
     "smoothing_compile_mean_ms": smoothCompileStats.mean,
     "smoothing_publication_mean_ms": smoothPublicationStats.mean,
+    "polynomial_fit_mean_ms": polynomialFitStats.mean,
+    "polynomial_construction_mean_ms": polynomialConstructionStats.mean,
+    "polynomial_compile_mean_ms": polynomialCompileStats.mean,
+    "polynomial_publication_mean_ms": polynomialPublicationStats.mean,
     "density_estimate_mean_ms": densityEstimateStats.mean,
     "density_construction_mean_ms": densityConstructionStats.mean,
     "density_compile_mean_ms": densityCompileStats.mean,

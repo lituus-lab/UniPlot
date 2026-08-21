@@ -36,6 +36,7 @@ proc main() =
           "semantics", "image_mark_count", "image_resource_count",
           "temporal_point_count", "histogram_point_count", "histogram_rule",
           "smoothing_point_count", "smoothing_grid_count", "contour_grid",
+          "polynomial_degree",
           "contour_level_count", "dense_grid", "power_point_count",
           "polar_point_count"]:
         if reports[run][field] != reports[0][field]:
@@ -69,6 +70,7 @@ proc main() =
     "histogram_rule": first["histogram_rule"],
     "smoothing_point_count": first["smoothing_point_count"],
     "smoothing_grid_count": first["smoothing_grid_count"],
+    "polynomial_degree": first["polynomial_degree"],
     "density_point_count": first["density_point_count"],
     "density_grid_count": first["density_grid_count"],
     "contour_grid": first["contour_grid"],
@@ -93,6 +95,10 @@ proc main() =
   result["smoothing_construction"] = phase("smoothing_construction_mean_ms")
   result["smoothing_compile"] = phase("smoothing_compile_mean_ms")
   result["smoothing_publication"] = phase("smoothing_publication_mean_ms")
+  result["polynomial_fit"] = phase("polynomial_fit_mean_ms")
+  result["polynomial_construction"] = phase("polynomial_construction_mean_ms")
+  result["polynomial_compile"] = phase("polynomial_compile_mean_ms")
+  result["polynomial_publication"] = phase("polynomial_publication_mean_ms")
   result["density_estimate"] = phase("density_estimate_mean_ms")
   result["density_construction"] = phase("density_construction_mean_ms")
   result["density_compile"] = phase("density_compile_mean_ms")
