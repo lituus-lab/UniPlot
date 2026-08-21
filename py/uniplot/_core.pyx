@@ -41,6 +41,9 @@ cdef extern from "UniPlot.h":
     int uplot_add_linear_smooth(uplot_plot *, const double *, const double *,
                                 size_t, int, double, int, const char *,
                                 const char *)
+    int uplot_add_polynomial_smooth(uplot_plot *, const double *,
+                                    const double *, size_t, int, int,
+                                    const char *)
     int uplot_add_density(uplot_plot *, const double *, size_t, int, double,
                           const char *, const char *)
     int uplot_add_violin(uplot_plot *, const double *, size_t, int, double,
@@ -459,6 +462,36 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid linear smoothing input or non-empty plot")
+        return self
+
+    def polynomial_smooth(self, x, y, int degree=2, int point_count=100,
+                          line_color="#3366cc"):
+        x = list(x)
+        y = list(y)
+        if len(x) != len(y) or len(x) < degree + 2:
+            raise ValueError("polynomial samples have insufficient aligned values")
+        cdef size_t count = len(x)
+        cdef double *x_items = <double *>malloc(count * sizeof(double))
+        cdef double *y_items = <double *>malloc(count * sizeof(double))
+        cdef bytes encoded_line = str(line_color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if x_items == NULL or y_items == NULL:
+            free(x_items); free(y_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                x_items[index] = float(x[index])
+                y_items[index] = float(y[index])
+            status = uplot_add_polynomial_smooth(
+                self._handle, x_items, y_items, count, degree, point_count,
+                encoded_line)
+        finally:
+            free(x_items); free(y_items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid polynomial smoothing input or non-empty plot")
         return self
 
     def density(self, values, int point_count=512, double bandwidth=0.0,
