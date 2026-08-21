@@ -45,6 +45,102 @@ type
     value*: float64
     count*: int
 
+  ContourSegment* = object
+    ## One isoline segment in original data coordinates.
+    level*, x0*, y0*, x1*, y1*: float64
+
+proc contourRatio(level, first, last: float64): float64 =
+  let
+    numerator = level - first
+    denominator = last - first
+  result = if numerator.isFinite and denominator.isFinite:
+      numerator / denominator
+    else:
+      (level * 0.5 - first * 0.5) / (last * 0.5 - first * 0.5)
+  if not result.isFinite or result < 0.0 or result > 1.0:
+    raise newException(PlotError, "contour interpolation is not finite")
+
+proc contourSegments*(xs, ys, values, levels: openArray[float64]):
+    seq[ContourSegment] {.contractual.} =
+  ## Extract deterministic marching-squares segments from a row-major grid.
+  require:
+    xs.len >= 2 and ys.len >= 2
+    levels.len > 0
+  body:
+    if xs.len < 2 or ys.len < 2 or levels.len == 0 or
+        xs.len > high(int) div ys.len or values.len != xs.len * ys.len:
+      raise newException(PlotError, "invalid contour grid dimensions")
+    for coordinates in [@xs, @ys, @levels]:
+      for index, value in coordinates:
+        if not value.isFinite or
+            (index > 0 and value <= coordinates[index - 1]):
+          raise newException(PlotError,
+            "contour coordinates and levels must be finite and increasing")
+    type DataPoint = tuple[x, y: float64]
+    proc interpolateEdge(edge: int; level, x0, x1, y0, y1,
+        v00, v10, v11, v01: float64): DataPoint =
+      var ax, ay, av, bx, by, bv: float64
+      case edge
+      of 0: (ax, ay, av, bx, by, bv) = (x0, y0, v00, x1, y0, v10)
+      of 1: (ax, ay, av, bx, by, bv) = (x1, y0, v10, x1, y1, v11)
+      of 2: (ax, ay, av, bx, by, bv) = (x1, y1, v11, x0, y1, v01)
+      of 3: (ax, ay, av, bx, by, bv) = (x0, y1, v01, x0, y0, v00)
+      else: raise newException(PlotError, "invalid contour edge")
+      let ratio = contourRatio(level, av, bv)
+      result = (ax * (1.0 - ratio) + bx * ratio,
+        ay * (1.0 - ratio) + by * ratio)
+      if not result.x.isFinite or not result.y.isFinite:
+        raise newException(PlotError, "contour coordinate is not finite")
+    proc addPair(output: var seq[ContourSegment]; isoLevel: float64;
+        firstEdge, secondEdge: int;
+        cellX0, cellX1, cellY0, cellY1,
+        cellV00, cellV10, cellV11, cellV01: float64) =
+      let
+        first = interpolateEdge(firstEdge, isoLevel,
+          cellX0, cellX1, cellY0, cellY1,
+          cellV00, cellV10, cellV11, cellV01)
+        second = interpolateEdge(secondEdge, isoLevel,
+          cellX0, cellX1, cellY0, cellY1,
+          cellV00, cellV10, cellV11, cellV01)
+      output.add ContourSegment(level: isoLevel, x0: first.x, y0: first.y,
+        x1: second.x, y1: second.y)
+    for level in levels:
+      for row in 0 ..< ys.len - 1:
+        for column in 0 ..< xs.len - 1:
+          let
+            v00 = values[row * xs.len + column]
+            v10 = values[row * xs.len + column + 1]
+            v11 = values[(row + 1) * xs.len + column + 1]
+            v01 = values[(row + 1) * xs.len + column]
+          if not v00.isFinite or not v10.isFinite or not v11.isFinite or
+              not v01.isFinite:
+            continue
+          let mask = (if v00 >= level: 1 else: 0) or
+            (if v10 >= level: 2 else: 0) or
+            (if v11 >= level: 4 else: 0) or
+            (if v01 >= level: 8 else: 0)
+          template pair(a, b: int) =
+            addPair(result, level, a, b, xs[column], xs[column + 1],
+              ys[row], ys[row + 1], v00, v10, v11, v01)
+          case mask
+          of 0, 15: discard
+          of 1, 14: pair(3, 0)
+          of 2, 13: pair(0, 1)
+          of 3, 12: pair(3, 1)
+          of 4, 11: pair(1, 2)
+          of 6, 9: pair(0, 2)
+          of 7, 8: pair(3, 2)
+          of 5, 10:
+            let centre = v00 * 0.25 + v10 * 0.25 + v11 * 0.25 + v01 * 0.25
+            let connectHigh = centre >= level
+            if (mask == 5 and connectHigh) or (mask == 10 and not connectHigh):
+              pair(0, 1)
+              pair(2, 3)
+            else:
+              pair(3, 0)
+              pair(1, 2)
+          else: raise newException(PlotError, "invalid contour topology")
+
 proc finiteSorted(values: openArray[float64]): seq[float64] =
   result = newSeqOfCap[float64](values.len)
   for value in values:
