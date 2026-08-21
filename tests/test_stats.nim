@@ -239,3 +239,33 @@ suite "statistics":
       discard numericHeatmapPlot([0.0, 1.0], [0.0, 1.0], [1.0, 2.0])
     expect PlotError:
       discard numericHeatmapPlot([-1e308, 1e308], [0.0, 1.0], [1.0])
+
+  test "marching squares extracts plane and saddle contours deterministically":
+    let plane = contourSegments([0.0, 1.0], [0.0, 1.0],
+      [0.0, 1.0, 1.0, 2.0], [1.0])
+    check plane.len == 1
+    check plane[0] == ContourSegment(level: 1.0, x0: 0.0, y0: 1.0,
+      x1: 1.0, y1: 0.0)
+
+    let saddle = contourSegments([0.0, 1.0], [0.0, 1.0],
+      [1.0, -1.0, -1.0, 1.0], [0.0])
+    check saddle.len == 2
+    check saddle[0] == ContourSegment(level: 0.0, x0: 0.5, y0: 0.0,
+      x1: 1.0, y1: 0.5)
+    check saddle[1] == ContourSegment(level: 0.0, x0: 0.5, y0: 1.0,
+      x1: 0.0, y1: 0.5)
+
+  test "contours skip missing cells and validate grids before indexing":
+    check contourSegments([0.0, 1.0], [0.0, 1.0],
+      [0.0, NaN, 1.0, 2.0], [1.0]).len == 0
+    expect PlotError:
+      discard contourSegments([0.0, 0.0], [0.0, 1.0],
+        [0.0, 1.0, 1.0, 2.0], [1.0])
+    expect PlotError:
+      discard contourSegments([0.0, 1.0], [0.0, 1.0], [0.0], [1.0])
+    when defined(release) or defined(danger):
+      expect PlotError:
+        discard contourSegments([0.0], [0.0, 1.0], [0.0], [1.0])
+    else:
+      expect PreConditionDefect:
+        discard contourSegments([0.0], [0.0, 1.0], [0.0], [1.0])
