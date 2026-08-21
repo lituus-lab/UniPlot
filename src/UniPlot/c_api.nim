@@ -200,6 +200,38 @@ proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
   except CatchableError, Defect:
     UPLOT_ERR_ARGUMENT
 
+proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
+    values: ptr float64; valueCount: csize_t;
+    xMin, xMax, yMin, yMax: float64; filter: cint): cint {.
+    exportc, dynlib, cdecl.} =
+  if value.isNil or values.isNil or width <= 0 or height <= 0 or
+      filter < cint(RasterNearest) or filter > cint(RasterBox) or
+      not xMin.isFinite or not xMax.isFinite or xMin >= xMax or
+      not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
+    return UPLOT_ERR_ARGUMENT
+  let
+    w = int(width)
+    h = int(height)
+  if w > high(int) div h or valueCount != csize_t(w * h):
+    return UPLOT_ERR_ARGUMENT
+  try:
+    let hnd = handle(value)
+    if not hnd.spec.isBlankRecipeTarget:
+      return UPLOT_ERR_ARGUMENT
+    let input = cast[ptr UncheckedArray[float64]](values)
+    var copied = newSeqUninit[float64](w * h)
+    for index in 0 ..< copied.len:
+      copied[index] = input[index]
+    let candidate = rasterHeatmapPlot(w, h, copied, xMin, xMax, yMin, yMax,
+      RasterFilter(filter))
+    hnd.spec = candidate
+    hnd.nextColumn = 0
+    UPLOT_OK
+  except OutOfMemDefect:
+    UPLOT_ERR_MEMORY
+  except CatchableError, Defect:
+    UPLOT_ERR_ARGUMENT
+
 proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
     width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
     filter: cint): cint {.exportc, dynlib, cdecl.} =

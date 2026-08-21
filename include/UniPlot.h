@@ -83,6 +83,12 @@ int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
 int uplot_add_raster(uplot_plot *, const uint8_t *pixels, size_t length,
                      int width, int height, int channels, double x_min,
                      double x_max, double y_min, double y_max, int filter);
+/* Map a copied row-major scalar matrix through UniPlot's ordered UniColor
+ * palette and retain the resulting RGBA8 raster. */
+int uplot_add_raster_heatmap(uplot_plot *, int width, int height,
+                             const double *values, size_t value_count,
+                             double x_min, double x_max, double y_min,
+                             double y_max, int filter);
 /* Add one data mark in layer order. Pixels are copied and remain caller-owned. */
 int uplot_add_image_mark(uplot_plot *, const uint8_t *pixels, size_t length,
                          int width, int height, int channels, double x_min,
