@@ -138,6 +138,8 @@ int main(void) {
   UniStatistics linear fit plus an optional mean-confidence ribbon on an empty
   handle. Point count, confidence level, flags and colours are validated before
   publication.
+- `uplot_add_density` copies samples and materialises a Gaussian density area
+  plus outline. Bandwidth zero selects the UniStatistics automatic rule.
 - `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
   first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.

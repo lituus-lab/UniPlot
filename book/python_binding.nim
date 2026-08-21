@@ -146,6 +146,8 @@ in Cython. More ergonomic builders can grow additively over that foundation.
 `Plot.linear_smooth(x, y, point_count=100, confidence_level=0.95)` uses the
 same UniStatistics fit as Nim and C. It returns the plot for chaining and may
 disable the retained confidence ribbon with `show_confidence=False`.
+`Plot.density(values, point_count=512, bandwidth=0)` builds the corresponding
+UniStatistics Gaussian density area and outline.
 
 Next: [Rosetta stone and benchmarks](rosetta_benchmarks.html).
 """

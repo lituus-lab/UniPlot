@@ -263,6 +263,29 @@ The recipe requires at least three finite pairs, a varying predictor, 2 to
 10,000 evaluation points, and a confidence level strictly between zero and
 one. Set `showConfidence = false` to materialise only the fitted line.
 
+## Kernel density
+
+`densityPlot` delegates Gaussian kernels, exact accumulation and automatic
+bandwidth selection to UniStatistics. UniPlot filters non-finite observations
+and materialises the estimate as an area followed by its outline.
+"""
+
+nbCode:
+  let density = densityPlot(
+    [-2.4, -2.0, -1.7, -1.1, -0.8, 0.6, 0.9, 1.2, 1.7, 2.1, 2.5],
+    pointCount = 160, fillColor = "#7a3db840",
+    lineColor = "#7a3db8")
+  let densitySvg = density.compileScene(
+    Size(width: 720, height: 420)).toSvg(font)
+
+nbRawHtml svgFigure(densitySvg,
+  "Gaussian density with an automatic UniStatistics bandwidth.")
+
+nbText: """
+At least two finite observations are required. `bandwidth = 0` selects the
+automatic rule; any explicit bandwidth must be finite and positive. The
+evaluation grid accepts between 2 and 100,000 points.
+
 ## Legends
 
 A non-empty `legend` argument names a layer. Calling `legend` on the plot
