@@ -43,6 +43,27 @@ suite "plot compilation":
     expect PlotError:
       discard linearSmoothPlot([1.0, 1.0, 1.0], [1.0, 2.0, 3.0])
 
+  test "density recipe materialises retained area and line":
+    let spec = densityPlot([-2.0, -1.0, 0.0, 1.0, 2.0, NaN],
+      pointCount = 65)
+    check spec.data.rowCount == 65
+    check spec.layers.len == 2
+    check spec.layers[0].mark == mkArea
+    check spec.layers[1].mark == mkLine
+    let density = spec.data.numeric("density")
+    check abs(density[0] - density[^1]) < 2e-15
+    check spec.compileScene(Size(width: 480, height: 320)).nodes.anyIt(
+      it.kind == snPath)
+
+  test "density recipe validates configuration and finite sample count":
+    when not defined(release) and not defined(danger):
+      expect PreConditionDefect:
+        discard densityPlot([1.0, 2.0], pointCount = 1)
+    else:
+      expect PlotError:
+        discard densityPlot([1.0, 2.0], pointCount = 1)
+    expect PlotError: discard densityPlot([NaN, Inf])
+
   test "layers compile in deterministic order":
     let scene = sample().compileScene(Size(width: 640, height: 400))
     check scene.size.width == 640
