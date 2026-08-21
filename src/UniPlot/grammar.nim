@@ -777,6 +777,50 @@ proc linearSmoothPlot*(x, y: openArray[float64]; pointCount = 100;
     except ValueError as error:
       raise newException(PlotError, error.msg)
 
+proc polynomialSmoothPlot*(x, y: openArray[float64]; degree = 2;
+    pointCount = 100; lineColor = "#3366cc";
+    legend = ""): PlotSpec {.contractual.} =
+  ## Fit a normalized polynomial through UniStatistics and retain its line.
+  require:
+    x.len == y.len
+    degree >= 1 and degree <= 8
+    pointCount >= 2 and pointCount <= 10_000
+  body:
+    if x.len != y.len or degree < 1 or degree > 8 or pointCount < 2 or
+        pointCount > 10_000:
+      raise newException(PlotError, "invalid polynomial smoothing input")
+    var
+      finiteX = newSeqOfCap[float64](x.len)
+      finiteY = newSeqOfCap[float64](y.len)
+    for index in 0 ..< x.len:
+      if x[index].isFinite and y[index].isFinite:
+        finiteX.add x[index]
+        finiteY.add y[index]
+    if finiteX.len < degree + 2:
+      raise newException(PlotError,
+        "polynomial smoothing has insufficient finite pairs")
+    var minimumX = finiteX[0]
+    var maximumX = finiteX[0]
+    for value in finiteX:
+      minimumX = min(minimumX, value)
+      maximumX = max(maximumX, value)
+    try:
+      let fitted = statistics.polynomialRegression(finiteX, finiteY, degree)
+      var
+        grid = newSeq[float64](pointCount)
+        estimate = newSeq[float64](pointCount)
+      for index in 0 ..< pointCount:
+        let fraction = float64(index) / float64(pointCount - 1)
+        grid[index] = minimumX * (1.0 - fraction) + maximumX * fraction
+        estimate[index] = statistics.predictPolynomial(fitted, grid[index])
+      var frame = initDataFrame()
+      frame.addColumn("x", grid)
+      frame.addColumn("estimate", estimate)
+      result = plot(frame)
+      result.geomLine(aes("x", "estimate"), lineColor, legend = legend)
+    except ValueError as error:
+      raise newException(PlotError, error.msg)
+
 proc densityPlot*(values: openArray[float64]; pointCount = 512;
     bandwidth = 0.0; fillColor = "#3366cc40";
     lineColor = "#3366cc"; legend = ""): PlotSpec {.contractual.} =
