@@ -311,6 +311,10 @@ proc collectAxisDomains*(spec: PlotSpec): AxisDomains =
         spec.data.columns[layer.mapping.y].kind != ckCategorical):
       raise newException(PlotError,
         "tile layers require categorical x and y coordinates")
+    if layer.mark == mkPolygon and
+        spec.data.columns[xMapping].kind != ckNumeric:
+      raise newException(PlotError,
+        "polygon coordinates must reference numeric columns")
     if spec.data.columns[xMapping].kind != result.xKind:
       raise newException(PlotError, "all x mappings must use the same column kind")
     if layer.mark in {mkRect, mkImage}:
@@ -494,12 +498,13 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
           spec.data.columns[mapping].kind != ckNumeric):
         raise newException(PlotError,
           "size and alpha mappings must reference numeric columns")
-    if layer.mark in {mkArea, mkRibbon} and (layer.mapping.color.len > 0 or
+    if layer.mark in {mkArea, mkRibbon, mkPolygon} and
+        (layer.mapping.color.len > 0 or
         layer.mapping.fill.len > 0 or
         layer.mapping.size.len > 0 or layer.mapping.alpha.len > 0 or
         layer.mapping.shape.len > 0 or layer.mapping.lineStyle.len > 0):
       raise newException(PlotError,
-        "area and ribbon layers do not support per-row aesthetic mappings")
+        "area, ribbon and polygon layers do not support per-row aesthetic mappings")
     if layer.mark == mkText and (layer.mapping.label.len == 0 or
         layer.mapping.label notin spec.data.columns or
         spec.data.columns[layer.mapping.label].kind != ckCategorical):
@@ -845,7 +850,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
       of mkPoint: spec.theme.pointSize
       of mkLine, mkErrorBar, mkBoxPlot: spec.theme.lineWidth
       of mkText: 12'f32
-      of mkBar, mkArea, mkRibbon, mkTile, mkRect, mkImage: 0'f32
+      of mkBar, mkArea, mkRibbon, mkTile, mkRect, mkImage, mkPolygon: 0'f32
     var pendingBreak = false
     for row in 0 ..< spec.data.rowCount:
       if not rowFilter.rowIsFinite(row):
@@ -898,7 +903,7 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let y = if yKind == ckNumeric: yScale.map(ys[row]) else:
           yBand.map(categoricalYs[row])
         points.add Point(x: x, y: y)
-      if layer.mark in {mkLine, mkArea, mkRibbon}:
+      if layer.mark in {mkLine, mkArea, mkRibbon, mkPolygon}:
         breakBefore.add pendingBreak
       pendingBreak = false
       var paint = if categoricalPaintValues.len > 0:
@@ -976,6 +981,18 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
             areaPoints.add Point(x: points[stop - 1].x, y: base)
             areaPoints.add Point(x: points[start].x, y: base)
             result.addPath(polygon(areaPoints), layer.color, nodeId)
+            inc nodeId
+            start = stop
+    of mkPolygon:
+      if points.len > 0:
+        var start = 0
+        for stop in 1 .. points.len:
+          if stop == points.len or breakBefore[stop]:
+            if stop - start < 3:
+              raise newException(PlotError,
+                "polygon segments require at least three finite vertices")
+            result.addPath(polygon(points.toOpenArray(start, stop - 1)),
+              layer.color, nodeId)
             inc nodeId
             start = stop
     of mkText:
@@ -1100,7 +1117,8 @@ proc compileScene*(spec: PlotSpec; size = Size(width: 800,
         let radius = if entry.size > 0: entry.size else: spec.theme.pointSize
         result.addPath(markerPath(entry.shape, vec2(center.x, center.y),
           min(radius, 7'f32) * 2'f32), entry.color)
-      of mkBar, mkArea, mkRibbon, mkBoxPlot, mkTile, mkRect, mkImage:
+      of mkBar, mkArea, mkRibbon, mkBoxPlot, mkTile, mkRect, mkImage,
+          mkPolygon:
         var swatch = newPath()
         swatch.rect(legendX + 2, center.y - 6, 16, 12)
         result.addPath(swatch, entry.color)

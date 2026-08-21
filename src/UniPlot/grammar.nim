@@ -24,6 +24,7 @@ type
     mkTile
     mkRect
     mkImage
+    mkPolygon
 
   LineStyle* = enum
     SolidLine
@@ -333,6 +334,11 @@ proc geomImage*(spec: var PlotSpec; mapping: Aes;
 proc geomArea*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
     legend = ""; missingValues = BreakOnMissing) =
   spec.addLayer(mkArea, mapping, color, legend = legend,
+    missingValues = missingValues)
+proc geomPolygon*(spec: var PlotSpec; mapping: Aes; color = "#6699dd";
+    legend = ""; missingValues = BreakOnMissing) =
+  ## Add filled polygons from ordered numeric vertices.
+  spec.addLayer(mkPolygon, mapping, color, legend = legend,
     missingValues = missingValues)
 proc geomText*(spec: var PlotSpec; mapping: Aes; color = "#202124";
     size = 12'f32; legend = ""; missingValues = DropMissing) =
