@@ -72,8 +72,9 @@ non-finite layout parameters and incompatible mappings are rejected rather than
 silently repaired.
 
 UniPlot 1.0 does not promise a complete clone of any single plotting library,
-nonlinear smoothers, 3D scenes, volume rendering,
-arbitrary shader injection, a GUI event loop, or a bundled WGPU runtime.
+arbitrary user-defined statistical models, 3D scenes, volume rendering, rich
+multi-style text, PDF output, arbitrary shader injection, a GUI event loop, or
+a bundled WGPU runtime.
 Interactivity, picking, observables and streaming use explicit extension points
 and may grow without changing the CPU scene contract.
 

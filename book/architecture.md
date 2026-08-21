@@ -48,10 +48,11 @@ text are tessellated by UniVector, rendered offscreen and readable as RGBA8.
 
 ## Not yet part of the 1.0 promise
 
-Facets, smoothing, date-aware scales, legends, 3D and volume rendering,
-observables, streaming, GUI event loops and arbitrary shader injection are
-future work. They should extend the retained-scene contract rather than create
-parallel plotting semantics.
+Rich multi-style text awaits a run-level UniGlyph contract, and deterministic
+PDF awaits a lower-level Uni* backend. 3D and volume rendering, observables,
+streaming, GUI event loops and arbitrary shader injection remain future work.
+They should extend the retained-scene contract rather than create parallel
+plotting semantics.
 
 ## Reference and contribution
 

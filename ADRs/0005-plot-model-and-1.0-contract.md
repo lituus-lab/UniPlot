@@ -31,14 +31,14 @@ axes, labels, themes; and deterministic SVG and raster export.
 
 ## Exclusions
 
-The 1.0 contract excludes facets, date-aware ticks, statistical smoothing, 3D
-and volume plots, a GUI toolkit, arbitrary shader code, implicit network data
-loading, and full compatibility with third-party plot object models. These can
-be layered above the stable specification and scene boundaries.
+This ADR established the minimum 1.0 contract. Later accepted ADRs extended it
+additively with facets, temporal ticks, statistical recipes and polar
+coordinates without changing the specification/scene boundary. The remaining
+exclusions are 3D and volume plots, a GUI toolkit, arbitrary shader code,
+implicit network data loading, and full compatibility with third-party plot
+object models.
 
-The C ABI and Python binding intentionally expose owned plot handles, line and
-point series, titles, and SVG/PNG export. DataFrame mutation, custom layers,
-categorical bars, areas, text mappings, raw scenes, scales and histogram bins
-remain Nim-only because their tagged, generic or nested value models have no
-stable flat C representation. Bindings use the procedural recipes; they do not
-duplicate the complete grammar object model.
+The C ABI and Python binding expose owned plot handles and additive procedural
+recipes rather than duplicating the complete tagged grammar object model.
+Nested custom layers and raw retained scenes remain Nim-only where no stable
+flat representation exists.

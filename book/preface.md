@@ -14,8 +14,11 @@ current UniPlot API. SVG is inserted inline and PNG is encoded as a Base64
 - typed numeric and categorical data;
 - finite-row filtering;
 - linear, logarithmic and categorical scales;
+- symmetric-logarithmic, signed-power, UTC, duration and polar coordinates;
 - line, point, bar, area and text layers;
-- concise line, scatter, bar and histogram recipes;
+- concise publication recipes including histograms, density, smoothing,
+  box/violin, heatmap and contour plots;
+- legends, facets, subplot grids, annotations and image marks;
 - axes, ticks, labels, titles and themes;
 - an inspectable retained scene shared by every backend;
 - deterministic SVG and PNG rendering;
@@ -32,7 +35,7 @@ backends.
 
 ## The 1.0 boundary
 
-Version 1.0 does not promise facets, smoothing, date-aware ticks, 3D scenes,
-volume rendering, arbitrary shader injection or a GUI event loop. Stable scene
+Version 1.0 does not promise 3D scenes, volume rendering, rich multi-style text,
+PDF export, arbitrary shader injection or a GUI event loop. Stable scene
 identifiers and the WGPU boundary are designed so interactivity, picking and
 streaming can grow without changing the CPU scene contract.
