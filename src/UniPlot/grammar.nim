@@ -1079,6 +1079,70 @@ proc numericHeatmapPlot*(xBreaks, yBreaks, values: openArray[float64];
     if legend.len > 0:
       result.legend()
 
+proc rasterHeatmapPlot*(width, height: int; values: openArray[float64];
+    xMin, xMax, yMin, yMax: float64;
+    filter = RasterNearest): PlotSpec {.contractual.} =
+  ## Map a dense row-major scalar matrix through UniColor into one RGBA8 raster.
+  require:
+    width > 0 and height > 0
+    xMin.isFinite and xMax.isFinite and xMin < xMax
+    yMin.isFinite and yMax.isFinite and yMin < yMax
+  body:
+    if width <= 0 or height <= 0 or width > high(int) div height:
+      raise newException(PlotError, "invalid raster heatmap dimensions")
+    let pixelCount = width * height
+    if pixelCount > high(int) div 4 or values.len != pixelCount:
+      raise newException(PlotError,
+        "raster heatmap values must match the row-major pixel count")
+    if not xMin.isFinite or not xMax.isFinite or xMin >= xMax or
+        not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
+      raise newException(PlotError,
+        "raster heatmap extents must be finite and increasing")
+    var
+      minimum = Inf
+      maximum = NegInf
+    for value in values:
+      if value.isFinite:
+        minimum = min(minimum, value)
+        maximum = max(maximum, value)
+    if not minimum.isFinite:
+      raise newException(PlotError,
+        "raster heatmap requires at least one finite value")
+    var frame = initDataFrame()
+    result = plot(frame)
+    let prepared = result.continuousColors.prepareSampler()
+    if prepared.isErr:
+      raise newException(PlotError,
+        "cannot prepare the raster heatmap palette")
+    var image = ucore.newImage[uint8](width, height, ucore.csRgba)
+    for index, value in values:
+      let offset = index * 4
+      if not value.isFinite:
+        image.data[offset .. offset + 3] = [0'u8, 0'u8, 0'u8, 0'u8]
+        continue
+      let ratio = if minimum == maximum: 0.5 else:
+        let
+          numerator = value - minimum
+          denominator = maximum - minimum
+        if numerator.isFinite and denominator.isFinite:
+          numerator / denominator
+        else:
+          (value * 0.5 - minimum * 0.5) /
+            (maximum * 0.5 - minimum * 0.5)
+      let sampled = prepared.get.sample(ratio)
+      if sampled.isErr:
+        raise newException(PlotError, "cannot sample the raster heatmap palette")
+      let mapped = sampled.get.gamutMap(tagSrgb)
+      if mapped.isErr:
+        raise newException(PlotError,
+          "cannot map the raster heatmap palette to sRGB")
+      let rgba = mapped.get
+      for channel in 0 .. 2:
+        let component = min(1.0'f32, max(0.0'f32, rgba.comp(channel)))
+        image.data[offset + channel] = uint8(int(component * 255.0'f32 + 0.5))
+      image.data[offset + 3] = uint8(int(rgba.alpha * 255.0'f32 + 0.5))
+    result.raster(image, xMin, xMax, yMin, yMax, filter)
+
 proc contourPlot*(xs, ys, values, levels: openArray[float64];
     color = "#3366cc"; width = 0'f32; legend = ""): PlotSpec {.contractual.} =
   ## Materialise rectilinear marching-squares contours as retained lines.
