@@ -367,6 +367,27 @@ int main(void) {
   uplot_buffer_free(svg, svg_len);
   uplot_plot_free(automatic_histogram);
 
+  {
+    const double smooth_x[] = {1, 2, 3, 4, 5};
+    const double smooth_y[] = {1.2, 1.9, 3.2, 3.9, 5.1};
+    uplot_plot *smooth = uplot_plot_new(320, 240);
+    assert(smooth != NULL);
+    assert(uplot_add_linear_smooth(smooth, smooth_x, smooth_y, 5, 32, 0.95,
+      1, "#3366cc", "#3366cc40") == UPLOT_OK);
+    assert(uplot_render_svg(smooth, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    uplot_plot_free(smooth);
+    assert(uplot_add_linear_smooth(NULL, smooth_x, smooth_y, 5, 32, 0.95,
+      1, "#3366cc", "#3366cc40") == UPLOT_ERR_ARGUMENT);
+    smooth = uplot_plot_new(320, 240);
+    assert(smooth != NULL);
+    assert(uplot_add_linear_smooth(smooth, smooth_x, smooth_y, 5, 1, 0.95,
+      1, "#3366cc", "#3366cc40") == UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(smooth);
+  }
+
   uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
   assert(invalid_automatic != NULL);
   assert(uplot_add_automatic_histogram(
