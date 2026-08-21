@@ -76,6 +76,7 @@ cdef extern from "UniPlot.h":
     int uplot_set_y_scale(uplot_plot *, int, int)
     int uplot_set_x_power_scale(uplot_plot *, double, int)
     int uplot_set_y_power_scale(uplot_plot *, double, int)
+    int uplot_set_coordinates(uplot_plot *, int)
     int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
     int uplot_clear_secondary_y(uplot_plot *)
     int uplot_annotate_text(uplot_plot *, double, double, const char *,
@@ -141,6 +142,8 @@ SCALE_LINEAR = 0
 SCALE_LOG10 = 1
 SCALE_SYMLOG10 = 2
 SCALE_POWER = 3
+COORD_CARTESIAN = 0
+COORD_POLAR = 1
 HISTOGRAM_AUTO = 0
 HISTOGRAM_SQUARE_ROOT = 1
 HISTOGRAM_STURGES = 2
@@ -717,6 +720,17 @@ cdef class Plot:
                 self._handle, exponent, int(reversed)) != 0:
             raise ValueError("invalid y power scale")
         return self
+
+    def coordinates(self, int kind=COORD_CARTESIAN):
+        if uplot_set_coordinates(self._handle, kind) != 0:
+            raise ValueError("invalid coordinate system")
+        return self
+
+    def polar(self):
+        return self.coordinates(COORD_POLAR)
+
+    def cartesian(self):
+        return self.coordinates(COORD_CARTESIAN)
 
     def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
         cdef bytes encoded = str(label).encode("utf-8")
