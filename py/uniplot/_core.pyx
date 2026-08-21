@@ -36,6 +36,9 @@ cdef extern from "UniPlot.h":
                                     const char *)
     int uplot_add_automatic_histogram(uplot_plot *, const double *, size_t,
                                       int, int, const char *)
+    int uplot_add_linear_smooth(uplot_plot *, const double *, const double *,
+                                size_t, int, double, int, const char *,
+                                const char *)
     int uplot_add_grouped_aggregate(uplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
@@ -401,6 +404,39 @@ cdef class Plot:
             raise MemoryError()
         if status != UPLOT_OK:
             raise ValueError("invalid automatic histogram or non-empty plot")
+        return self
+
+    def linear_smooth(self, x, y, int point_count=100,
+                      double confidence_level=0.95,
+                      bint show_confidence=True, line_color="#3366cc",
+                      band_color="#3366cc40"):
+        x = list(x)
+        y = list(y)
+        if len(x) != len(y) or len(x) < 3:
+            raise ValueError("smoothing samples must have equal lengths >= 3")
+        cdef size_t count = len(x)
+        cdef double *x_items = <double *>malloc(count * sizeof(double))
+        cdef double *y_items = <double *>malloc(count * sizeof(double))
+        cdef bytes encoded_line = str(line_color).encode("utf-8")
+        cdef bytes encoded_band = str(band_color).encode("utf-8")
+        cdef size_t index
+        cdef int status
+        if x_items == NULL or y_items == NULL:
+            free(x_items); free(y_items)
+            raise MemoryError()
+        try:
+            for index in range(count):
+                x_items[index] = float(x[index])
+                y_items[index] = float(y[index])
+            status = uplot_add_linear_smooth(
+                self._handle, x_items, y_items, count, point_count,
+                confidence_level, show_confidence, encoded_line, encoded_band)
+        finally:
+            free(x_items); free(y_items)
+        if status == UPLOT_ERR_MEMORY:
+            raise MemoryError()
+        if status != UPLOT_OK:
+            raise ValueError("invalid linear smoothing input or non-empty plot")
         return self
 
     def aggregate(self, groups, values, int aggregation=AGG_MEAN,
