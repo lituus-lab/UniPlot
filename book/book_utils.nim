@@ -14,7 +14,7 @@ proc svgFigure*(svg, caption: string): string =
 
 proc pngFigure*(uri, caption, alt: string): string =
   "<figure class=\"uniplot-demo\"><img src=\"" & uri & "\" alt=\"" & alt &
-    "\"><figcaption>" & caption & "</figcaption></figure>"
+    "\" decoding=\"async\"><figcaption>" & caption & "</figcaption></figure>"
 
 proc gallery*(figures: openArray[string]): string =
   result = "<div class=\"uniplot-gallery\">"
@@ -24,22 +24,29 @@ proc gallery*(figures: openArray[string]): string =
 
 proc bookStyle*(): string = """
 <style>
-  .uniplot-lead { font-size: 1.08rem; max-width: 72ch; }
+  .uniplot-lead { font-size: 1.08rem; line-height: 1.65; max-width: 72ch; }
   .uniplot-callout {
     margin: 1.25rem 0; padding: 1rem 1.15rem; border-left: 4px solid #3366cc;
     border-radius: .25rem; background: color-mix(in srgb, #3366cc 8%, transparent);
   }
   .uniplot-gallery {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: 1rem; align-items: start; margin: 1.5rem 0 2.5rem;
   }
-  .uniplot-demo { margin: 1.5rem 0 2.5rem; }
+  .uniplot-demo { margin: 1.5rem 0 2.5rem; break-inside: avoid; }
   .uniplot-gallery .uniplot-demo { margin: 0; }
   .uniplot-demo svg, .uniplot-demo img {
     display: block; width: 100%; height: auto; border: 1px solid #d9dde3;
     border-radius: .5rem; background: #fff;
   }
-  .uniplot-demo figcaption { margin-top: .6rem; opacity: .78; }
+  .uniplot-demo figcaption {
+    margin-top: .65rem; line-height: 1.5; opacity: .82;
+  }
+  @media (max-width: 480px) {
+    .uniplot-gallery { gap: 1.35rem; }
+    .uniplot-demo { margin-bottom: 2rem; }
+  }
 </style>
 """
 
