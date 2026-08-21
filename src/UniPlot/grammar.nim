@@ -690,6 +690,8 @@ proc linearSmoothPlot*(x, y: openArray[float64]; pointCount = 100;
         "linear smoothing predictor must not be constant")
     try:
       let fit = statistics.linearRegressionDiagnostics(finiteX, finiteY)
+      let predictionContext = statistics.linearPredictionContext(fit,
+        confidenceLevel)
       var
         grid = newSeq[float64](pointCount)
         estimate = newSeq[float64](pointCount)
@@ -698,8 +700,8 @@ proc linearSmoothPlot*(x, y: openArray[float64]; pointCount = 100;
       for index in 0 ..< pointCount:
         let fraction = float64(index) / float64(pointCount - 1)
         grid[index] = minimumX * (1.0 - fraction) + maximumX * fraction
-        let prediction = statistics.predictLinear(fit, grid[index],
-          confidenceLevel)
+        let prediction = statistics.predictLinear(predictionContext,
+          grid[index])
         estimate[index] = prediction.estimate
         lower[index] = prediction.confidenceLower
         upper[index] = prediction.confidenceUpper
