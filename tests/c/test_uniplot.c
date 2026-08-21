@@ -454,6 +454,41 @@ int main(void) {
       33, 0.0, 1.1, "#3366cc80") == UPLOT_ERR_ARGUMENT);
     uplot_plot_free(violin);
   }
+  {
+    const double contour_x[] = {0, 1};
+    const double contour_y[] = {0, 1};
+    const double contour_values[] = {0, 1, 1, 2};
+    const double contour_levels[] = {0.5, 1.5};
+    const double unordered_x[] = {1, 0};
+    const double outside_level[] = {3};
+    uplot_plot *contour = uplot_plot_new(320, 240);
+    assert(contour != NULL);
+    assert(uplot_add_contours(contour, contour_x, 2, contour_y, 2,
+      contour_values, 4, contour_levels, 2, "#3366cc", 2.0) == UPLOT_OK);
+    assert(uplot_render_svg(contour, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    assert(uplot_add_contours(contour, contour_x, 2, contour_y, 2,
+      contour_values, 4, contour_levels, 2, "#3366cc", 2.0) ==
+      UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(contour);
+    contour = uplot_plot_new(320, 240);
+    assert(contour != NULL);
+    assert(uplot_add_contours(contour, NULL, 2, contour_y, 2,
+      contour_values, 4, contour_levels, 2, "#3366cc", 2.0) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_contours(contour, contour_x, 2, contour_y, 2,
+      contour_values, 3, contour_levels, 2, "#3366cc", 2.0) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_contours(contour, unordered_x, 2, contour_y, 2,
+      contour_values, 4, contour_levels, 2, "#3366cc", 2.0) ==
+      UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_contours(contour, contour_x, 2, contour_y, 2,
+      contour_values, 4, outside_level, 1, "#3366cc", 2.0) ==
+      UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(contour);
+  }
 
   uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
   assert(invalid_automatic != NULL);
