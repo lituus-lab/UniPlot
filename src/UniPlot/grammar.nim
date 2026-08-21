@@ -1149,6 +1149,22 @@ proc rasterHeatmapPlot*(width, height: int; values: openArray[float64];
     if prepared.isErr:
       raise newException(PlotError,
         "cannot prepare the raster heatmap palette")
+    var colorTable: array[256, array[4, uint8]]
+    for tableIndex in 0 .. 255:
+      let sampled = prepared.get.sample(float64(tableIndex) / 255.0)
+      if sampled.isErr:
+        raise newException(PlotError,
+          "cannot sample the raster heatmap palette")
+      let mapped = sampled.get.gamutMap(tagSrgb)
+      if mapped.isErr:
+        raise newException(PlotError,
+          "cannot map the raster heatmap palette to sRGB")
+      let rgba = mapped.get
+      for channel in 0 .. 2:
+        let component = min(1.0'f32, max(0.0'f32, rgba.comp(channel)))
+        colorTable[tableIndex][channel] =
+          uint8(int(component * 255.0'f32 + 0.5))
+      colorTable[tableIndex][3] = uint8(int(rgba.alpha * 255.0'f32 + 0.5))
     var image = ucore.newImage[uint8](width, height, ucore.csRgba)
     for index, value in values:
       let offset = index * 4
@@ -1164,18 +1180,12 @@ proc rasterHeatmapPlot*(width, height: int; values: openArray[float64];
         else:
           (value * 0.5 - minimum * 0.5) /
             (maximum * 0.5 - minimum * 0.5)
-      let sampled = prepared.get.sample(ratio)
-      if sampled.isErr:
-        raise newException(PlotError, "cannot sample the raster heatmap palette")
-      let mapped = sampled.get.gamutMap(tagSrgb)
-      if mapped.isErr:
+      if not ratio.isFinite or ratio < 0.0 or ratio > 1.0:
         raise newException(PlotError,
-          "cannot map the raster heatmap palette to sRGB")
-      let rgba = mapped.get
-      for channel in 0 .. 2:
-        let component = min(1.0'f32, max(0.0'f32, rgba.comp(channel)))
-        image.data[offset + channel] = uint8(int(component * 255.0'f32 + 0.5))
-      image.data[offset + 3] = uint8(int(rgba.alpha * 255.0'f32 + 0.5))
+          "raster heatmap normalization is not finite")
+      let tableIndex = int(ratio * 255.0 + 0.5)
+      for channel in 0 .. 3:
+        image.data[offset + channel] = colorTable[tableIndex][channel]
     result.raster(image, xMin, xMax, yMin, yMax, filter)
 
 proc contourPlot*(xs, ys, values, levels: openArray[float64];
