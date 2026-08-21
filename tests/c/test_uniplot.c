@@ -401,6 +401,29 @@ int main(void) {
     assert(uplot_add_density(NULL, density_values, 5, 65, 0.0,
       "#3366cc40", "#3366cc") == UPLOT_ERR_ARGUMENT);
   }
+  {
+    const double violin_values[] = {-2, -1, 0, 1, 2};
+    uplot_plot *violin = uplot_plot_new(320, 240);
+    assert(violin != NULL);
+    assert(uplot_add_violin(violin, violin_values, 5, 65, 0.0, 0.8,
+      "#3366cc80") == UPLOT_OK);
+    assert(uplot_render_svg(violin, TEST_FONT, &svg, &svg_len) == UPLOT_OK);
+    assert(svg_len > 100);
+    uplot_buffer_free(svg, svg_len);
+    svg = NULL;
+    assert(uplot_add_violin(violin, violin_values, 5, 65, 0.0, 0.8,
+      "#3366cc80") == UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(violin);
+    assert(uplot_add_violin(NULL, violin_values, 5, 65, 0.0, 0.8,
+      "#3366cc80") == UPLOT_ERR_ARGUMENT);
+    violin = uplot_plot_new(320, 240);
+    assert(violin != NULL);
+    assert(uplot_add_violin(violin, NULL, 5, 65, 0.0, 0.8,
+      "#3366cc80") == UPLOT_ERR_ARGUMENT);
+    assert(uplot_add_violin(violin, violin_values, 5, 65, 0.0, 0.0,
+      "#3366cc80") == UPLOT_ERR_ARGUMENT);
+    uplot_plot_free(violin);
+  }
 
   uplot_plot *invalid_automatic = uplot_plot_new(320, 240);
   assert(invalid_automatic != NULL);
