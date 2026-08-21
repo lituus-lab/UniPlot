@@ -281,6 +281,22 @@ def test_grouped_violin_renders_and_validates_contracts():
     with pytest.raises(ValueError):
         uniplot.Plot().grouped_violin(["a", "a"], [1, 2], width=1.1)
 
+def test_contours_render_and_validate_rectilinear_grids():
+    plot = uniplot.Plot().contour(
+        [0, 1], [0, 1], [0, 1, 1, 2], [0.5, 1.5], width=2)
+    assert plot.svg(FONT).startswith(b"<svg")
+    assert plot.png(FONT).startswith(b"\x89PNG")
+    with pytest.raises(ValueError):
+        plot.contour([0, 1], [0, 1], [0, 1, 1, 2], [1])
+    with pytest.raises(ValueError):
+        uniplot.Plot().contour([0], [0, 1], [0, 1], [0.5])
+    with pytest.raises(ValueError):
+        uniplot.Plot().contour([0, 1], [0, 1], [0, 1], [0.5])
+    with pytest.raises(ValueError):
+        uniplot.Plot().contour([1, 0], [0, 1], [0, 1, 1, 2], [0.5])
+    with pytest.raises(ValueError):
+        uniplot.Plot().contour([0, 1], [0, 1], [0, 1, 1, 2], [3])
+
 def test_grouped_aggregates_render_and_validate_empty_plot_contract():
     plot = uniplot.Plot().aggregate(
         ["beta", "alpha", "beta", "empty"],
