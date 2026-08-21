@@ -144,6 +144,12 @@ suite "statistics":
     else:
       expect PreConditionDefect: discard summarize([1.0], -1.0)
 
+  test "summaries and grouped means preserve representable extremes":
+    let largest = cast[float64](0x7FEF_FFFF_FFFF_FFFF'u64)
+    check summarize([largest, largest]).mean == largest
+    check aggregateGroups(["a", "a"], [largest, largest], agMean)[0].value ==
+      largest
+
   test "box-plot recipe retains summaries and outliers as separate layers":
     let spec = boxPlot(["a", "a", "a", "a", "a", "b", "b"],
       [1.0, 2.0, 3.0, 4.0, 100.0, 8.0, 9.0])
