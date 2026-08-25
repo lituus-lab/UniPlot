@@ -269,7 +269,7 @@ task clib, "C shared library":
        " src/UniPlot/c_api.nim"
 
 task clibStatic, "C static library":
-  exec "nim c --nimcache:build/nimcache-clib-static --app:staticlib --noMain" &
+  exec "nim c --nimcache:build/nimcache-clib-static --app:staticlib -d:staticNoAutoInit --noMain" &
        " --mm:arc -d:release -o:" & staticLib &
        " src/UniPlot/c_api.nim"
 
@@ -279,7 +279,7 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # output is `UniPlot.lib` — the intentional exception to the sharedLib /
   # staticLib naming. setup.py's Windows branch matches: `LIB_NAME =
   # "UniPlot.lib"` and `libraries=["UniPlot"]`.
-  exec "nim c --nimcache:build/nimcache-clib-msvc --cc:vcc --app:staticlib" &
+  exec "nim c --nimcache:build/nimcache-clib-msvc --cc:vcc --app:staticlib -d:staticNoAutoInit" &
        " --noMain --mm:arc -d:release" &
        " -o:UniPlot.lib src/UniPlot/c_api.nim"
 

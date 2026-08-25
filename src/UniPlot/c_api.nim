@@ -41,7 +41,49 @@ initLock(initLock)
 
 proc NimMain() {.importc.}
 
+
+# A shared library runs NimMain from DllMain (Windows) or an ELF constructor;
+# a static one has neither, so nothing initializes the Nim runtime. The first
+# entry point then enters Nim code whose globals were never set up and the
+# process faults. The static-library tasks pass -d:staticNoAutoInit; shared
+# builds must not, or NimMain runs twice.
+when defined(staticNoAutoInit):
+  # A once primitive, not a plain flag: two threads reaching an entry point
+  # together would both see the flag unset, both call NimMain, and the second
+  # would enter Nim code the first had not finished initializing. The platform
+  # primitives block the losers until the winner returns, which a flag cannot.
+  #
+  # C statics, not Nim globals: module initialization would reset a Nim one and
+  # NimMain would run again. NimMain is declared here too — the generated
+  # prototype comes after this section.
+  {.emit: """/*VARSECTION*/
+void NimMain(void);
+#ifdef _WIN32
+#  include <windows.h>
+static INIT_ONCE uplot_runtime_once = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK uplot_runtime_init(PINIT_ONCE o, PVOID p, PVOID *c) {
+  (void)o; (void)p; (void)c; NimMain(); return TRUE;
+}
+static void uplot_runtime_ensure(void) {
+  InitOnceExecuteOnce(&uplot_runtime_once, uplot_runtime_init, NULL, NULL);
+}
+#else
+#  include <pthread.h>
+static pthread_once_t uplot_runtime_once = PTHREAD_ONCE_INIT;
+static void uplot_runtime_init(void) { NimMain(); }
+static void uplot_runtime_ensure(void) {
+  pthread_once(&uplot_runtime_once, uplot_runtime_init);
+}
+#endif
+""".}
+  template ensureRuntime() =
+    {.emit: "  uplot_runtime_ensure();".}
+else:
+  template ensureRuntime() = discard
+
+
 proc uplot_init*(): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   withLock initLock:
     if not runtimeStarted:
       NimMain()
@@ -49,10 +91,16 @@ proc uplot_init*(): cint {.exportc, dynlib, cdecl.} =
   UPLOT_OK
 
 proc uplot_version*(): cstring {.exportc, dynlib,
-    cdecl.} = UniPlotVersion.cstring
-proc uplot_abi_version*(): cint {.exportc, dynlib, cdecl.} = UPLOT_ABI_VERSION
+    cdecl.} =
+  ensureRuntime()
+  UniPlotVersion.cstring
+
+proc uplot_abi_version*(): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
+  UPLOT_ABI_VERSION
 
 proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   try:
     let size = Size(width: int(width), height: int(height))
     size.validate()
@@ -64,6 +112,7 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
 
 proc uplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
     height: cint; output: ptr pointer): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if output.isNil: return UPLOT_ERR_ARGUMENT
   output[] = nil
   if payload.isNil or length == 0 or length > csize_t(high(int)):
@@ -85,6 +134,7 @@ proc uplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
 proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
     height: cint): pointer {.exportc, dynlib, cdecl.} =
   ## Compatibility entry point. New bindings should use the status API above.
+  ensureRuntime()
   discard uplot_plot_from_json_status(payload, length, width, height,
     addr result)
 
@@ -160,16 +210,19 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
 
 proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; width: float32): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   addSeries(value, xs, ys, count, mkLine, color, width,
     missingValues = BreakOnMissing)
 
 proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   addSeries(value, xs, ys, count, mkPoint, color, radius)
 
 proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
     width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
     filter: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or pixels.isNil or width <= 0 or height <= 0 or
       channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
       filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
@@ -204,6 +257,7 @@ proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
     values: ptr float64; valueCount: csize_t;
     xMin, xMax, yMin, yMax: float64; filter: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or values.isNil or width <= 0 or height <= 0 or
       filter < cint(RasterNearest) or filter > cint(RasterBox) or
       not xMin.isFinite or not xMax.isFinite or xMin >= xMax or
@@ -235,6 +289,7 @@ proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
 proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
     width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
     filter: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or pixels.isNil or width <= 0 or height <= 0 or
       channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
       filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
@@ -334,6 +389,7 @@ proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
 proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; whiskerLength: float64; color,
     outlierColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or groups.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or color.isNil or outlierColor.isNil:
     return UPLOT_ERR_ARGUMENT
@@ -390,12 +446,14 @@ proc addHistogram(value: pointer; values: ptr float64;
 proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   addHistogram(value, values, valueCount, breaks, breakCount, color,
     numeric = false, density = false)
 
 proc uplot_add_numeric_histogram*(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
     density: cint; color: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if density notin [cint(0), cint(1)]: return UPLOT_ERR_ARGUMENT
   addHistogram(value, values, valueCount, breaks, breakCount, color,
     numeric = true, density = density == 1)
@@ -403,6 +461,7 @@ proc uplot_add_numeric_histogram*(value: pointer; values: ptr float64;
 proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
     valueCount: csize_t; rule, density: cint; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or values.isNil or valueCount == 0 or
       valueCount > csize_t(high(int)) or color.isNil or
       rule < cint(low(HistogramRule).ord) or
@@ -431,6 +490,7 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
     count: csize_t; pointCount: cint; confidenceLevel: float64;
     showConfidence: cint; lineColor, bandColor: cstring): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or valuesX.isNil or valuesY.isNil or count < 3 or
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 10_000 or
       showConfidence notin [cint(0), cint(1)] or lineColor.isNil or
@@ -462,6 +522,7 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
 proc uplot_add_polynomial_smooth*(value: pointer;
     valuesX, valuesY: ptr float64; count: csize_t; degree,
     pointCount: cint; lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or valuesX.isNil or valuesY.isNil or count < 3 or
       count > csize_t(high(int)) or degree < 1 or degree > 8 or
       pointCount < 2 or pointCount > 10_000 or lineColor.isNil:
@@ -492,6 +553,7 @@ proc uplot_add_polynomial_smooth*(value: pointer;
 proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
     pointCount: cint; bandwidth: float64;
     fillColor, lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or values.isNil or count < 2 or
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       fillColor.isNil or lineColor.isNil:
@@ -517,6 +579,7 @@ proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
 proc uplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
     pointCount: cint; bandwidth, width: float64; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or values.isNil or count < 2 or
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
@@ -544,6 +607,7 @@ proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; pointCount: cint;
     bandwidth, width: float64; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or groups.isNil or values.isNil or count < 2 or
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
@@ -577,6 +641,7 @@ proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
     ys: ptr float64; yCount: csize_t; values: ptr float64;
     valueCount: csize_t; levels: ptr float64; levelCount: csize_t;
     color: cstring; width: float64): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or xs.isNil or ys.isNil or values.isNil or levels.isNil or
       color.isNil or xCount < 2 or yCount < 2 or levelCount == 0 or
       xCount > csize_t(high(int)) or yCount > csize_t(high(int)) or
@@ -617,6 +682,7 @@ proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
 proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or groups.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or color.isNil or
       aggregation < cint(low(AggregationKind).ord) or
@@ -646,6 +712,7 @@ proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
 proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or xs.isNil or ys.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or
       aggregation < cint(low(AggregationKind).ord) or
@@ -679,6 +746,7 @@ proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
     xBreakCount: csize_t; yBreaks: ptr float64; yBreakCount: csize_t;
     values: ptr float64; valueCount: csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or xBreaks.isNil or yBreaks.isNil or values.isNil or
       xBreakCount < 2 or yBreakCount < 2 or valueCount == 0 or
       xBreakCount > csize_t(high(int)) or
@@ -710,6 +778,7 @@ proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
 
 proc uplot_add_categorical_column*(value: pointer; name: cstring;
     values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or name.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or ($name).len == 0:
     return UPLOT_ERR_ARGUMENT
@@ -729,6 +798,7 @@ proc uplot_add_categorical_column*(value: pointer; name: cstring;
 proc uplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; width: float32;
     lineStyle: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if lineStyle < cint(low(LineStyle).ord) or
       lineStyle > cint(high(LineStyle).ord):
     return UPLOT_ERR_ARGUMENT
@@ -738,6 +808,7 @@ proc uplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
 proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; radius: float32;
     shape: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if shape < cint(low(MarkerShape).ord) or
       shape > cint(high(MarkerShape).ord):
     return UPLOT_ERR_ARGUMENT
@@ -747,6 +818,7 @@ proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
 proc uplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; width: float32; lineStyle,
     missingValues: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if lineStyle < cint(low(LineStyle).ord) or
       lineStyle > cint(high(LineStyle).ord) or
       missingValues < cint(low(MissingValuePolicy).ord) or
@@ -758,6 +830,7 @@ proc uplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
 proc uplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; radius: float32; shape,
     missingValues: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if shape < cint(low(MarkerShape).ord) or
       shape > cint(high(MarkerShape).ord) or
       missingValues < cint(low(MissingValuePolicy).ord) or
@@ -769,6 +842,7 @@ proc uplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
 
 proc uplot_set_title*(value: pointer; title: cstring): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or title.isNil: return UPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.title = $title
@@ -797,10 +871,12 @@ proc setAxisLabels(value: pointer; labels, reversed: cint;
 
 proc uplot_set_x_axis_labels*(value: pointer; labels, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setAxisLabels(value, labels, reversed, true)
 
 proc uplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setAxisLabels(value, labels, reversed, false)
 
 proc setAxisScale(value: pointer; kind, reversed: cint; xAxis: bool): cint =
@@ -817,10 +893,12 @@ proc setAxisScale(value: pointer; kind, reversed: cint; xAxis: bool): cint =
 
 proc uplot_set_x_scale*(value: pointer; kind, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setAxisScale(value, kind, reversed, true)
 
 proc uplot_set_y_scale*(value: pointer; kind, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setAxisScale(value, kind, reversed, false)
 
 proc setPowerScale(value: pointer; exponent: float64; reversed: cint;
@@ -838,14 +916,17 @@ proc setPowerScale(value: pointer; exponent: float64; reversed: cint;
 
 proc uplot_set_x_power_scale*(value: pointer; exponent: float64;
     reversed: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setPowerScale(value, exponent, reversed, true)
 
 proc uplot_set_y_power_scale*(value: pointer; exponent: float64;
     reversed: cint): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   setPowerScale(value, exponent, reversed, false)
 
 proc uplot_set_coordinates*(value: pointer; coordinates: cint): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or coordinates < cint(low(CoordinateKind).ord) or
       coordinates > cint(high(CoordinateKind).ord):
     return UPLOT_ERR_ARGUMENT
@@ -860,6 +941,7 @@ proc uplot_set_coordinates*(value: pointer; coordinates: cint): cint {.
 
 proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
     label: cstring): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or label.isNil or not scale.isFinite or scale == 0 or
       not offset.isFinite:
     return UPLOT_ERR_ARGUMENT
@@ -871,12 +953,14 @@ proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
 
 proc uplot_clear_secondary_y*(value: pointer): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil: return UPLOT_ERR_ARGUMENT
   handle(value).spec.clearSecondaryY()
   UPLOT_OK
 
 proc uplot_annotate_text*(value: pointer; x, y: float64; text,
     color: cstring; fontSize: float32): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or text.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.annotateText(x, y, $text, $color, fontSize)
@@ -887,6 +971,7 @@ proc uplot_annotate_text*(value: pointer; x, y: float64; text,
 proc uplot_annotate_arrow*(value: pointer; x, y, xEnd, yEnd: float64;
     color: cstring; width, headSize: float32): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.annotateArrow(x, y, xEnd, yEnd, $color, width, headSize)
@@ -896,6 +981,7 @@ proc uplot_annotate_arrow*(value: pointer; x, y, xEnd, yEnd: float64;
 
 proc uplot_clear_annotations*(value: pointer): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil: return UPLOT_ERR_ARGUMENT
   handle(value).spec.clearAnnotations()
   UPLOT_OK
@@ -918,6 +1004,7 @@ proc copyBuffer(bytes: string; output: ptr ptr uint8;
 
 proc uplot_plot_to_json*(value: pointer; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil: return UPLOT_ERR_ARGUMENT
   try:
     copyBuffer(handle(value).spec.toJson, output, outputLen)
@@ -928,6 +1015,7 @@ proc uplot_plot_to_json*(value: pointer; output: ptr ptr uint8;
 
 proc uplot_render_png*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or fontPath.isNil: return UPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
@@ -938,6 +1026,7 @@ proc uplot_render_png*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
 
 proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if value.isNil or fontPath.isNil: return UPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
@@ -978,6 +1067,7 @@ proc uplot_render_grid_svg*(values: ptr pointer; count: csize_t;
     columns, width, height, gap: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
     outputLen, true, false, false)
 
@@ -985,6 +1075,7 @@ proc uplot_render_grid_png*(values: ptr pointer; count: csize_t;
     columns, width, height, gap: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
     outputLen, false, false, false)
 
@@ -1002,6 +1093,7 @@ proc uplot_render_grid_svg_shared*(values: ptr pointer; count: csize_t;
     columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderSharedGrid(values, count, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, true)
 
@@ -1009,6 +1101,7 @@ proc uplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
     columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderSharedGrid(values, count, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, false)
 
@@ -1040,6 +1133,7 @@ proc uplot_render_facet_grid_svg*(value: pointer; column: cstring; columns,
     width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderFacetGrid(value, column, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, true)
 
@@ -1047,6 +1141,7 @@ proc uplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
     width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderFacetGrid(value, column, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, false)
 
@@ -1079,6 +1174,7 @@ proc uplot_render_facet_matrix_svg*(value: pointer; rowColumn,
     columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
     fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
     sharedX, sharedY, fontPath, output, outputLen, true)
 
@@ -1086,12 +1182,15 @@ proc uplot_render_facet_matrix_png*(value: pointer; rowColumn,
     columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
     fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
     sharedX, sharedY, fontPath, output, outputLen, false)
 
 proc uplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if not value.isNil: deallocShared(value)
 
 proc uplot_plot_free*(value: pointer) {.exportc, dynlib, cdecl.} =
+  ensureRuntime()
   if not value.isNil: GC_unref(handle(value))
