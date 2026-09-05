@@ -43,7 +43,7 @@ nbCode:
 nbText: """
 `SceneNodeKind` distinguishes `snPath`, `snText` and retained `snImage` nodes.
 Non-zero IDs identify data
-marks and survive into SVG as `data-uplot-id`, providing a future picking key.
+marks and survive into SVG as `data-uniplot-id`, providing a future picking key.
 Text nodes also retain `textStart`, `textMiddle` or `textEnd` anchoring.
 The renderer resolves the anchor from UniGlyph's shaped advance, so CPU, SVG
 and WGPU place centered tick labels and axis titles identically.

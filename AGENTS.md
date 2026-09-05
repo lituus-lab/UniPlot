@@ -41,7 +41,7 @@ nimble docs
 - Do not parse fonts or approximate text metrics; call UniGlyph.
 - Do not introduce backend handles into public plot or scene types.
 - Keep C header, C implementation and Cython declarations synchronised.
-- C entry points use `uplot_` and never let a Nim exception cross the ABI.
+- C entry points use `uniplot_` and never let a Nim exception cross the ABI.
 - Use concise English comments and SPDX headers.
 
 ## Scope discipline

@@ -33,65 +33,65 @@ def library_path():
 def configure_c_api():
     library = ctypes.CDLL(str(library_path()))
     double_pointer = ctypes.POINTER(ctypes.c_double)
-    library.uplot_init.restype = ctypes.c_int
-    library.uplot_plot_new.argtypes = [ctypes.c_int, ctypes.c_int]
-    library.uplot_plot_new.restype = ctypes.c_void_p
-    library.uplot_add_line.argtypes = [ctypes.c_void_p, double_pointer,
+    library.uniplot_init.restype = ctypes.c_int
+    library.uniplot_plot_new.argtypes = [ctypes.c_int, ctypes.c_int]
+    library.uniplot_plot_new.restype = ctypes.c_void_p
+    library.uniplot_add_line.argtypes = [ctypes.c_void_p, double_pointer,
                                        double_pointer, ctypes.c_size_t,
                                        ctypes.c_char_p, ctypes.c_float]
-    library.uplot_add_line.restype = ctypes.c_int
-    library.uplot_plot_to_json.argtypes = [ctypes.c_void_p,
+    library.uniplot_add_line.restype = ctypes.c_int
+    library.uniplot_plot_to_json.argtypes = [ctypes.c_void_p,
                                            ctypes.POINTER(ctypes.c_void_p),
                                            ctypes.POINTER(ctypes.c_size_t)]
-    library.uplot_plot_to_json.restype = ctypes.c_int
-    library.uplot_plot_from_json.argtypes = [ctypes.POINTER(ctypes.c_uint8),
+    library.uniplot_plot_to_json.restype = ctypes.c_int
+    library.uniplot_plot_from_json.argtypes = [ctypes.POINTER(ctypes.c_uint8),
                                              ctypes.c_size_t, ctypes.c_int,
                                              ctypes.c_int]
-    library.uplot_plot_from_json.restype = ctypes.c_void_p
-    library.uplot_render_grid_svg.argtypes = [
+    library.uniplot_plot_from_json.restype = ctypes.c_void_p
+    library.uniplot_render_grid_svg.argtypes = [
         ctypes.POINTER(ctypes.c_void_p), ctypes.c_size_t, ctypes.c_int,
         ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    library.uplot_render_grid_svg.restype = ctypes.c_int
-    library.uplot_buffer_free.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-    library.uplot_plot_free.argtypes = [ctypes.c_void_p]
-    if library.uplot_init() != 0:
-        raise RuntimeError("uplot_init failed")
+    library.uniplot_render_grid_svg.restype = ctypes.c_int
+    library.uniplot_buffer_free.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+    library.uniplot_plot_free.argtypes = [ctypes.c_void_p]
+    if library.uniplot_init() != 0:
+        raise RuntimeError("uniplot_init failed")
     return library
 
 
 def c_payload(library, xs, ys):
-    handle = library.uplot_plot_new(800, 500)
+    handle = library.uniplot_plot_new(800, 500)
     if not handle:
-        raise RuntimeError("uplot_plot_new failed")
+        raise RuntimeError("uniplot_plot_new failed")
     try:
-        if library.uplot_add_line(handle, xs, ys, len(xs), b"#3366cc", 2.0):
-            raise RuntimeError("uplot_add_line failed")
+        if library.uniplot_add_line(handle, xs, ys, len(xs), b"#3366cc", 2.0):
+            raise RuntimeError("uniplot_add_line failed")
         output = ctypes.c_void_p()
         length = ctypes.c_size_t()
-        if library.uplot_plot_to_json(handle, ctypes.byref(output),
+        if library.uniplot_plot_to_json(handle, ctypes.byref(output),
                                       ctypes.byref(length)):
-            raise RuntimeError("uplot_plot_to_json failed")
+            raise RuntimeError("uniplot_plot_to_json failed")
         try:
             return ctypes.string_at(output, length.value)
         finally:
-            library.uplot_buffer_free(output, length)
+            library.uniplot_buffer_free(output, length)
     finally:
-        library.uplot_plot_free(handle)
+        library.uniplot_plot_free(handle)
 
 
 def c_grid_svg(library, handles, font):
     output = ctypes.c_void_p()
     length = ctypes.c_size_t()
-    if library.uplot_render_grid_svg(
+    if library.uniplot_render_grid_svg(
             handles, len(handles), 2, 800, 500, 12,
             str(font).encode("utf-8"), ctypes.byref(output),
             ctypes.byref(length)):
-        raise RuntimeError("uplot_render_grid_svg failed")
+        raise RuntimeError("uniplot_render_grid_svg failed")
     try:
         return ctypes.string_at(output, length.value)
     finally:
-        library.uplot_buffer_free(output, length)
+        library.uniplot_buffer_free(output, length)
 
 
 def main():
@@ -117,8 +117,8 @@ def main():
     panel_ys = panel_array_type(*values_y[:panel_points])
     c_panel_values = []
     for _ in range(4):
-        panel = library.uplot_plot_new(800, 500)
-        if not panel or library.uplot_add_line(
+        panel = library.uniplot_plot_new(800, 500)
+        if not panel or library.uniplot_add_line(
                 panel, panel_xs, panel_ys, panel_points, b"#3366cc", 2.0):
             raise RuntimeError("C grid benchmark setup failed")
         c_panel_values.append(panel)
@@ -135,27 +135,27 @@ def main():
     guard = 0
 
     for iteration in range(iterations + warmups):
-        handle = library.uplot_plot_new(800, 500)
-        if not handle or library.uplot_add_line(
+        handle = library.uniplot_plot_new(800, 500)
+        if not handle or library.uniplot_add_line(
                 handle, xs, ys, point_count, b"#3366cc", 2.0):
             raise RuntimeError("C benchmark setup failed")
         output = ctypes.c_void_p()
         length = ctypes.c_size_t()
         started = time.perf_counter_ns()
-        status = library.uplot_plot_to_json(handle, ctypes.byref(output),
+        status = library.uniplot_plot_to_json(handle, ctypes.byref(output),
                                             ctypes.byref(length))
         c_encode_ms = (time.perf_counter_ns() - started) / 1_000_000
-        library.uplot_plot_free(handle)
+        library.uniplot_plot_free(handle)
         if status: raise RuntimeError("C JSON encode failed")
         guard += length.value
-        library.uplot_buffer_free(output, length)
+        library.uniplot_buffer_free(output, length)
 
         started = time.perf_counter_ns()
-        decoded = library.uplot_plot_from_json(
+        decoded = library.uniplot_plot_from_json(
             payload_array, len(raw_payload), 800, 500)
         c_decode_ms = (time.perf_counter_ns() - started) / 1_000_000
         if not decoded: raise RuntimeError("C JSON decode failed")
-        library.uplot_plot_free(decoded)
+        library.uniplot_plot_free(decoded)
 
         started = time.perf_counter_ns()
         encoded = python_plot.to_json()
@@ -189,7 +189,7 @@ def main():
             c_grid.append(c_grid_ms); py_grid.append(py_grid_ms)
 
     for panel in c_panel_values:
-        library.uplot_plot_free(panel)
+        library.uniplot_plot_free(panel)
 
     print(json.dumps({
         "iterations": iterations, "points": point_count,

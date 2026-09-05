@@ -7,114 +7,114 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 
 cdef extern from "UniPlot.h":
     enum:
-        UPLOT_OK
-        UPLOT_ERR_MEMORY
-    ctypedef struct uplot_plot:
+        UNIPLOT_OK
+        UNIPLOT_ERR_MEMORY
+    ctypedef struct uniplot_plot:
         pass
-    int uplot_init()
-    const char *uplot_version()
-    int uplot_abi_version()
-    uplot_plot *uplot_plot_new(int, int)
-    uplot_plot *uplot_plot_from_json(const uint8_t *, size_t, int, int)
-    int uplot_plot_from_json_status(const uint8_t *, size_t, int, int,
-                                    uplot_plot **)
-    int uplot_plot_to_json(uplot_plot *, uint8_t **, size_t *)
-    int uplot_add_line(uplot_plot *, const double *, const double *, size_t,
+    int uniplot_init()
+    const char *uniplot_version()
+    int uniplot_abi_version()
+    uniplot_plot *uniplot_plot_new(int, int)
+    uniplot_plot *uniplot_plot_from_json(const uint8_t *, size_t, int, int)
+    int uniplot_plot_from_json_status(const uint8_t *, size_t, int, int,
+                                    uniplot_plot **)
+    int uniplot_plot_to_json(uniplot_plot *, uint8_t **, size_t *)
+    int uniplot_add_line(uniplot_plot *, const double *, const double *, size_t,
                        const char *, float)
-    int uplot_add_points(uplot_plot *, const double *, const double *, size_t,
+    int uniplot_add_points(uniplot_plot *, const double *, const double *, size_t,
                          const char *, float)
-    int uplot_add_raster(uplot_plot *, const uint8_t *, size_t, int, int, int,
+    int uniplot_add_raster(uniplot_plot *, const uint8_t *, size_t, int, int, int,
                          double, double, double, double, int)
-    int uplot_add_raster_heatmap(uplot_plot *, int, int, const double *,
+    int uniplot_add_raster_heatmap(uniplot_plot *, int, int, const double *,
                                  size_t, double, double, double, double, int)
-    int uplot_add_image_mark(uplot_plot *, const uint8_t *, size_t, int, int,
+    int uniplot_add_image_mark(uniplot_plot *, const uint8_t *, size_t, int, int,
                              int, double, double, double, double, int)
-    int uplot_add_box_plot(uplot_plot *, const char **, const double *, size_t,
+    int uniplot_add_box_plot(uniplot_plot *, const char **, const double *, size_t,
                            double, const char *, const char *)
-    int uplot_add_histogram_breaks(uplot_plot *, const double *, size_t,
+    int uniplot_add_histogram_breaks(uniplot_plot *, const double *, size_t,
                                    const double *, size_t, const char *)
-    int uplot_add_numeric_histogram(uplot_plot *, const double *, size_t,
+    int uniplot_add_numeric_histogram(uniplot_plot *, const double *, size_t,
                                     const double *, size_t, int,
                                     const char *)
-    int uplot_add_automatic_histogram(uplot_plot *, const double *, size_t,
+    int uniplot_add_automatic_histogram(uniplot_plot *, const double *, size_t,
                                       int, int, const char *)
-    int uplot_add_linear_smooth(uplot_plot *, const double *, const double *,
+    int uniplot_add_linear_smooth(uniplot_plot *, const double *, const double *,
                                 size_t, int, double, int, const char *,
                                 const char *)
-    int uplot_add_polynomial_smooth(uplot_plot *, const double *,
+    int uniplot_add_polynomial_smooth(uniplot_plot *, const double *,
                                     const double *, size_t, int, int,
                                     const char *)
-    int uplot_add_density(uplot_plot *, const double *, size_t, int, double,
+    int uniplot_add_density(uniplot_plot *, const double *, size_t, int, double,
                           const char *, const char *)
-    int uplot_add_violin(uplot_plot *, const double *, size_t, int, double,
+    int uniplot_add_violin(uniplot_plot *, const double *, size_t, int, double,
                          double, const char *)
-    int uplot_add_grouped_violin(uplot_plot *, const char **, const double *,
+    int uniplot_add_grouped_violin(uniplot_plot *, const char **, const double *,
                                  size_t, int, double, double, const char *)
-    int uplot_add_contours(uplot_plot *, const double *, size_t,
+    int uniplot_add_contours(uniplot_plot *, const double *, size_t,
                            const double *, size_t, const double *, size_t,
                            const double *, size_t, const char *, double)
-    int uplot_add_grouped_aggregate(uplot_plot *, const char **,
+    int uniplot_add_grouped_aggregate(uniplot_plot *, const char **,
                                     const double *, size_t, int,
                                     const char *)
-    int uplot_add_heatmap(uplot_plot *, const char **, const char **,
+    int uniplot_add_heatmap(uniplot_plot *, const char **, const char **,
                           const double *, size_t, int)
-    int uplot_add_numeric_heatmap(uplot_plot *, const double *, size_t,
+    int uniplot_add_numeric_heatmap(uniplot_plot *, const double *, size_t,
                                   const double *, size_t, const double *,
                                   size_t)
-    int uplot_add_categorical_column(uplot_plot *, const char *,
+    int uniplot_add_categorical_column(uniplot_plot *, const char *,
                                       const char **, size_t)
-    int uplot_add_line_styled(uplot_plot *, const double *, const double *,
+    int uniplot_add_line_styled(uniplot_plot *, const double *, const double *,
                               size_t, const char *, float, int)
-    int uplot_add_points_shaped(uplot_plot *, const double *, const double *,
+    int uniplot_add_points_shaped(uniplot_plot *, const double *, const double *,
                                 size_t, const char *, float, int)
-    int uplot_add_line_configured(uplot_plot *, const double *, const double *,
+    int uniplot_add_line_configured(uniplot_plot *, const double *, const double *,
                                   size_t, const char *, float, int, int)
-    int uplot_add_points_configured(uplot_plot *, const double *,
+    int uniplot_add_points_configured(uniplot_plot *, const double *,
                                     const double *, size_t, const char *,
                                     float, int, int)
-    int uplot_set_title(uplot_plot *, const char *)
-    int uplot_set_x_axis_labels(uplot_plot *, int, int)
-    int uplot_set_y_axis_labels(uplot_plot *, int, int)
-    int uplot_set_x_scale(uplot_plot *, int, int)
-    int uplot_set_y_scale(uplot_plot *, int, int)
-    int uplot_set_x_power_scale(uplot_plot *, double, int)
-    int uplot_set_y_power_scale(uplot_plot *, double, int)
-    int uplot_set_coordinates(uplot_plot *, int)
-    int uplot_set_secondary_y(uplot_plot *, double, double, const char *)
-    int uplot_clear_secondary_y(uplot_plot *)
-    int uplot_annotate_text(uplot_plot *, double, double, const char *,
+    int uniplot_set_title(uniplot_plot *, const char *)
+    int uniplot_set_x_axis_labels(uniplot_plot *, int, int)
+    int uniplot_set_y_axis_labels(uniplot_plot *, int, int)
+    int uniplot_set_x_scale(uniplot_plot *, int, int)
+    int uniplot_set_y_scale(uniplot_plot *, int, int)
+    int uniplot_set_x_power_scale(uniplot_plot *, double, int)
+    int uniplot_set_y_power_scale(uniplot_plot *, double, int)
+    int uniplot_set_coordinates(uniplot_plot *, int)
+    int uniplot_set_secondary_y(uniplot_plot *, double, double, const char *)
+    int uniplot_clear_secondary_y(uniplot_plot *)
+    int uniplot_annotate_text(uniplot_plot *, double, double, const char *,
                              const char *, float)
-    int uplot_annotate_arrow(uplot_plot *, double, double, double, double,
+    int uniplot_annotate_arrow(uniplot_plot *, double, double, double, double,
                               const char *, float, float)
-    int uplot_clear_annotations(uplot_plot *)
-    int uplot_render_png(uplot_plot *, const char *, uint8_t **, size_t *)
-    int uplot_render_svg(uplot_plot *, const char *, uint8_t **, size_t *)
-    int uplot_render_grid_svg(uplot_plot **, size_t, int, int, int, int,
+    int uniplot_clear_annotations(uniplot_plot *)
+    int uniplot_render_png(uniplot_plot *, const char *, uint8_t **, size_t *)
+    int uniplot_render_svg(uniplot_plot *, const char *, uint8_t **, size_t *)
+    int uniplot_render_grid_svg(uniplot_plot **, size_t, int, int, int, int,
                                const char *, uint8_t **, size_t *)
-    int uplot_render_grid_png(uplot_plot **, size_t, int, int, int, int,
+    int uniplot_render_grid_png(uniplot_plot **, size_t, int, int, int, int,
                                const char *, uint8_t **, size_t *)
-    int uplot_render_grid_svg_shared(uplot_plot **, size_t, int, int, int, int,
+    int uniplot_render_grid_svg_shared(uniplot_plot **, size_t, int, int, int, int,
                                       int, int, const char *, uint8_t **,
                                       size_t *)
-    int uplot_render_grid_png_shared(uplot_plot **, size_t, int, int, int, int,
+    int uniplot_render_grid_png_shared(uniplot_plot **, size_t, int, int, int, int,
                                       int, int, const char *, uint8_t **,
                                       size_t *)
-    int uplot_render_facet_grid_svg(uplot_plot *, const char *, int, int, int,
+    int uniplot_render_facet_grid_svg(uniplot_plot *, const char *, int, int, int,
                                      int, int, int, const char *, uint8_t **,
                                      size_t *)
-    int uplot_render_facet_grid_png(uplot_plot *, const char *, int, int, int,
+    int uniplot_render_facet_grid_png(uniplot_plot *, const char *, int, int, int,
                                      int, int, int, const char *, uint8_t **,
                                      size_t *)
-    int uplot_render_facet_matrix_svg(uplot_plot *, const char *,
+    int uniplot_render_facet_matrix_svg(uniplot_plot *, const char *,
                                        const char *, int, int, int, int, int,
                                        const char *, uint8_t **, size_t *)
-    int uplot_render_facet_matrix_png(uplot_plot *, const char *,
+    int uniplot_render_facet_matrix_png(uniplot_plot *, const char *,
                                        const char *, int, int, int, int, int,
                                        const char *, uint8_t **, size_t *)
-    void uplot_buffer_free(void *, size_t)
-    void uplot_plot_free(uplot_plot *)
+    void uniplot_buffer_free(void *, size_t)
+    void uniplot_plot_free(uniplot_plot *)
 
-uplot_init()
+uniplot_init()
 
 LINE_SOLID = 0
 LINE_DASHED = 1
@@ -155,16 +155,16 @@ HISTOGRAM_SCOTT = 4
 HISTOGRAM_FREEDMAN_DIACONIS = 5
 
 cdef class Plot:
-    cdef uplot_plot *_handle
+    cdef uniplot_plot *_handle
 
     def __cinit__(self, int width=800, int height=500):
-        self._handle = uplot_plot_new(width, height)
+        self._handle = uniplot_plot_new(width, height)
         if self._handle == NULL:
             raise ValueError("plot dimensions must be positive")
 
     def __dealloc__(self):
         if self._handle != NULL:
-            uplot_plot_free(self._handle)
+            uniplot_plot_free(self._handle)
 
     cdef _add_image_pixels(self, pixels, int width, int height, int channels,
                            double x_min, double x_max, double y_min,
@@ -175,14 +175,14 @@ cdef class Plot:
             raise ValueError("image pixels cannot be empty")
         cdef int status
         if mark:
-            status = uplot_add_image_mark(
+            status = uniplot_add_image_mark(
                 self._handle, data, len(payload), width, height, channels,
                 x_min, x_max, y_min, y_max, filter)
         else:
-            status = uplot_add_raster(
+            status = uniplot_add_raster(
                 self._handle, data, len(payload), width, height, channels,
                 x_min, x_max, y_min, y_max, filter)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
         if status != 0:
             raise ValueError(
@@ -212,28 +212,28 @@ cdef class Plot:
             encoded = payload.encode("utf-8")
         else:
             raise TypeError("payload must be str or bytes")
-        cdef uplot_plot *parsed = NULL
-        cdef int status = uplot_plot_from_json_status(
+        cdef uniplot_plot *parsed = NULL
+        cdef int status = uniplot_plot_from_json_status(
             <const uint8_t *>encoded, len(encoded), width, height, &parsed)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid UniPlot JSON or plot dimensions")
         result = cls(width, height)
-        uplot_plot_free((<Plot>result)._handle)
+        uniplot_plot_free((<Plot>result)._handle)
         (<Plot>result)._handle = parsed
         return result
 
     def to_json(self):
         cdef uint8_t *output = NULL
         cdef size_t length = 0
-        if uplot_plot_to_json(self._handle, &output, &length) != 0:
+        if uniplot_plot_to_json(self._handle, &output, &length) != 0:
             raise RuntimeError("JSON encoding failed")
         try:
             return PyBytes_FromStringAndSize(
                 <char *>output, length).decode("utf-8")
         finally:
-            uplot_buffer_free(output, length)
+            uniplot_buffer_free(output, length)
 
     cdef _series(self, x, y, color, float size, bint points, int style,
                  int missing):
@@ -252,10 +252,10 @@ cdef class Plot:
             for i in range(n):
                 xs[i] = float(x[i]); ys[i] = float(y[i])
             if points:
-                status = uplot_add_points_configured(
+                status = uniplot_add_points_configured(
                     self._handle, xs, ys, n, encoded, size, style, missing)
             else:
-                status = uplot_add_line_configured(
+                status = uniplot_add_line_configured(
                     self._handle, xs, ys, n, encoded, size, style, missing)
         finally:
             free(xs); free(ys)
@@ -293,7 +293,7 @@ cdef class Plot:
             for index in range(count):
                 group_items[index] = encoded_groups[index]
                 number_items[index] = float(values[index])
-            status = uplot_add_box_plot(self._handle, group_items,
+            status = uniplot_add_box_plot(self._handle, group_items,
                                         number_items, count, whisker_length,
                                         encoded_color,
                                         encoded_outlier_color)
@@ -327,7 +327,7 @@ cdef class Plot:
                 x_items[index] = encoded_x[index]
                 y_items[index] = encoded_y[index]
                 number_items[index] = float(values[index])
-            status = uplot_add_heatmap(self._handle, x_items, y_items,
+            status = uniplot_add_heatmap(self._handle, x_items, y_items,
                                        number_items, count, aggregation)
         finally:
             free(x_items); free(y_items); free(number_items)
@@ -362,7 +362,7 @@ cdef class Plot:
                 y_items[index] = float(y_breaks[index])
             for index in range(value_count):
                 value_items[index] = float(values[index])
-            status = uplot_add_numeric_heatmap(
+            status = uniplot_add_numeric_heatmap(
                 self._handle, x_items, x_count, y_items, y_count,
                 value_items, value_count)
         finally:
@@ -395,7 +395,7 @@ cdef class Plot:
                 value_items[index] = float(values[index])
             for index in range(break_count):
                 break_items[index] = float(breaks[index])
-            status = uplot_add_numeric_histogram(
+            status = uniplot_add_numeric_histogram(
                 self._handle, value_items, value_count,
                 break_items, break_count, density, encoded_color)
         finally:
@@ -420,14 +420,14 @@ cdef class Plot:
         try:
             for index in range(value_count):
                 value_items[index] = float(values[index])
-            status = uplot_add_automatic_histogram(
+            status = uniplot_add_automatic_histogram(
                 self._handle, value_items, value_count, rule, density,
                 encoded_color)
         finally:
             free(value_items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid automatic histogram or non-empty plot")
         return self
 
@@ -453,14 +453,14 @@ cdef class Plot:
             for index in range(count):
                 x_items[index] = float(x[index])
                 y_items[index] = float(y[index])
-            status = uplot_add_linear_smooth(
+            status = uniplot_add_linear_smooth(
                 self._handle, x_items, y_items, count, point_count,
                 confidence_level, show_confidence, encoded_line, encoded_band)
         finally:
             free(x_items); free(y_items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid linear smoothing input or non-empty plot")
         return self
 
@@ -483,14 +483,14 @@ cdef class Plot:
             for index in range(count):
                 x_items[index] = float(x[index])
                 y_items[index] = float(y[index])
-            status = uplot_add_polynomial_smooth(
+            status = uniplot_add_polynomial_smooth(
                 self._handle, x_items, y_items, count, degree, point_count,
                 encoded_line)
         finally:
             free(x_items); free(y_items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid polynomial smoothing input or non-empty plot")
         return self
 
@@ -510,13 +510,13 @@ cdef class Plot:
         try:
             for index in range(count):
                 items[index] = float(values[index])
-            status = uplot_add_density(self._handle, items, count,
+            status = uniplot_add_density(self._handle, items, count,
                 point_count, bandwidth, encoded_fill, encoded_line)
         finally:
             free(items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid density input or non-empty plot")
         return self
 
@@ -535,13 +535,13 @@ cdef class Plot:
         try:
             for index in range(count):
                 items[index] = float(values[index])
-            status = uplot_add_violin(self._handle, items, count,
+            status = uniplot_add_violin(self._handle, items, count,
                 point_count, bandwidth, width, encoded_color)
         finally:
             free(items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid violin input or non-empty plot")
         return self
 
@@ -568,14 +568,14 @@ cdef class Plot:
             for index in range(count):
                 group_items[index] = encoded_groups[index]
                 number_items[index] = float(values[index])
-            status = uplot_add_grouped_violin(
+            status = uniplot_add_grouped_violin(
                 self._handle, group_items, number_items, count, point_count,
                 bandwidth, width, encoded_color)
         finally:
             free(group_items); free(number_items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid grouped violin input or non-empty plot")
         return self
 
@@ -614,14 +614,14 @@ cdef class Plot:
                 value_items[index] = float(values[index])
             for index in range(level_count):
                 level_items[index] = float(levels[index])
-            status = uplot_add_contours(self._handle, x_items, x_count,
+            status = uniplot_add_contours(self._handle, x_items, x_count,
                 y_items, y_count, value_items, value_count, level_items,
                 level_count, encoded_color, width)
         finally:
             free(x_items); free(y_items); free(value_items); free(level_items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid contour input or non-empty plot")
         return self
 
@@ -641,13 +641,13 @@ cdef class Plot:
         try:
             for index in range(count):
                 items[index] = float(values[index])
-            status = uplot_add_raster_heatmap(self._handle, width, height,
+            status = uniplot_add_raster_heatmap(self._handle, width, height,
                 items, count, x_min, x_max, y_min, y_max, filter)
         finally:
             free(items)
-        if status == UPLOT_ERR_MEMORY:
+        if status == UNIPLOT_ERR_MEMORY:
             raise MemoryError()
-        if status != UPLOT_OK:
+        if status != UNIPLOT_OK:
             raise ValueError("invalid raster heatmap input or non-empty plot")
         return self
 
@@ -673,7 +673,7 @@ cdef class Plot:
             for index in range(count):
                 group_items[index] = encoded_groups[index]
                 number_items[index] = float(values[index])
-            status = uplot_add_grouped_aggregate(
+            status = uniplot_add_grouped_aggregate(
                 self._handle, group_items, number_items, count,
                 aggregation, encoded_color)
         finally:
@@ -698,7 +698,7 @@ cdef class Plot:
         try:
             for index in range(count):
                 items[index] = encoded_values[index]
-            if uplot_add_categorical_column(
+            if uniplot_add_categorical_column(
                     self._handle, encoded_name, items, count) != 0:
                 raise ValueError("invalid categorical column")
         finally:
@@ -707,16 +707,16 @@ cdef class Plot:
 
     def title(self, value):
         cdef bytes encoded = str(value).encode("utf-8")
-        if uplot_set_title(self._handle, encoded) != 0: raise ValueError("invalid title")
+        if uniplot_set_title(self._handle, encoded) != 0: raise ValueError("invalid title")
         return self
 
     def x_axis_labels(self, int labels=AXIS_NUMERIC, bint reversed=False):
-        if uplot_set_x_axis_labels(self._handle, labels, int(reversed)) != 0:
+        if uniplot_set_x_axis_labels(self._handle, labels, int(reversed)) != 0:
             raise ValueError("invalid x axis label semantics")
         return self
 
     def y_axis_labels(self, int labels=AXIS_NUMERIC, bint reversed=False):
-        if uplot_set_y_axis_labels(self._handle, labels, int(reversed)) != 0:
+        if uniplot_set_y_axis_labels(self._handle, labels, int(reversed)) != 0:
             raise ValueError("invalid y axis label semantics")
         return self
 
@@ -733,29 +733,29 @@ cdef class Plot:
         return self.y_axis_labels(AXIS_DURATION, reversed)
 
     def scale_x(self, int kind=SCALE_LINEAR, bint reversed=False):
-        if uplot_set_x_scale(self._handle, kind, int(reversed)) != 0:
+        if uniplot_set_x_scale(self._handle, kind, int(reversed)) != 0:
             raise ValueError("invalid x scale")
         return self
 
     def scale_y(self, int kind=SCALE_LINEAR, bint reversed=False):
-        if uplot_set_y_scale(self._handle, kind, int(reversed)) != 0:
+        if uniplot_set_y_scale(self._handle, kind, int(reversed)) != 0:
             raise ValueError("invalid y scale")
         return self
 
     def scale_x_power(self, double exponent, bint reversed=False):
-        if uplot_set_x_power_scale(
+        if uniplot_set_x_power_scale(
                 self._handle, exponent, int(reversed)) != 0:
             raise ValueError("invalid x power scale")
         return self
 
     def scale_y_power(self, double exponent, bint reversed=False):
-        if uplot_set_y_power_scale(
+        if uniplot_set_y_power_scale(
                 self._handle, exponent, int(reversed)) != 0:
             raise ValueError("invalid y power scale")
         return self
 
     def coordinates(self, int kind=COORD_CARTESIAN):
-        if uplot_set_coordinates(self._handle, kind) != 0:
+        if uniplot_set_coordinates(self._handle, kind) != 0:
             raise ValueError("invalid coordinate system")
         return self
 
@@ -767,13 +767,13 @@ cdef class Plot:
 
     def secondary_y(self, double scale=1.0, double offset=0.0, label=""):
         cdef bytes encoded = str(label).encode("utf-8")
-        if uplot_set_secondary_y(
+        if uniplot_set_secondary_y(
                 self._handle, scale, offset, encoded) != 0:
             raise ValueError("invalid secondary y transform")
         return self
 
     def clear_secondary_y(self):
-        if uplot_clear_secondary_y(self._handle) != 0:
+        if uniplot_clear_secondary_y(self._handle) != 0:
             raise RuntimeError("cannot clear secondary y axis")
         return self
 
@@ -781,7 +781,7 @@ cdef class Plot:
                       float font_size=13.0):
         cdef bytes encoded_text = str(text).encode("utf-8")
         cdef bytes encoded_color = str(color).encode("utf-8")
-        if uplot_annotate_text(self._handle, x, y, encoded_text,
+        if uniplot_annotate_text(self._handle, x, y, encoded_text,
                                encoded_color, font_size) != 0:
             raise ValueError("invalid text annotation")
         return self
@@ -790,13 +790,13 @@ cdef class Plot:
                        color="#202124", float width=2.0,
                        float head_size=8.0):
         cdef bytes encoded_color = str(color).encode("utf-8")
-        if uplot_annotate_arrow(self._handle, x, y, x_end, y_end,
+        if uniplot_annotate_arrow(self._handle, x, y, x_end, y_end,
                                 encoded_color, width, head_size) != 0:
             raise ValueError("invalid arrow annotation")
         return self
 
     def clear_annotations(self):
-        if uplot_clear_annotations(self._handle) != 0:
+        if uniplot_clear_annotations(self._handle) != 0:
             raise RuntimeError("cannot clear annotations")
         return self
 
@@ -806,14 +806,14 @@ cdef class Plot:
         cdef size_t length = 0
         cdef int status
         if svg:
-            status = uplot_render_svg(self._handle, encoded, &output, &length)
+            status = uniplot_render_svg(self._handle, encoded, &output, &length)
         else:
-            status = uplot_render_png(self._handle, encoded, &output, &length)
+            status = uniplot_render_png(self._handle, encoded, &output, &length)
         if status != 0: raise RuntimeError("render failed")
         try:
             return PyBytes_FromStringAndSize(<char *>output, length)
         finally:
-            uplot_buffer_free(output, length)
+            uniplot_buffer_free(output, length)
 
     def svg(self, font): return self._render(font, True)
     def png(self, font): return self._render(font, False)
@@ -821,7 +821,7 @@ cdef class Plot:
 cdef bytes _render_grid(plots, font, int columns, int width, int height,
                         int gap, bint svg, bint shared_x, bint shared_y):
     cdef Py_ssize_t count = len(plots)
-    cdef uplot_plot **handles
+    cdef uniplot_plot **handles
     cdef Py_ssize_t index
     cdef bytes encoded = str(font).encode("utf-8")
     cdef uint8_t *output = NULL
@@ -829,7 +829,7 @@ cdef bytes _render_grid(plots, font, int columns, int width, int height,
     cdef int status
     if count == 0:
         raise ValueError("plot grid requires at least one plot")
-    handles = <uplot_plot **>malloc(count * sizeof(uplot_plot *))
+    handles = <uniplot_plot **>malloc(count * sizeof(uniplot_plot *))
     if handles == NULL:
         raise MemoryError()
     try:
@@ -838,11 +838,11 @@ cdef bytes _render_grid(plots, font, int columns, int width, int height,
                 raise TypeError("plot grid entries must be Plot instances")
             handles[index] = (<Plot>plots[index])._handle
         if svg:
-            status = uplot_render_grid_svg_shared(
+            status = uniplot_render_grid_svg_shared(
                 handles, count, columns, width, height, gap, shared_x,
                 shared_y, encoded, &output, &length)
         else:
-            status = uplot_render_grid_png_shared(
+            status = uniplot_render_grid_png_shared(
                 handles, count, columns, width, height, gap, shared_x,
                 shared_y, encoded, &output, &length)
         if status == 1:
@@ -852,7 +852,7 @@ cdef bytes _render_grid(plots, font, int columns, int width, int height,
         return PyBytes_FromStringAndSize(<char *>output, length)
     finally:
         free(handles)
-        uplot_buffer_free(output, length)
+        uniplot_buffer_free(output, length)
 
 def grid_svg(plots, font, int columns, int width=1200, int height=800,
              int gap=16, bint shared_x=False, bint shared_y=False):
@@ -873,11 +873,11 @@ cdef bytes _render_facets(Plot plot, column, font, int columns, int width,
     cdef size_t length = 0
     cdef int status
     if svg:
-        status = uplot_render_facet_grid_svg(
+        status = uniplot_render_facet_grid_svg(
             plot._handle, encoded_column, columns, width, height, gap,
             shared_x, shared_y, encoded_font, &output, &length)
     else:
-        status = uplot_render_facet_grid_png(
+        status = uniplot_render_facet_grid_png(
             plot._handle, encoded_column, columns, width, height, gap,
             shared_x, shared_y, encoded_font, &output, &length)
     try:
@@ -887,7 +887,7 @@ cdef bytes _render_facets(Plot plot, column, font, int columns, int width,
             raise RuntimeError("facet grid render failed")
         return PyBytes_FromStringAndSize(<char *>output, length)
     finally:
-        uplot_buffer_free(output, length)
+        uniplot_buffer_free(output, length)
 
 def facet_svg(Plot plot, column, font, int columns, int width=1200,
               int height=800, int gap=16, bint shared_x=False,
@@ -911,11 +911,11 @@ cdef bytes _render_facet_matrix(Plot plot, row_column, column_column, font,
     cdef size_t length = 0
     cdef int status
     if svg:
-        status = uplot_render_facet_matrix_svg(
+        status = uniplot_render_facet_matrix_svg(
             plot._handle, encoded_row, encoded_column, width, height, gap,
             shared_x, shared_y, encoded_font, &output, &length)
     else:
-        status = uplot_render_facet_matrix_png(
+        status = uniplot_render_facet_matrix_png(
             plot._handle, encoded_row, encoded_column, width, height, gap,
             shared_x, shared_y, encoded_font, &output, &length)
     try:
@@ -925,7 +925,7 @@ cdef bytes _render_facet_matrix(Plot plot, row_column, column_column, font,
             raise RuntimeError("facet matrix render failed")
         return PyBytes_FromStringAndSize(<char *>output, length)
     finally:
-        uplot_buffer_free(output, length)
+        uniplot_buffer_free(output, length)
 
 def facet_matrix_svg(Plot plot, row_column, column_column, font,
                      int width=1200, int height=800, int gap=16,
@@ -941,5 +941,5 @@ def facet_matrix_png(Plot plot, row_column, column_column, font,
         plot, row_column, column_column, font, width, height, gap, False,
         shared_x, shared_y)
 
-def version(): return uplot_version().decode("ascii")
-def abi_version(): return uplot_abi_version()
+def version(): return uniplot_version().decode("ascii")
+def abi_version(): return uniplot_abi_version()

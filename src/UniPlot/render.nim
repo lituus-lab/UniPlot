@@ -95,14 +95,14 @@ proc toSvg*(prepared: PreparedScene): string =
     of snPath, snText:
       result &= "<path d=\"" & $node.path & "\" fill=\"" &
         toSvgColor(node.color) & "\""
-      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      if node.id != 0: result &= " data-uniplot-id=\"" & $node.id & "\""
       result &= "/>"
     of snImage:
       result &= &"<image x=\"{node.imageX}\" y=\"{node.imageY}\" " &
         &"width=\"{node.image.width}\" height=\"{node.image.height}\" " &
         &"opacity=\"{float32(node.opacity) / 255'f32}\" href=\"" &
         node.image.imageDataUri & "\""
-      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      if node.id != 0: result &= " data-uniplot-id=\"" & $node.id & "\""
       result &= "/>"
   result &= "</svg>"
 
@@ -119,14 +119,14 @@ proc toSvg*(scene: Scene; font: Font): string =
     of snPath, snText:
       result &= "<path d=\"" & $(node.nodePath(font)) & "\" fill=\"" &
         toSvgColor(node.color) & "\""
-      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      if node.id != 0: result &= " data-uniplot-id=\"" & $node.id & "\""
       result &= "/>"
     of snImage:
       result &= &"<image x=\"{node.imageX}\" y=\"{node.imageY}\" " &
         &"width=\"{node.image.width}\" height=\"{node.image.height}\" " &
         &"opacity=\"{float32(node.opacity) / 255'f32}\" href=\"" &
         node.image.imageDataUri & "\""
-      if node.id != 0: result &= " data-uplot-id=\"" & $node.id & "\""
+      if node.id != 0: result &= " data-uniplot-id=\"" & $node.id & "\""
       result &= "/>"
   result &= "</svg>"
 

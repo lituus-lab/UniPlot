@@ -38,143 +38,143 @@ int main(void) {
   uint8_t *bytes = NULL;
   size_t length = 0;
 
-  if (uplot_init() != UPLOT_OK) return 1;
-  uplot_plot *plot = uplot_plot_new(800, 500);
+  if (uniplot_init() != UNIPLOT_OK) return 1;
+  uniplot_plot *plot = uniplot_plot_new(800, 500);
   if (plot == NULL) return 1;
 
-  uplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
-                        UPLOT_LINE_DOT_DASH);
-  uplot_add_points_shaped(plot, x, y, 3, "#cc3344", 4.0f,
-                          UPLOT_MARKER_DIAMOND);
-  uplot_set_title(plot, "Measurements");
+  uniplot_add_line_styled(plot, x, y, 3, "#3366cc", 2.0f,
+                        UNIPLOT_LINE_DOT_DASH);
+  uniplot_add_points_shaped(plot, x, y, 3, "#cc3344", 4.0f,
+                          UNIPLOT_MARKER_DIAMOND);
+  uniplot_set_title(plot, "Measurements");
 
   uint8_t *json = NULL;
   size_t json_length = 0;
-  uplot_plot_to_json(plot, &json, &json_length);
-  uplot_plot *restored = uplot_plot_from_json(
+  uniplot_plot_to_json(plot, &json, &json_length);
+  uniplot_plot *restored = uniplot_plot_from_json(
     json, json_length, 800, 500);
-  uplot_buffer_free(json, json_length);
-  uplot_plot_free(plot);
+  uniplot_buffer_free(json, json_length);
+  uniplot_plot_free(plot);
   plot = restored;
 
-  uplot_plot *panels[] = {plot, restored};
-  int status = uplot_render_grid_svg_shared(
+  uniplot_plot *panels[] = {plot, restored};
+  int status = uniplot_render_grid_svg_shared(
     panels, 2, 2, 1000, 420, 16, 1, 1,
     "DejaVuSans.ttf", &bytes, &length);
-  if (status == UPLOT_OK) {
+  if (status == UNIPLOT_OK) {
     fwrite(bytes, 1, length, stdout);
-    uplot_buffer_free(bytes, length);
+    uniplot_buffer_free(bytes, length);
   }
-  uplot_plot_free(plot);
+  uniplot_plot_free(plot);
   return status;
 }
 ```
 
 ## Ownership and errors
 
-- `uplot_plot_new` returns an opaque owned handle; release it with
-  `uplot_plot_free`.
+- `uniplot_plot_new` returns an opaque owned handle; release it with
+  `uniplot_plot_free`.
 - SVG and PNG renderers allocate byte buffers; release them with
-  `uplot_buffer_free` using the returned length.
-- `uplot_render_grid_svg` and `uplot_render_grid_png` accept a borrowed array
+  `uniplot_buffer_free` using the returned length.
+- `uniplot_render_grid_svg` and `uniplot_render_grid_png` accept a borrowed array
   of non-null plot handles, an explicit row-major column count, canvas size
   and pixel gap. They do not take ownership of the handles.
 - The additive `_shared` variants take `shared_x` and `shared_y` integer flags
   (`0` or `1`) and derive common numeric domains or categorical x order. The
   original entry points
   remain ABI-compatible aliases for two false flags.
-- `uplot_add_categorical_column` copies a complete string column into the
-  retained frame. `uplot_render_facet_grid_svg` and its PNG counterpart split
+- `uniplot_add_categorical_column` copies a complete string column into the
+  retained frame. `uniplot_render_facet_grid_svg` and its PNG counterpart split
   one handle by that column; their flags follow the same shared-domain
   contract as plot grids.
-- `uplot_render_facet_matrix_svg` and its PNG counterpart take distinct row
+- `uniplot_render_facet_matrix_svg` and its PNG counterpart take distinct row
   and column fields. They retain the full Cartesian layout and render absent
   combinations as labelled empty panels.
-- `uplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
-  ownership rule applies to its byte buffer. `uplot_plot_from_json` accepts
+- `uniplot_plot_to_json` returns the complete schema-v1 `PlotSpec`; the same
+  ownership rule applies to its byte buffer. `uniplot_plot_from_json` accepts
   explicit output dimensions and returns null for malformed or unsupported
   documents.
 - Caller-owned input arrays only need to remain valid for the duration of the
   add call; UniPlot copies them into its specification.
-- Status is `UPLOT_OK`, `UPLOT_ERR_ARGUMENT`, `UPLOT_ERR_RENDER` or
-  `UPLOT_ERR_MEMORY`.
+- Status is `UNIPLOT_OK`, `UNIPLOT_ERR_ARGUMENT`, `UNIPLOT_ERR_RENDER` or
+  `UNIPLOT_ERR_MEMORY`.
 - A null pointer, zero-sized series, length mismatch, invalid colour or invalid
   dimensions is an argument error rather than undefined behaviour.
-- `uplot_add_line_styled` accepts the five `UPLOT_LINE_*` values;
-  `uplot_add_points_shaped` accepts the six `UPLOT_MARKER_*` values. Invalid
+- `uniplot_add_line_styled` accepts the five `UNIPLOT_LINE_*` values;
+  `uniplot_add_points_shaped` accepts the six `UNIPLOT_MARKER_*` values. Invalid
   enum integers are rejected before conversion to Nim enums.
-- `uplot_add_line_configured` and `uplot_add_points_configured` additionally
-  accept `UPLOT_MISSING_DROP`, `UPLOT_MISSING_BREAK` or
-  `UPLOT_MISSING_REJECT`. Existing line entry points break at non-finite values;
+- `uniplot_add_line_configured` and `uniplot_add_points_configured` additionally
+  accept `UNIPLOT_MISSING_DROP`, `UNIPLOT_MISSING_BREAK` or
+  `UNIPLOT_MISSING_REJECT`. Existing line entry points break at non-finite values;
   existing point entry points drop them.
-- `uplot_set_secondary_y(scale, offset, label)` adds the same affine right-side
-  guide as Nim; `uplot_clear_secondary_y` removes it.
-- `uplot_annotate_text` and `uplot_annotate_arrow` retain plain annotations in
-  numeric data coordinates; `uplot_clear_annotations` removes them. They are
+- `uniplot_set_secondary_y(scale, offset, label)` adds the same affine right-side
+  guide as Nim; `uniplot_clear_secondary_y` removes it.
+- `uniplot_annotate_text` and `uniplot_annotate_arrow` retain plain annotations in
+  numeric data coordinates; `uniplot_clear_annotations` removes them. They are
   included in schema-v1 JSON and therefore survive the C round trip shown
   above.
-- `uplot_add_box_plot` computes type-7 quartiles and Tukey whiskers from copied
+- `uniplot_add_box_plot` computes type-7 quartiles and Tukey whiskers from copied
   grouped samples. It requires an otherwise empty handle, making replacement
   semantics explicit; malformed groups, colours or whisker lengths are
   argument errors.
-- `uplot_add_heatmap` copies aligned categorical x/y/value arrays and accepts
-  `UPLOT_AGG_COUNT`, `SUM`, `MEAN`, `MINIMUM` or `MAXIMUM`. It also requires an
+- `uniplot_add_heatmap` copies aligned categorical x/y/value arrays and accepts
+  `UNIPLOT_AGG_COUNT`, `SUM`, `MEAN`, `MINIMUM` or `MAXIMUM`. It also requires an
   otherwise empty handle. First-seen axis order and missing Cartesian cells
   follow the Nim `aggregate2D` contract.
-- `uplot_add_numeric_heatmap` copies explicit x/y boundary arrays and a
+- `uniplot_add_numeric_heatmap` copies explicit x/y boundary arrays and a
   row-major value matrix. The value count must equal the Cartesian cell count;
   finite values become variable-size numeric UniVector rectangles.
-- `uplot_add_raster_heatmap` copies a dense row-major scalar matrix, maps its
+- `uniplot_add_raster_heatmap` copies a dense row-major scalar matrix, maps its
   finite domain through UniColor and retains one RGBA8 raster. Non-finite cells
   are transparent.
-- `uplot_add_histogram_breaks` copies samples and finite, strictly increasing
+- `uniplot_add_histogram_breaks` copies samples and finite, strictly increasing
   boundaries into a categorical histogram on an empty handle. Values outside
   the supplied domain are excluded and the final boundary is included. Bars
   have equal screen width even when numeric intervals differ.
-- `uplot_add_numeric_histogram` uses the same validated breaks as numeric
+- `uniplot_add_numeric_histogram` uses the same validated breaks as numeric
   data-coordinate rectangles. Its `density` flag is exactly `0` or `1`; the
   latter normalises rectangle area to one for a non-empty in-domain sample.
-- `uplot_add_automatic_histogram` selects equal-width numeric bins with one of
-  the `UPLOT_HISTOGRAM_*` rules. The generated C figure uses
+- `uniplot_add_automatic_histogram` selects equal-width numeric bins with one of
+  the `UNIPLOT_HISTOGRAM_*` rules. The generated C figure uses
   Freedman–Diaconis density and therefore exercises the real ABI entry point.
-- `uplot_add_linear_smooth` copies aligned x/y arrays and materialises a
+- `uniplot_add_linear_smooth` copies aligned x/y arrays and materialises a
   UniStatistics linear fit plus an optional mean-confidence ribbon on an empty
   handle. Point count, confidence level, flags and colours are validated before
   publication.
-- `uplot_add_density` copies samples and materialises a Gaussian density area
+- `uniplot_add_density` copies samples and materialises a Gaussian density area
   plus outline. Bandwidth zero selects the UniStatistics automatic rule.
-- `uplot_add_violin` copies samples and materialises the same estimate as one
+- `uniplot_add_violin` copies samples and materialises the same estimate as one
   mirrored retained polygon with an explicit positive width.
-- `uplot_add_grouped_violin` copies aligned group/value arrays, retains
+- `uniplot_add_grouped_violin` copies aligned group/value arrays, retains
   first-seen categories and places one mirrored density inside each band.
-- `uplot_add_contours` copies rectilinear x/y coordinates, a row-major scalar
+- `uniplot_add_contours` copies rectilinear x/y coordinates, a row-major scalar
   grid and ordered levels, then retains deterministic marching-squares lines.
   Cells containing a non-finite sample are skipped.
-- `uplot_add_polynomial_smooth` copies aligned samples, fits degree 1 through
+- `uniplot_add_polynomial_smooth` copies aligned samples, fits degree 1 through
   8 through UniStatistics/UniLinalg QR, and retains the sampled line.
-- `uplot_set_x_scale` / `uplot_set_y_scale` select linear, base-10 logarithmic
+- `uniplot_set_x_scale` / `uniplot_set_y_scale` select linear, base-10 logarithmic
   or fixed-unit symmetric-logarithmic coordinates and may reverse direction.
-- `uplot_set_x_power_scale` / `uplot_set_y_power_scale` configure a positive
+- `uniplot_set_x_power_scale` / `uniplot_set_y_power_scale` configure a positive
   signed-power exponent without changing the existing scale setter ABI.
-- `uplot_set_coordinates(plot, UPLOT_COORD_POLAR)` treats x values as radians
+- `uniplot_set_coordinates(plot, UNIPLOT_COORD_POLAR)` treats x values as radians
   in `[0, 2*pi]` and y values as non-negative radii. Set
-  `UPLOT_COORD_CARTESIAN` to restore Cartesian projection.
-- `uplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
-  first-seen groups and supports the five `UPLOT_AGG_*` operations. Non-finite
+  `UNIPLOT_COORD_CARTESIAN` to restore Cartesian projection.
+- `uniplot_add_grouped_aggregate` copies aligned group/value arrays, preserves
+  first-seen groups and supports the five `UNIPLOT_AGG_*` operations. Non-finite
   observations are excluded and the builder requires an empty handle.
 - Series may have different lengths. The rectangular internal frame is padded
   with `NaN`, then each layer's missing-value policy resolves those absent rows.
 
 ## ABI compatibility
 
-`UNIPLOT_VERSION`, `uplot_version()` and `uplot_abi_version()` expose library
+`UNIPLOT_VERSION`, `uniplot_version()` and `uniplot_abi_version()` expose library
 compatibility. `UNIPLOT_ABI_VERSION` is 1. Adding functions may preserve this
 version; changing an existing signature or ownership rule may not.
 
 The direct C builders include numeric/categorical plots and retained rasters.
-`uplot_add_raster` copies a caller-owned packed Gray/RGB/RGBA8 buffer and
-positions it with numeric extents; `UPLOT_RASTER_NEAREST`, `BILINEAR` and `BOX`
-select UniImage filtering. `uplot_add_image_mark` uses the same copied input
+`uniplot_add_raster` copies a caller-owned packed Gray/RGB/RGBA8 buffer and
+positions it with numeric extents; `UNIPLOT_RASTER_NEAREST`, `BILINEAR` and `BOX`
+select UniImage filtering. `uniplot_add_image_mark` uses the same copied input
 contract but inserts the image in ordinary data-layer order rather than behind
 the guides. The versioned JSON bridge transports the complete
 valid Nim `PlotSpec`, including layers, mappings, references, scales, themes
@@ -182,8 +182,8 @@ palettes, rasters and image resources, without duplicating the grammar in C.
 The original solid-line and circle-point functions remain ABI-compatible
 convenience entry points.
 
-`uplot_set_x_axis_labels` and `uplot_set_y_axis_labels` accept
-`UPLOT_AXIS_NUMERIC`, `UPLOT_AXIS_UTC_DATETIME` or `UPLOT_AXIS_DURATION`, plus
+`uniplot_set_x_axis_labels` and `uniplot_set_y_axis_labels` accept
+`UNIPLOT_AXIS_NUMERIC`, `UNIPLOT_AXIS_UTC_DATETIME` or `UNIPLOT_AXIS_DURATION`, plus
 an exact `0`/`1` reversal flag. Temporal inputs remain ordinary `double`
 seconds, so the ABI owns no calendar structure and never uses the host locale.
 
@@ -215,7 +215,7 @@ nbRawHtml gallery([
   svgFigure(cBoxSvg, "A grouped boxplot built and rendered through the C ABI."),
   pngFigure(cBoxPng, "The same C boxplot as an embedded PNG.",
     "A grouped boxplot rendered through the UniPlot C ABI"),
-  svgFigure(cHeatSvg, "A categorical heatmap built through `uplot_add_heatmap`."),
+  svgFigure(cHeatSvg, "A categorical heatmap built through `uniplot_add_heatmap`."),
   pngFigure(cHeatPng, "The same C heatmap as an embedded PNG.",
     "A categorical heatmap rendered through the UniPlot C ABI"),
   svgFigure(cHistogramSvg,
@@ -223,7 +223,7 @@ nbRawHtml gallery([
   pngFigure(cHistogramPng, "The same C density as an embedded PNG.",
     "A numeric histogram density rendered through the UniPlot C ABI"),
   svgFigure(cGroupedSvg,
-    "First-seen grouped means built through `uplot_add_grouped_aggregate`."),
+    "First-seen grouped means built through `uniplot_add_grouped_aggregate`."),
   pngFigure(cGroupedPng, "The same grouped aggregate as an embedded PNG.",
     "Grouped means rendered through the UniPlot C ABI"),
   svgFigure(cNumericHeatSvg,
@@ -232,7 +232,7 @@ nbRawHtml gallery([
     "The same C numeric heatmap as an embedded PNG.",
     "A numeric heatmap rendered through the UniPlot C ABI"),
   svgFigure(cImageSvg,
-    "A copied RGBA resource inserted with `uplot_add_image_mark`."),
+    "A copied RGBA resource inserted with `uniplot_add_image_mark`."),
   pngFigure(cImagePng, "The same C image mark as an embedded PNG.",
     "A data-mapped image mark rendered through the UniPlot C ABI"),
   svgFigure(cTemporalSvg,

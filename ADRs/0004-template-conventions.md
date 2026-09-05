@@ -12,7 +12,7 @@
 src/UniPlot/       data, scales, statistics, grammar, scene, guides, render
 src/UniPlot.nim    public umbrella module
 bin/uniplot_cli.nim
-include/UniPlot.h  hand-written C header using uplot_ symbols
+include/UniPlot.h  hand-written C header using uniplot_ symbols
 tests/             Nim and C conformance tests
 py/                Cython binding and pytest
 book/              executable examples
@@ -26,7 +26,7 @@ book/              executable examples
 - Core types contain no backend or window-system handles.
 - English comments are terse and explain one relevant fact.
 - Every executable tutorial block is compiled and run.
-- C symbols use `uplot_`; the library is `libUniPlot`.
+- C symbols use `uniplot_`; the library is `libUniPlot`.
 
 ## Gates
 

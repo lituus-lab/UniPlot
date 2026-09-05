@@ -30,7 +30,7 @@ suite "rendering":
     let svg = scene.toSvg(font)
     let png = scene.encodePng(font)
     check svg.startsWith("<svg")
-    check "data-uplot-id" in svg
+    check "data-uniplot-id" in svg
     check png.len > 8
     check png[0 .. 3] == @[137'u8, 80, 78, 71]
 
@@ -94,7 +94,7 @@ suite "rendering":
       preparedPixels = prepared.renderImage
     check "<image x=\"-1\"" in svg
     check "data:image/png;base64," in svg
-    check "data-uplot-id=\"42\"" in svg
+    check "data-uniplot-id=\"42\"" in svg
     check rendered.data[0 .. 3] == @[0'u8, 255, 0, 255]
     check preparedPixels.data == rendered.data
     pixels.data[3] = 17

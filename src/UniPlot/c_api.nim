@@ -7,11 +7,11 @@ import UniImage/core as uimg
 import UniPlot
 
 const
-  UPLOT_OK* = 0.cint
-  UPLOT_ERR_ARGUMENT* = 1.cint
-  UPLOT_ERR_RENDER* = 2.cint
-  UPLOT_ERR_MEMORY* = 3.cint
-  UPLOT_ABI_VERSION* = 1.cint
+  UNIPLOT_OK* = 0.cint
+  UNIPLOT_ERR_ARGUMENT* = 1.cint
+  UNIPLOT_ERR_RENDER* = 2.cint
+  UNIPLOT_ERR_MEMORY* = 3.cint
+  UNIPLOT_ABI_VERSION* = 1.cint
 
 type PlotHandle = ref object
   spec: PlotSpec
@@ -60,46 +60,46 @@ when defined(staticNoAutoInit):
 void NimMain(void);
 #ifdef _WIN32
 #  include <windows.h>
-static INIT_ONCE uplot_runtime_once = INIT_ONCE_STATIC_INIT;
-static BOOL CALLBACK uplot_runtime_init(PINIT_ONCE o, PVOID p, PVOID *c) {
+static INIT_ONCE uniplot_runtime_once = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK uniplot_runtime_init(PINIT_ONCE o, PVOID p, PVOID *c) {
   (void)o; (void)p; (void)c; NimMain(); return TRUE;
 }
-static void uplot_runtime_ensure(void) {
-  InitOnceExecuteOnce(&uplot_runtime_once, uplot_runtime_init, NULL, NULL);
+static void uniplot_runtime_ensure(void) {
+  InitOnceExecuteOnce(&uniplot_runtime_once, uniplot_runtime_init, NULL, NULL);
 }
 #else
 #  include <pthread.h>
-static pthread_once_t uplot_runtime_once = PTHREAD_ONCE_INIT;
-static void uplot_runtime_init(void) { NimMain(); }
-static void uplot_runtime_ensure(void) {
-  pthread_once(&uplot_runtime_once, uplot_runtime_init);
+static pthread_once_t uniplot_runtime_once = PTHREAD_ONCE_INIT;
+static void uniplot_runtime_init(void) { NimMain(); }
+static void uniplot_runtime_ensure(void) {
+  pthread_once(&uniplot_runtime_once, uniplot_runtime_init);
 }
 #endif
 """.}
   template ensureRuntime() =
-    {.emit: "  uplot_runtime_ensure();".}
+    {.emit: "  uniplot_runtime_ensure();".}
 else:
   template ensureRuntime() = discard
 
 
-proc uplot_init*(): cint {.exportc, dynlib, cdecl.} =
+proc uniplot_init*(): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   withLock initLock:
     if not runtimeStarted:
       NimMain()
       runtimeStarted = true
-  UPLOT_OK
+  UNIPLOT_OK
 
-proc uplot_version*(): cstring {.exportc, dynlib,
+proc uniplot_version*(): cstring {.exportc, dynlib,
     cdecl.} =
   ensureRuntime()
   UniPlotVersion.cstring
 
-proc uplot_abi_version*(): cint {.exportc, dynlib, cdecl.} =
+proc uniplot_abi_version*(): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  UPLOT_ABI_VERSION
+  UNIPLOT_ABI_VERSION
 
-proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
+proc uniplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   try:
     let size = Size(width: int(width), height: int(height))
@@ -110,13 +110,13 @@ proc uplot_plot_new*(width, height: cint): pointer {.exportc, dynlib, cdecl.} =
     cast[pointer](handle)
   except CatchableError, Defect: nil
 
-proc uplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
+proc uniplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
     height: cint; output: ptr pointer): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if output.isNil: return UPLOT_ERR_ARGUMENT
+  if output.isNil: return UNIPLOT_ERR_ARGUMENT
   output[] = nil
   if payload.isNil or length == 0 or length > csize_t(high(int)):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let size = Size(width: int(width), height: int(height))
     size.validate()
@@ -125,17 +125,17 @@ proc uplot_plot_from_json_status*(payload: ptr uint8; length: csize_t; width,
     let parsed = PlotHandle(spec: fromJson(encoded), size: size)
     GC_ref(parsed)
     output[] = cast[pointer](parsed)
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
+proc uniplot_plot_from_json*(payload: ptr uint8; length: csize_t; width,
     height: cint): pointer {.exportc, dynlib, cdecl.} =
   ## Compatibility entry point. New bindings should use the status API above.
   ensureRuntime()
-  discard uplot_plot_from_json_status(payload, length, width, height,
+  discard uniplot_plot_from_json_status(payload, length, width, height,
     addr result)
 
 proc handle(value: pointer): PlotHandle {.inline.} = cast[PlotHandle](value)
@@ -168,11 +168,11 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     lineStyle = SolidLine; shape = CircleMarker;
     missingValues = DropMissing): cint =
   if value.isNil or xs.isNil or ys.isNil or count == 0 or color.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   if count > csize_t(high(int)):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   if size < 0 or not size.isFinite or parseColor($color).isErr:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     let inputCount = int(count)
@@ -180,9 +180,9 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
     var candidate = h.nextColumn
     while "x" & $candidate in h.spec.data.columns or
         "y" & $candidate in h.spec.data.columns:
-      if candidate == high(int): return UPLOT_ERR_ARGUMENT
+      if candidate == high(int): return UNIPLOT_ERR_ARGUMENT
       inc candidate
-    if candidate == high(int): return UPLOT_ERR_ARGUMENT
+    if candidate == high(int): return UNIPLOT_ERR_ARGUMENT
     var candidateSpec = h.spec
     candidateSpec.data = h.spec.data.snapshotFrame
     candidateSpec.layers = newSeqOfCap[Layer](h.spec.layers.len + 1)
@@ -204,22 +204,22 @@ proc addSeries(value: pointer; xs, ys: ptr float64; count: csize_t;
       lineStyle = lineStyle, shape = shape, missingValues = missingValues)
     h.spec = candidateSpec
     h.nextColumn = candidate + 1
-    UPLOT_OK
-  except OutOfMemDefect: UPLOT_ERR_MEMORY
-  except CatchableError, Defect: UPLOT_ERR_ARGUMENT
+    UNIPLOT_OK
+  except OutOfMemDefect: UNIPLOT_ERR_MEMORY
+  except CatchableError, Defect: UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
+proc uniplot_add_line*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; width: float32): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   addSeries(value, xs, ys, count, mkLine, color, width,
     missingValues = BreakOnMissing)
 
-proc uplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
+proc uniplot_add_points*(value: pointer; xs, ys: ptr float64; count: csize_t;
     color: cstring; radius: float32): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   addSeries(value, xs, ys, count, mkPoint, color, radius)
 
-proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
+proc uniplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
     width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
     filter: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -227,16 +227,16 @@ proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
       channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
       filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
       xMin >= xMax or not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let
     w = int(width)
     h = int(height)
     ch = int(channels)
   if w > high(int) div h or w * h > high(int) div ch:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let expected = w * h * ch
   if length != csize_t(expected):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let colorspace = case ch
       of 1: uimg.csGray
@@ -247,13 +247,13 @@ proc uplot_add_raster*(value: pointer; pixels: ptr uint8; length: csize_t;
     copyMem(addr image.data[0], pixels, expected)
     handle(value).spec.rasters.add RasterLayer(image: image, xMin: xMin,
       xMax: xMax, yMin: yMin, yMax: yMax, filter: RasterFilter(filter))
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
+proc uniplot_add_raster_heatmap*(value: pointer; width, height: cint;
     values: ptr float64; valueCount: csize_t;
     xMin, xMax, yMin, yMax: float64; filter: cint): cint {.
     exportc, dynlib, cdecl.} =
@@ -262,16 +262,16 @@ proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
       filter < cint(RasterNearest) or filter > cint(RasterBox) or
       not xMin.isFinite or not xMax.isFinite or xMin >= xMax or
       not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let
     w = int(width)
     h = int(height)
   if w > high(int) div h or valueCount != csize_t(w * h):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let hnd = handle(value)
     if not hnd.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let input = cast[ptr UncheckedArray[float64]](values)
     var copied = newSeqUninit[float64](w * h)
     for index in 0 ..< copied.len:
@@ -280,13 +280,13 @@ proc uplot_add_raster_heatmap*(value: pointer; width, height: cint;
       RasterFilter(filter))
     hnd.spec = candidate
     hnd.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
+proc uniplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
     width, height, channels: cint; xMin, xMax, yMin, yMax: float64;
     filter: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -294,16 +294,16 @@ proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
       channels notin [1.cint, 3.cint, 4.cint] or filter < cint(RasterNearest) or
       filter > cint(RasterBox) or not xMin.isFinite or not xMax.isFinite or
       xMin >= xMax or not yMin.isFinite or not yMax.isFinite or yMin >= yMax:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let
     w = int(width)
     h = int(height)
     ch = int(channels)
   if w > high(int) div h or w * h > high(int) div ch:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let expected = w * h * ch
   if length != csize_t(expected):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let
       colorspace = case ch
@@ -330,9 +330,9 @@ proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
       for resource in hnd.spec.imageResources:
         occupied = occupied or resource.name == resourceName
       if not occupied: break
-      if candidate == high(int): return UPLOT_ERR_ARGUMENT
+      if candidate == high(int): return UNIPLOT_ERR_ARGUMENT
       inc candidate
-    if candidate == high(int): return UPLOT_ERR_ARGUMENT
+    if candidate == high(int): return UNIPLOT_ERR_ARGUMENT
     let
       suffix = $candidate
       resourceName = "image-resource-" & suffix
@@ -380,38 +380,38 @@ proc uplot_add_image_mark*(value: pointer; pixels: ptr uint8; length: csize_t;
       RasterFilter(filter))
     hnd.spec = candidateSpec
     hnd.nextColumn = candidate + 1
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_box_plot*(value: pointer; groups: ptr cstring;
+proc uniplot_add_box_plot*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; whiskerLength: float64; color,
     outlierColor: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or groups.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or color.isNil or outlierColor.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputGroups = cast[ptr UncheckedArray[cstring]](groups)
       inputValues = cast[ptr UncheckedArray[float64]](values)
     var copiedGroups = newSeqOfCap[string](int(count))
     var copiedValues = newSeqOfCap[float64](int(count))
     for index in 0 ..< int(count):
-      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      if inputGroups[index].isNil: return UNIPLOT_ERR_ARGUMENT
       copiedGroups.add $inputGroups[index]
       copiedValues.add inputValues[index]
     h.spec = boxPlot(copiedGroups, copiedValues, whiskerLength, $color,
       $outlierColor)
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
 proc addHistogram(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
@@ -419,11 +419,11 @@ proc addHistogram(value: pointer; values: ptr float64;
   if value.isNil or values.isNil or valueCount == 0 or breaks.isNil or
       breakCount < 2 or valueCount > csize_t(high(int)) or
       breakCount > csize_t(high(int)) or color.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputValues = cast[ptr UncheckedArray[float64]](values)
       inputBreaks = cast[ptr UncheckedArray[float64]](breaks)
@@ -439,26 +439,26 @@ proc addHistogram(value: pointer; values: ptr float64;
     else:
       histogramBreaksPlot(copiedValues, copiedBreaks, $color)
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_histogram_breaks*(value: pointer; values: ptr float64;
+proc uniplot_add_histogram_breaks*(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   addHistogram(value, values, valueCount, breaks, breakCount, color,
     numeric = false, density = false)
 
-proc uplot_add_numeric_histogram*(value: pointer; values: ptr float64;
+proc uniplot_add_numeric_histogram*(value: pointer; values: ptr float64;
     valueCount: csize_t; breaks: ptr float64; breakCount: csize_t;
     density: cint; color: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if density notin [cint(0), cint(1)]: return UPLOT_ERR_ARGUMENT
+  if density notin [cint(0), cint(1)]: return UNIPLOT_ERR_ARGUMENT
   addHistogram(value, values, valueCount, breaks, breakCount, color,
     numeric = true, density = density == 1)
 
-proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
+proc uniplot_add_automatic_histogram*(value: pointer; values: ptr float64;
     valueCount: csize_t; rule, density: cint; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -467,11 +467,11 @@ proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
       rule < cint(low(HistogramRule).ord) or
       rule > cint(high(HistogramRule).ord) or
       density notin [cint(0), cint(1)]:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let inputValues = cast[ptr UncheckedArray[float64]](values)
     var copiedValues = newSeqUninit[float64](int(valueCount))
     for index in 0 ..< copiedValues.len:
@@ -480,13 +480,13 @@ proc uplot_add_automatic_histogram*(value: pointer; values: ptr float64;
       density == 1, $color)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
+proc uniplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
     count: csize_t; pointCount: cint; confidenceLevel: float64;
     showConfidence: cint; lineColor, bandColor: cstring): cint {.
     exportc, dynlib, cdecl.} =
@@ -495,11 +495,11 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 10_000 or
       showConfidence notin [cint(0), cint(1)] or lineColor.isNil or
       bandColor.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputX = cast[ptr UncheckedArray[float64]](valuesX)
       inputY = cast[ptr UncheckedArray[float64]](valuesY)
@@ -513,24 +513,24 @@ proc uplot_add_linear_smooth*(value: pointer; valuesX, valuesY: ptr float64;
       confidenceLevel, showConfidence == 1, $lineColor, $bandColor)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_polynomial_smooth*(value: pointer;
+proc uniplot_add_polynomial_smooth*(value: pointer;
     valuesX, valuesY: ptr float64; count: csize_t; degree,
     pointCount: cint; lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or valuesX.isNil or valuesY.isNil or count < 3 or
       count > csize_t(high(int)) or degree < 1 or degree > 8 or
       pointCount < 2 or pointCount > 10_000 or lineColor.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputX = cast[ptr UncheckedArray[float64]](valuesX)
       inputY = cast[ptr UncheckedArray[float64]](valuesY)
@@ -544,24 +544,24 @@ proc uplot_add_polynomial_smooth*(value: pointer;
       int(pointCount), $lineColor)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
+proc uniplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
     pointCount: cint; bandwidth: float64;
     fillColor, lineColor: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or values.isNil or count < 2 or
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       fillColor.isNil or lineColor.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let input = cast[ptr UncheckedArray[float64]](values)
     var copied = newSeqUninit[float64](int(count))
     for index in 0 ..< copied.len:
@@ -570,13 +570,13 @@ proc uplot_add_density*(value: pointer; values: ptr float64; count: csize_t;
       $fillColor, $lineColor)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
+proc uniplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
     pointCount: cint; bandwidth, width: float64; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -584,11 +584,11 @@ proc uplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
       not width.isFinite or color.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let input = cast[ptr UncheckedArray[float64]](values)
     var copied = newSeqUninit[float64](int(count))
     for index in 0 ..< copied.len:
@@ -597,13 +597,13 @@ proc uplot_add_violin*(value: pointer; values: ptr float64; count: csize_t;
       $color)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
+proc uniplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; pointCount: cint;
     bandwidth, width: float64; color: cstring): cint {.
     exportc, dynlib, cdecl.} =
@@ -612,11 +612,11 @@ proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
       count > csize_t(high(int)) or pointCount < 2 or pointCount > 100_000 or
       bandwidth < 0.0 or not bandwidth.isFinite or width <= 0.0 or
       width > 1.0 or not width.isFinite or color.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputGroups = cast[ptr UncheckedArray[cstring]](groups)
       inputValues = cast[ptr UncheckedArray[float64]](values)
@@ -624,20 +624,20 @@ proc uplot_add_grouped_violin*(value: pointer; groups: ptr cstring;
       copiedGroups = newSeqOfCap[string](int(count))
       copiedValues = newSeqUninit[float64](int(count))
     for index in 0 ..< int(count):
-      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      if inputGroups[index].isNil: return UNIPLOT_ERR_ARGUMENT
       copiedGroups.add $inputGroups[index]
       copiedValues[index] = inputValues[index]
     let candidate = violinPlot(copiedGroups, copiedValues, int(pointCount),
       bandwidth, width, $color)
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
+proc uniplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
     ys: ptr float64; yCount: csize_t; values: ptr float64;
     valueCount: csize_t; levels: ptr float64; levelCount: csize_t;
     color: cstring; width: float64): cint {.exportc, dynlib, cdecl.} =
@@ -648,11 +648,11 @@ proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
       valueCount > csize_t(high(int)) or levelCount > csize_t(high(int)) or
       xCount > csize_t(high(int)) div yCount or valueCount != xCount * yCount or
       width < 0.0 or not width.isFinite or width > float64(high(float32)):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if not h.spec.isBlankRecipeTarget:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputXs = cast[ptr UncheckedArray[float64]](xs)
       inputYs = cast[ptr UncheckedArray[float64]](ys)
@@ -673,13 +673,13 @@ proc uplot_add_contours*(value: pointer; xs: ptr float64; xCount: csize_t;
       copiedLevels, $color, float32(width))
     h.spec = candidate
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except OutOfMemDefect:
-    UPLOT_ERR_MEMORY
+    UNIPLOT_ERR_MEMORY
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
+proc uniplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint;
     color: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -687,11 +687,11 @@ proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
       count > csize_t(high(int)) or color.isNil or
       aggregation < cint(low(AggregationKind).ord) or
       aggregation > cint(high(AggregationKind).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputGroups = cast[ptr UncheckedArray[cstring]](groups)
       inputValues = cast[ptr UncheckedArray[float64]](values)
@@ -699,17 +699,17 @@ proc uplot_add_grouped_aggregate*(value: pointer; groups: ptr cstring;
       copiedGroups = newSeqOfCap[string](int(count))
       copiedValues = newSeqOfCap[float64](int(count))
     for index in 0 ..< int(count):
-      if inputGroups[index].isNil: return UPLOT_ERR_ARGUMENT
+      if inputGroups[index].isNil: return UNIPLOT_ERR_ARGUMENT
       copiedGroups.add $inputGroups[index]
       copiedValues.add inputValues[index]
     h.spec = groupedAggregatePlot(copiedGroups, copiedValues,
       AggregationKind(aggregation), $color)
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
+proc uniplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
     values: ptr float64; count: csize_t; aggregation: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -717,11 +717,11 @@ proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
       count > csize_t(high(int)) or
       aggregation < cint(low(AggregationKind).ord) or
       aggregation > cint(high(AggregationKind).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputXs = cast[ptr UncheckedArray[cstring]](xs)
       inputYs = cast[ptr UncheckedArray[cstring]](ys)
@@ -731,18 +731,18 @@ proc uplot_add_heatmap*(value: pointer; xs, ys: ptr cstring;
     var copiedValues = newSeqOfCap[float64](int(count))
     for index in 0 ..< int(count):
       if inputXs[index].isNil or inputYs[index].isNil:
-        return UPLOT_ERR_ARGUMENT
+        return UNIPLOT_ERR_ARGUMENT
       copiedXs.add $inputXs[index]
       copiedYs.add $inputYs[index]
       copiedValues.add inputValues[index]
     h.spec = heatmapPlot(copiedXs, copiedYs, copiedValues,
       AggregationKind(aggregation))
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
+proc uniplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
     xBreakCount: csize_t; yBreaks: ptr float64; yBreakCount: csize_t;
     values: ptr float64; valueCount: csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -751,11 +751,11 @@ proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
       xBreakCount < 2 or yBreakCount < 2 or valueCount == 0 or
       xBreakCount > csize_t(high(int)) or
       yBreakCount > csize_t(high(int)) or valueCount > csize_t(high(int)):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     if h.spec.layers.len > 0 or h.spec.data.rowCount > 0:
-      return UPLOT_ERR_ARGUMENT
+      return UNIPLOT_ERR_ARGUMENT
     let
       inputXBreaks = cast[ptr UncheckedArray[float64]](xBreaks)
       inputYBreaks = cast[ptr UncheckedArray[float64]](yBreaks)
@@ -772,50 +772,50 @@ proc uplot_add_numeric_heatmap*(value: pointer; xBreaks: ptr float64;
       copiedValues.add inputValues[index]
     h.spec = numericHeatmapPlot(copiedXBreaks, copiedYBreaks, copiedValues)
     h.nextColumn = 0
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_categorical_column*(value: pointer; name: cstring;
+proc uniplot_add_categorical_column*(value: pointer; name: cstring;
     values: ptr cstring; count: csize_t): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or name.isNil or values.isNil or count == 0 or
       count > csize_t(high(int)) or ($name).len == 0:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
-    if int(count) != h.spec.data.rowCount: return UPLOT_ERR_ARGUMENT
+    if int(count) != h.spec.data.rowCount: return UNIPLOT_ERR_ARGUMENT
     let input = cast[ptr UncheckedArray[cstring]](values)
     var copied = newSeqOfCap[string](int(count))
     for index in 0 ..< int(count):
-      if input[index].isNil: return UPLOT_ERR_ARGUMENT
+      if input[index].isNil: return UNIPLOT_ERR_ARGUMENT
       copied.add $input[index]
     h.spec.data.addColumn($name, copied)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
+proc uniplot_add_line_styled*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; width: float32;
     lineStyle: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if lineStyle < cint(low(LineStyle).ord) or
       lineStyle > cint(high(LineStyle).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   addSeries(value, xs, ys, count, mkLine, color, width,
     LineStyle(lineStyle), missingValues = BreakOnMissing)
 
-proc uplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
+proc uniplot_add_points_shaped*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; radius: float32;
     shape: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if shape < cint(low(MarkerShape).ord) or
       shape > cint(high(MarkerShape).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   addSeries(value, xs, ys, count, mkPoint, color, radius,
     shape = MarkerShape(shape))
 
-proc uplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
+proc uniplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; width: float32; lineStyle,
     missingValues: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -823,11 +823,11 @@ proc uplot_add_line_configured*(value: pointer; xs, ys: ptr float64;
       lineStyle > cint(high(LineStyle).ord) or
       missingValues < cint(low(MissingValuePolicy).ord) or
       missingValues > cint(high(MissingValuePolicy).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   addSeries(value, xs, ys, count, mkLine, color, width,
     LineStyle(lineStyle), missingValues = MissingValuePolicy(missingValues))
 
-proc uplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
+proc uniplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
     count: csize_t; color: cstring; radius: float32; shape,
     missingValues: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
@@ -835,26 +835,26 @@ proc uplot_add_points_configured*(value: pointer; xs, ys: ptr float64;
       shape > cint(high(MarkerShape).ord) or
       missingValues < cint(low(MissingValuePolicy).ord) or
       missingValues > cint(high(MissingValuePolicy).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   addSeries(value, xs, ys, count, mkPoint, color, radius,
     shape = MarkerShape(shape),
     missingValues = MissingValuePolicy(missingValues))
 
-proc uplot_set_title*(value: pointer; title: cstring): cint {.
+proc uniplot_set_title*(value: pointer; title: cstring): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil or title.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil or title.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.title = $title
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
 proc setAxisLabels(value: pointer; labels, reversed: cint;
     xAxis: bool): cint =
   if value.isNil or labels < cint(low(AxisLabelKind).ord) or
       labels > cint(high(AxisLabelKind).ord) or reversed notin [0.cint, 1.cint]:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   let hnd = handle(value)
   let direction = reversed == 1
   case AxisLabelKind(labels)
@@ -867,14 +867,14 @@ proc setAxisLabels(value: pointer; labels, reversed: cint;
   of alkDuration:
     if xAxis: hnd.spec.scaleXDuration(direction)
     else: hnd.spec.scaleYDuration(direction)
-  UPLOT_OK
+  UNIPLOT_OK
 
-proc uplot_set_x_axis_labels*(value: pointer; labels, reversed: cint): cint {.
+proc uniplot_set_x_axis_labels*(value: pointer; labels, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   setAxisLabels(value, labels, reversed, true)
 
-proc uplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
+proc uniplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   setAxisLabels(value, labels, reversed, false)
@@ -882,21 +882,21 @@ proc uplot_set_y_axis_labels*(value: pointer; labels, reversed: cint): cint {.
 proc setAxisScale(value: pointer; kind, reversed: cint; xAxis: bool): cint =
   if value.isNil or kind < cint(low(ScaleKind).ord) or
       kind > cint(high(ScaleKind).ord) or reversed notin [0.cint, 1.cint]:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let hnd = handle(value)
     if xAxis: hnd.spec.scaleX(ScaleKind(kind), reversed == 1)
     else: hnd.spec.scaleY(ScaleKind(kind), reversed == 1)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_set_x_scale*(value: pointer; kind, reversed: cint): cint {.
+proc uniplot_set_x_scale*(value: pointer; kind, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   setAxisScale(value, kind, reversed, true)
 
-proc uplot_set_y_scale*(value: pointer; kind, reversed: cint): cint {.
+proc uniplot_set_y_scale*(value: pointer; kind, reversed: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   setAxisScale(value, kind, reversed, false)
@@ -905,151 +905,151 @@ proc setPowerScale(value: pointer; exponent: float64; reversed: cint;
     xAxis: bool): cint =
   if value.isNil or exponent <= 0.0 or not exponent.isFinite or
       reversed notin [0.cint, 1.cint]:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let hnd = handle(value)
     if xAxis: hnd.spec.scaleXPower(exponent, reversed == 1)
     else: hnd.spec.scaleYPower(exponent, reversed == 1)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_set_x_power_scale*(value: pointer; exponent: float64;
+proc uniplot_set_x_power_scale*(value: pointer; exponent: float64;
     reversed: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   setPowerScale(value, exponent, reversed, true)
 
-proc uplot_set_y_power_scale*(value: pointer; exponent: float64;
+proc uniplot_set_y_power_scale*(value: pointer; exponent: float64;
     reversed: cint): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   setPowerScale(value, exponent, reversed, false)
 
-proc uplot_set_coordinates*(value: pointer; coordinates: cint): cint {.
+proc uniplot_set_coordinates*(value: pointer; coordinates: cint): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or coordinates < cint(low(CoordinateKind).ord) or
       coordinates > cint(high(CoordinateKind).ord):
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let hnd = handle(value)
     case CoordinateKind(coordinates)
     of CartesianCoordinates: hnd.spec.coordCartesian()
     of PolarCoordinates: hnd.spec.coordPolar()
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_set_secondary_y*(value: pointer; scale, offset: float64;
+proc uniplot_set_secondary_y*(value: pointer; scale, offset: float64;
     label: cstring): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if value.isNil or label.isNil or not scale.isFinite or scale == 0 or
       not offset.isFinite:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.secondaryY(scale, offset, $label)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_clear_secondary_y*(value: pointer): cint {.
+proc uniplot_clear_secondary_y*(value: pointer): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil: return UNIPLOT_ERR_ARGUMENT
   handle(value).spec.clearSecondaryY()
-  UPLOT_OK
+  UNIPLOT_OK
 
-proc uplot_annotate_text*(value: pointer; x, y: float64; text,
+proc uniplot_annotate_text*(value: pointer; x, y: float64; text,
     color: cstring; fontSize: float32): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil or text.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil or text.isNil or color.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.annotateText(x, y, $text, $color, fontSize)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_annotate_arrow*(value: pointer; x, y, xEnd, yEnd: float64;
+proc uniplot_annotate_arrow*(value: pointer; x, y, xEnd, yEnd: float64;
     color: cstring; width, headSize: float32): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil or color.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil or color.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     handle(value).spec.annotateArrow(x, y, xEnd, yEnd, $color, width, headSize)
-    UPLOT_OK
+    UNIPLOT_OK
   except CatchableError, Defect:
-    UPLOT_ERR_ARGUMENT
+    UNIPLOT_ERR_ARGUMENT
 
-proc uplot_clear_annotations*(value: pointer): cint {.
+proc uniplot_clear_annotations*(value: pointer): cint {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil: return UNIPLOT_ERR_ARGUMENT
   handle(value).spec.clearAnnotations()
-  UPLOT_OK
+  UNIPLOT_OK
 
 proc copyBuffer(bytes: openArray[byte]; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint =
-  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  if output.isNil or outputLen.isNil: return UNIPLOT_ERR_ARGUMENT
   output[] = nil; outputLen[] = 0
-  if bytes.len == 0: return UPLOT_OK
+  if bytes.len == 0: return UNIPLOT_OK
   let memory = cast[ptr uint8](allocShared(bytes.len))
-  if memory.isNil: return UPLOT_ERR_RENDER
+  if memory.isNil: return UNIPLOT_ERR_RENDER
   copyMem(memory, unsafeAddr bytes[0], bytes.len)
   output[] = memory; outputLen[] = csize_t(bytes.len)
-  UPLOT_OK
+  UNIPLOT_OK
 
 proc copyBuffer(bytes: string; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint =
   if bytes.len == 0: return copyBuffer([], output, outputLen)
   copyBuffer(bytes.toOpenArrayByte(0, bytes.high), output, outputLen)
 
-proc uplot_plot_to_json*(value: pointer; output: ptr ptr uint8;
+proc uniplot_plot_to_json*(value: pointer; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     copyBuffer(handle(value).spec.toJson, output, outputLen)
   except CatchableError, Defect:
     if not output.isNil: output[] = nil
     if not outputLen.isNil: outputLen[] = 0
-    UPLOT_ERR_RENDER
+    UNIPLOT_ERR_RENDER
 
-proc uplot_render_png*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
-    outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+proc uniplot_render_png*(value: pointer; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil or fontPath.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil or fontPath.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     copyBuffer(h.spec.compileScene(h.size).encodePng(loadTtf($fontPath)),
         output,
       outputLen)
-  except CatchableError, Defect: UPLOT_ERR_RENDER
+  except CatchableError, Defect: UNIPLOT_ERR_RENDER
 
-proc uplot_render_svg*(value: pointer; fontPath: cstring; output: ptr ptr uint8;
-    outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
+proc uniplot_render_svg*(value: pointer; fontPath: cstring;
+    output: ptr ptr uint8; outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
   ensureRuntime()
-  if value.isNil or fontPath.isNil: return UPLOT_ERR_ARGUMENT
+  if value.isNil or fontPath.isNil: return UNIPLOT_ERR_ARGUMENT
   try:
     let h = handle(value)
     let svg = h.spec.compileScene(h.size).toSvg(loadTtf($fontPath))
     copyBuffer(svg.toOpenArrayByte(0, svg.high), output, outputLen)
-  except CatchableError, Defect: UPLOT_ERR_RENDER
+  except CatchableError, Defect: UNIPLOT_ERR_RENDER
 
 proc renderGrid(values: ptr pointer; count: csize_t; columns, width, height,
     gap: cint; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t; svg, sharedX, sharedY: bool): cint =
-  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  if output.isNil or outputLen.isNil: return UNIPLOT_ERR_ARGUMENT
   output[] = nil
   outputLen[] = 0
   if values.isNil or count == 0 or count > csize_t(high(int)) or
       columns <= 0 or width <= 0 or height <= 0 or gap < 0 or fontPath.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   if csize_t(columns) > count:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let handles = cast[ptr UncheckedArray[pointer]](values)
     var specs = newSeqOfCap[PlotSpec](int(count))
     for index in 0 ..< int(count):
-      if handles[index].isNil: return UPLOT_ERR_ARGUMENT
+      if handles[index].isNil: return UNIPLOT_ERR_ARGUMENT
       specs.add handle(handles[index]).spec
     let composed = compileGrid(specs, int(columns),
       Size(width: int(width), height: int(height)), int(gap), sharedX, sharedY)
@@ -1061,9 +1061,9 @@ proc renderGrid(values: ptr pointer; count: csize_t; columns, width, height,
   except CatchableError, Defect:
     output[] = nil
     outputLen[] = 0
-    UPLOT_ERR_RENDER
+    UNIPLOT_ERR_RENDER
 
-proc uplot_render_grid_svg*(values: ptr pointer; count: csize_t;
+proc uniplot_render_grid_svg*(values: ptr pointer; count: csize_t;
     columns, width, height, gap: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1071,7 +1071,7 @@ proc uplot_render_grid_svg*(values: ptr pointer; count: csize_t;
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
     outputLen, true, false, false)
 
-proc uplot_render_grid_png*(values: ptr pointer; count: csize_t;
+proc uniplot_render_grid_png*(values: ptr pointer; count: csize_t;
     columns, width, height, gap: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1085,11 +1085,11 @@ proc renderSharedGrid(values: ptr pointer; count: csize_t; columns, width,
   if sharedX notin 0 .. 1 or sharedY notin 0 .. 1:
     if not output.isNil: output[] = nil
     if not outputLen.isNil: outputLen[] = 0
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   renderGrid(values, count, columns, width, height, gap, fontPath, output,
     outputLen, svg, sharedX == 1, sharedY == 1)
 
-proc uplot_render_grid_svg_shared*(values: ptr pointer; count: csize_t;
+proc uniplot_render_grid_svg_shared*(values: ptr pointer; count: csize_t;
     columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1097,7 +1097,7 @@ proc uplot_render_grid_svg_shared*(values: ptr pointer; count: csize_t;
   renderSharedGrid(values, count, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, true)
 
-proc uplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
+proc uniplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
     columns, width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1108,13 +1108,13 @@ proc uplot_render_grid_png_shared*(values: ptr pointer; count: csize_t;
 proc renderFacetGrid(value: pointer; column: cstring; columns, width, height,
     gap, sharedX, sharedY: cint; fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t; svg: bool): cint =
-  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  if output.isNil or outputLen.isNil: return UNIPLOT_ERR_ARGUMENT
   output[] = nil
   outputLen[] = 0
   if value.isNil or column.isNil or ($column).len == 0 or columns <= 0 or
       width <= 0 or height <= 0 or gap < 0 or sharedX notin 0 .. 1 or
       sharedY notin 0 .. 1 or fontPath.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let composed = compileFacetGrid(handle(value).spec, $column, int(columns),
       Size(width: int(width), height: int(height)), int(gap), sharedX == 1,
@@ -1127,9 +1127,9 @@ proc renderFacetGrid(value: pointer; column: cstring; columns, width, height,
   except CatchableError, Defect:
     output[] = nil
     outputLen[] = 0
-    UPLOT_ERR_RENDER
+    UNIPLOT_ERR_RENDER
 
-proc uplot_render_facet_grid_svg*(value: pointer; column: cstring; columns,
+proc uniplot_render_facet_grid_svg*(value: pointer; column: cstring; columns,
     width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1137,7 +1137,7 @@ proc uplot_render_facet_grid_svg*(value: pointer; column: cstring; columns,
   renderFacetGrid(value, column, columns, width, height, gap, sharedX,
     sharedY, fontPath, output, outputLen, true)
 
-proc uplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
+proc uniplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
     width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t): cint {.
     exportc, dynlib, cdecl.} =
@@ -1148,14 +1148,14 @@ proc uplot_render_facet_grid_png*(value: pointer; column: cstring; columns,
 proc renderFacetMatrix(value: pointer; rowColumn, columnColumn: cstring;
     width, height, gap, sharedX, sharedY: cint; fontPath: cstring;
     output: ptr ptr uint8; outputLen: ptr csize_t; svg: bool): cint =
-  if output.isNil or outputLen.isNil: return UPLOT_ERR_ARGUMENT
+  if output.isNil or outputLen.isNil: return UNIPLOT_ERR_ARGUMENT
   output[] = nil
   outputLen[] = 0
   if value.isNil or rowColumn.isNil or columnColumn.isNil or
       ($rowColumn).len == 0 or ($columnColumn).len == 0 or width <= 0 or
       height <= 0 or gap < 0 or sharedX notin 0 .. 1 or
       sharedY notin 0 .. 1 or fontPath.isNil:
-    return UPLOT_ERR_ARGUMENT
+    return UNIPLOT_ERR_ARGUMENT
   try:
     let composed = compileFacetMatrix(handle(value).spec, $rowColumn,
       $columnColumn, Size(width: int(width), height: int(height)), int(gap),
@@ -1168,9 +1168,9 @@ proc renderFacetMatrix(value: pointer; rowColumn, columnColumn: cstring;
   except CatchableError, Defect:
     output[] = nil
     outputLen[] = 0
-    UPLOT_ERR_RENDER
+    UNIPLOT_ERR_RENDER
 
-proc uplot_render_facet_matrix_svg*(value: pointer; rowColumn,
+proc uniplot_render_facet_matrix_svg*(value: pointer; rowColumn,
     columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
     fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
@@ -1178,7 +1178,7 @@ proc uplot_render_facet_matrix_svg*(value: pointer; rowColumn,
   renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
     sharedX, sharedY, fontPath, output, outputLen, true)
 
-proc uplot_render_facet_matrix_png*(value: pointer; rowColumn,
+proc uniplot_render_facet_matrix_png*(value: pointer; rowColumn,
     columnColumn: cstring; width, height, gap, sharedX, sharedY: cint;
     fontPath: cstring; output: ptr ptr uint8;
     outputLen: ptr csize_t): cint {.exportc, dynlib, cdecl.} =
@@ -1186,11 +1186,11 @@ proc uplot_render_facet_matrix_png*(value: pointer; rowColumn,
   renderFacetMatrix(value, rowColumn, columnColumn, width, height, gap,
     sharedX, sharedY, fontPath, output, outputLen, false)
 
-proc uplot_buffer_free*(value: pointer; length: csize_t) {.
+proc uniplot_buffer_free*(value: pointer; length: csize_t) {.
     exportc, dynlib, cdecl.} =
   ensureRuntime()
   if not value.isNil: deallocShared(value)
 
-proc uplot_plot_free*(value: pointer) {.exportc, dynlib, cdecl.} =
+proc uniplot_plot_free*(value: pointer) {.exportc, dynlib, cdecl.} =
   ensureRuntime()
   if not value.isNil: GC_unref(handle(value))

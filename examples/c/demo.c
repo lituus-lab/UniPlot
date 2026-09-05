@@ -3,7 +3,7 @@
 #include "UniPlot.h"
 #include <stdio.h>
 int main(void) {
-  uplot_init();
-  printf("UniPlot %s (ABI v%d)\n", uplot_version(), uplot_abi_version());
+  uniplot_init();
+  printf("UniPlot %s (ABI v%d)\n", uniplot_version(), uniplot_abi_version());
   return 0;
 }

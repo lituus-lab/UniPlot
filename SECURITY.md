@@ -5,7 +5,7 @@
 Report vulnerabilities privately to the maintainer. Include the affected
 UniPlot version, input data or font, output backend and a minimal reproducer.
 
-Only the latest released line is supported. The 1.x C ABI uses the `uplot_`
+Only the latest released line is supported. The 1.x C ABI uses the `uniplot_`
 prefix and never lets a Nim exception unwind into foreign code.
 
 Plot dimensions, data lengths, colour strings and output pointers are validated

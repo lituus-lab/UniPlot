@@ -357,7 +357,7 @@ task ctest, "C ABI tests":
   exec makeExe & " -C tests/c"
   done "ctest"
 
-task cexample, "C demo (print-only consumer of the uplot_* ABI)":
+task cexample, "C demo (print-only consumer of the uniplot_* ABI)":
   exec "nimble clibStatic"
   exec makeExe & " -C examples/c"
   done "cexample"
