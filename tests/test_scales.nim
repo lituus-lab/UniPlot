@@ -150,6 +150,11 @@ suite "scales":
     let duration = continuousScale(-90, 3690, 0, 100)
     check duration.axisTickLabel(-90, alkDuration) == "−1:30"
     check duration.axisTickLabel(3690, alkDuration) == "1:01:30"
+    # The seconds field used to carry a rounding the other fields never saw,
+    # so 3659.7 read as `1:00:60`.
+    check duration.axisTickLabel(3659.7, alkDuration) == "1:01:00"
+    check duration.axisTickLabel(3659.4, alkDuration) == "1:00:59"
+    check duration.axisTickLabel(86399.6, alkDuration) == "1d 00:00:00"
     check duration.axisTicks(alkDuration).len >= 2
     expect PlotError:
       discard continuousScale(1, 10, 0, 1, skLog10).axisTicks(alkDuration)

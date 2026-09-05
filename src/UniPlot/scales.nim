@@ -312,9 +312,16 @@ proc fractionalSuffix(value, span: float64): string =
 proc durationTickLabel(value, span: float64): string =
   let
     negative = value < 0
-    magnitude = abs(value)
-  if magnitude < 60:
-    return (if negative: "−" else: "") & decimalField(magnitude, span) & " s"
+    raw = abs(value)
+  if raw < 60:
+    return (if negative: "−" else: "") & decimalField(raw, span) & " s"
+  # Rounded once, before the fields are cut out of it. Deriving hours, minutes
+  # and seconds from `floor` and then rounding the seconds field separately let
+  # 3659.7 read as `1:00:60`: the field carried the carry and the others never
+  # saw it.
+  let
+    precision = span.fractionalPrecision
+    magnitude = if precision == 0: round(raw) else: round(raw, precision)
   let
     whole = int64(floor(magnitude))
     seconds = whole mod 60
