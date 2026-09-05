@@ -1,0 +1,70 @@
+# build artifacts
+build/
+.deps/
+# Keep the CLI source under bin/, ignore only its generated executable.
+/bin/uniplot
+/bin/uniplot.exe
+libUniPlot.so
+libUniPlot.so.*
+libUniPlot.dylib
+libUniPlot.a
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.so.*
+*.dylib
+*.a
+*.lib
+
+# coverage
+coverage/
+lcov.info
+
+# machine-specific benchmark reports
+benchmarks/results/
+benchmarks/__pycache__/
+
+# nim cache
+nimcache/
+rnimcache/
+dnimcache/
+
+# docs output
+pages/
+docs/
+book/__site/
+*.html
+nimdoc.out.css
+
+# python binding artifacts (sources tracked; generated + bundled lib not)
+py/uniplot/_core.c
+py/uniplot/*.so
+py/uniplot/libUniPlot.so
+py/uniplot/libUniPlot.dylib
+py/dist/
+py/build/
+py/*.egg-info/
+py/**/__pycache__/
+py/.pytest_cache/
+# vendored by setup.py (vendor_nim_source) right before `sdist` packages
+# files -- shipped inside the sdist tarball, never tracked here
+py/_nimsrc/
+
+# c test/example binaries
+tests/c/test_uniplot
+examples/c/demo
+
+# os / editor
+.DS_Store
+*~
+.*.swp
+*.dSYM
+
+*.log
+*.core
+
+# `benchmarkDeps` resolves the Julia environment here. Project.toml is the
+# declaration and is tracked; the Manifest is the resolution for one machine.
+benchmarks/julia/Manifest.toml

@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push makes the previous run's answer irrelevant: cancel it rather
+# than pay for both.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    # The CI every Uni* engine runs, held once in lituus-lab/.github rather
+    # than copied per repo. Pinned by commit: a moving ref here would be the
+    # same unpinned dependency the family forbids everywhere else.
+    uses: lituus-lab/.github/.github/workflows/uni-nim-library.yml@739e552733d012b5938da3fbbf05c06913d31af1
+    permissions:
+      # A called workflow cannot obtain more than the calling job grants.
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      library: UniPlot
+      module: uniplot
+      python-smoke-test: py/tests/test_uniplot.py
+
+  wgpu:
+    # UniPlot's own, because no other engine has one: the optional WGPU scene
+    # boundary needs a Vulkan driver, and the Linux runner ships none.
+    name: WGPU (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: jiro4989/setup-nim-action@cb1fc1270b117457dd0d9f610ec981fad3369cec # v2.3.0
+        with:
+          nim-version: '2.2.10'
+      - name: Install software Vulkan (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers
+      - name: Build the failure gate
+        shell: bash
+        run: |
+          # Nimble exits 0 even when an `exec` inside a task failed, so every
+          # task below runs through the gate, which reads the task's own
+          # success marker instead. Built from std only: nothing is resolved yet.
+          GATE=build/unigate
+          [ "$RUNNER_OS" = Windows ] && GATE=build/unigate.exe
+          nim c --hints:off -o:$GATE tools/gate.nim
+          echo "GATE=$GATE" >> "$GITHUB_ENV"
+      - run: nimble install -y
+      - run: $GATE wgpuCheck
+      - run: $GATE wgpuDeps
+      - run: $GATE wgpuTest
+
+  all-green:
+    name: All green
+    # The one check branch protection requires, and the only name that has to
+    # stay stable. `needs.ci.result` is the whole called workflow's verdict;
+    # `wgpu` is this repo's own job, so it is named here beside it.
+    needs: [ci, wgpu]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every required job must have succeeded
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "results: $results"
+          for one in $results; do
+            case "$one" in
+              success) ;;
+              skipped) ;;
+              *) echo "all-green: a required job reported $one" >&2; exit 1 ;;
+            esac
+          done
