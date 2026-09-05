@@ -12,6 +12,11 @@ endif
 ROOT   := $(CURDIR)/../..
 CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
 LIB    := $(ROOT)/libUniPlot.a
+# glibc keeps the maths functions out of libc and UniMath's special functions
+# call them, so Linux fails to link without -lm; macOS has them in libSystem.
+# Named in the recipe, never as a prerequisite: make would look for a file
+# called `-lm`.
+SYSLIBS := -lz -lm
 
 ifeq ($(OS),Windows_NT)
   BIN  := demo.exe
@@ -28,7 +33,7 @@ all: run
 run: $(BIN)
 	$(RUN)
 $(BIN): demo.c $(ROOT)/include/UniPlot.h $(LIB)
-	$(CC) $(CFLAGS) -o $(BIN) demo.c $(LIB) -lz
+	$(CC) $(CFLAGS) -o $(BIN) demo.c $(LIB) $(SYSLIBS)
 # File target, not phony: `nimble cexample` already built the lib, don't redo it.
 $(LIB):
 	cd $(ROOT) && nimble clibStatic
