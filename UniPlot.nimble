@@ -84,7 +84,7 @@ task book, "Build the multipage nimib book (needs nimib + nimibook)":
 task bindingBookDemos, "Regenerate book plots through the C and Python bindings":
   mkDir "book/assets"
   mkDir "book/assets/generated"
-  exec "nimble clibStatic"
+  exec gate("clibStatic")
   let cDemo = when defined(windows): "build/book_demo.exe" else:
     "build/book_demo"
   let cCompiler = when defined(windows): "gcc" else: "cc"
@@ -106,7 +106,7 @@ task bindingBookDemos, "Regenerate book plots through the C and Python bindings"
        " book/assets/generated/c_image_mark.png" &
        " book/assets/generated/c_temporal.svg" &
        " book/assets/generated/c_temporal.png"
-  exec "nimble buildCython"
+  exec gate("buildCython")
   withDir "py":
     exec "python3 -m examples.book_demo ../tests/DejaVuSans.ttf" &
          " ../book/assets/generated/python_binding.svg" &
@@ -138,7 +138,7 @@ task docs, "API reference + book into pages/ — what CI publishes":
     exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot/" &
          module & ".nim"
   exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"
-  exec "nimble book"
+  exec gate("book")
   # Nimibook is the landing site; the generated reference remains under api/.
   cpDir "book/__site", "pages"
   done "docs"
@@ -178,9 +178,9 @@ task testCiRelease, "Nim tests (CI subset, release)":
   done "testCiRelease"
 
 task testAll, "debug + release + C ABI":
-  exec "nimble test"
-  exec "nimble testRelease"
-  exec "nimble ctest"
+  exec gate("test")
+  exec gate("testRelease")
+  exec gate("ctest")
   done "testAll"
 
 task example, "Nim demo (print-only; no file I/O)":
@@ -353,12 +353,12 @@ let makeExe = if findExe("mingw32-make").len > 0: "mingw32-make" else: "make"
 
 # `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
 task ctest, "C ABI tests":
-  exec "nimble clibStatic"
+  exec gate("clibStatic")
   exec makeExe & " -C tests/c"
   done "ctest"
 
 task cexample, "C demo (print-only consumer of the uniplot_* ABI)":
-  exec "nimble clibStatic"
+  exec gate("clibStatic")
   exec makeExe & " -C examples/c"
   done "cexample"
 
@@ -369,14 +369,14 @@ task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing"
 # The extension links the vcc static lib on Windows, the shared lib elsewhere.
 task pyLib, "Build the library the Python extension links against":
   when defined(windows):
-    exec "nimble clibMsvc"
+    exec gate("clibMsvc")
   else:
-    exec "nimble clib"
+    exec gate("clib")
   done "pyLib"
 
 task buildCython, "Cython extension in-place":
-  exec "nimble pyLib"
-  exec "nimble pyDeps"
+  exec gate("pyLib")
+  exec gate("pyDeps")
   # nimscript `cd` (lib/system/nimscript.nim) changes the VM cwd for the next
   # exec without a shell, so the task works under nimble's no-shell exec on Windows.
   cd "py"
@@ -385,22 +385,22 @@ task buildCython, "Cython extension in-place":
   done "buildCython"
 
 task pyTest, "Cython extension + pytest":
-  exec "nimble buildCython"
+  exec gate("buildCython")
   cd "py"
   exec "python3 -m pytest -q"
   cd ".."
   done "pyTest"
 
 task pyWheel, "wheel":
-  exec "nimble pyLib"
-  exec "nimble pyDeps"
+  exec gate("pyLib")
+  exec gate("pyDeps")
   cd "py"
   exec "python3 -m pip wheel --no-deps --no-build-isolation --wheel-dir dist ."
   cd ".."
   done "pyWheel"
 
 task pySdist, "Python source distribution":
-  exec "nimble pyDeps"
+  exec gate("pyDeps")
   cd "py"
   exec "python3 setup.py sdist"
   cd ".."

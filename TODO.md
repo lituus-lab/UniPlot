@@ -42,7 +42,10 @@ scene without weakening its deterministic CPU semantics.
 - [x] Cache or pool vertex, index, texture and readback buffers by capacity.
 - [x] Separate submission from optional readback so interactive frames do not
   pay a synchronous CPU transfer.
-- [x] Handle uncaptured validation errors and asynchronous device loss.
+- [x] Handle uncaptured validation errors.
+- [ ] Handle asynchronous device loss. The state is reached by polling
+  `deviceLostReason` at operation boundaries; a callback delivered whenever the
+  device dies is the separate milestone ADR-0007 names.
 - [x] Expose adapter identity and relevant limits without leaking WGPU ABI
   types.
 - [x] Add exact CPU/GPU pixel-parity fixtures for pixel-aligned geometry and
