@@ -138,9 +138,14 @@ task docs, "API reference + book into pages/ — what CI publishes":
     exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot/" &
          module & ".nim"
   exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"
-  exec gate("book")
-  # Nimibook is the landing site; the generated reference remains under api/.
-  cpDir "book/__site", "pages"
+  # The book is the landing site and the reference lives under api/ -- but a
+  # checkout without `book/` has no book to build, and this used to call it
+  # bare, which nimble reported as a success while nothing happened.
+  if dirExists("book"):
+    exec gate("book")
+    cpDir "book/__site", "pages"
+  else:
+    echo "docs: no book/ in this checkout; published the API reference alone"
   done "docs"
 
 # One entry per Nim test so every task (test, testRelease, testCi*,
