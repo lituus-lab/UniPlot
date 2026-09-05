@@ -1,0 +1,441 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
+# UniPlot — scientific visualisation for the lituus-lab Uni* family.
+
+version       = "1.0.0"
+author        = "lituus-lab"
+description   = "Pure-Nim scientific visualisation engine (Nim + C-ABI + Python)"
+license       = "Apache-2.0"
+srcDir        = "src"
+
+requires "nim >= 2.0.0"
+requires "https://github.com/lbartoletti/NimContracts#main"
+requires "https://github.com/lituus-lab/UniLinalg#main"
+requires "https://github.com/lituus-lab/UniMath#main"
+requires "https://github.com/lituus-lab/UniAccurate#main"
+requires "https://github.com/lituus-lab/UniStatistics#main"
+requires "https://github.com/lituus-lab/UniColor#main"
+requires "https://github.com/lituus-lab/UniImage#main"
+requires "https://github.com/lituus-lab/UniVector#main"
+requires "https://github.com/lituus-lab/UniGlyph#main"
+requires "https://github.com/lituus-lab/UniCrypto#main"
+
+# Book-only dependencies, pinned to the compatible upstream releases used by
+# UniGraph. They never enter the library core dependency graph.
+taskRequires "book", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+taskRequires "docs", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+taskRequires "docsDeps", "https://github.com/pietroppeter/nimib#v0.4.1",
+    "https://github.com/pietroppeter/nimibook#v0.4.0"
+
+
+# --- Failure gate -----------------------------------------------------------
+# Nimble 0.22 exits 0 even when an `exec` inside a task failed: the exception
+# is printed, the task stops, and the process still reports success. Neither
+# `try`/`except` nor `quit(1)` inside a task changes it -- measured, not
+# assumed -- so nothing written here can make nimble's exit code trustworthy.
+#
+# Each task therefore ends with `done "<its own name>"`, which drops a marker
+# file, and `tools/gate.nim` is what turns a missing marker into a non-zero
+# exit. Run a task through the gate, never bare, wherever the answer matters:
+# in CI, and in any task that composes another.
+
+const gateExe =
+  when defined(windows): "build/unigate.exe" else: "build/unigate"
+
+template done(task: string) =
+  mkDir "build/.gate"
+  writeFile("build/.gate/" & task & ".ok", "")
+
+proc gate(task: string): string =
+  ## `exec gate("test")` -- builds the tool on first use.
+  if not fileExists(gateExe):
+    exec "nim c --hints:off -o:" & gateExe & " tools/gate.nim"
+  gateExe & " " & task
+
+
+task canary, "Must fail: proves the gate still catches a broken build":
+  # No `done` here on purpose. If this task ever passes the gate, the gate has
+  # stopped working and every other green result is worthless.
+  exec "nim c -r --hints:off --path:src -o:build/canary tests/canary_broken.nim"
+
+task lint, "Fail if nimpretty would reformat a source":
+  exec "nim c -r --hints:off -o:build/lint_tool tools/lint.nim"
+  done "lint"
+
+task checkVGraph, "Fail on an import that climbs the layers in vgraph.cfg":
+  exec "nim c -r --hints:off -o:build/vgraph_tool tools/vgraph.nim"
+  done "checkVGraph"
+
+task docsDeps, "Install the docs toolchain (nimib + nimibook)":
+  echo "nimib/nimibook installed."
+  done "docsDeps"
+
+task book, "Build the multipage nimib book (needs nimib + nimibook)":
+  # Each Nim chapter is compiled and run: an API drift fails the build.
+  withDir "book":
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim init"
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim clean"
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim build"
+    cpFile "__site/preface.html", "__site/index.html"
+  done "book"
+
+task bindingBookDemos, "Regenerate book plots through the C and Python bindings":
+  mkDir "book/assets"
+  mkDir "book/assets/generated"
+  exec "nimble clibStatic"
+  let cDemo = when defined(windows): "build/book_demo.exe" else:
+    "build/book_demo"
+  let cCompiler = when defined(windows): "gcc" else: "cc"
+  exec cCompiler & " -Iinclude -O2 -Wall -Wextra -std=c11 -o " & cDemo &
+       " examples/c/book_demo.c libUniPlot.a -lz"
+  exec cDemo & " tests/DejaVuSans.ttf book/assets/generated/c_binding.svg" &
+       " book/assets/generated/c_binding.png" &
+       " book/assets/generated/c_boxplot.svg" &
+       " book/assets/generated/c_boxplot.png" &
+       " book/assets/generated/c_heatmap.svg" &
+       " book/assets/generated/c_heatmap.png" &
+       " book/assets/generated/c_histogram.svg" &
+       " book/assets/generated/c_histogram.png" &
+       " book/assets/generated/c_grouped.svg" &
+       " book/assets/generated/c_grouped.png" &
+       " book/assets/generated/c_numeric_heatmap.svg" &
+       " book/assets/generated/c_numeric_heatmap.png" &
+       " book/assets/generated/c_image_mark.svg" &
+       " book/assets/generated/c_image_mark.png" &
+       " book/assets/generated/c_temporal.svg" &
+       " book/assets/generated/c_temporal.png"
+  exec "nimble buildCython"
+  withDir "py":
+    exec "python3 -m examples.book_demo ../tests/DejaVuSans.ttf" &
+         " ../book/assets/generated/python_binding.svg" &
+         " ../book/assets/generated/python_binding.png" &
+         " ../book/assets/generated/python_boxplot.svg" &
+         " ../book/assets/generated/python_boxplot.png" &
+         " ../book/assets/generated/python_heatmap.svg" &
+         " ../book/assets/generated/python_heatmap.png" &
+         " ../book/assets/generated/python_histogram.svg" &
+         " ../book/assets/generated/python_histogram.png" &
+         " ../book/assets/generated/python_grouped.svg" &
+         " ../book/assets/generated/python_grouped.png" &
+         " ../book/assets/generated/python_numeric_heatmap.svg" &
+         " ../book/assets/generated/python_numeric_heatmap.png" &
+         " ../book/assets/generated/python_image_mark.svg" &
+         " ../book/assets/generated/python_image_mark.png" &
+         " ../book/assets/generated/python_temporal.svg" &
+         " ../book/assets/generated/python_temporal.png"
+  done "bindingBookDemos"
+
+task docs, "API reference + book into pages/ — what CI publishes":
+  rmDir "pages"
+  # Generate each public module explicitly. `--project` forces a JS search
+  # index and fails on Nim distributions (notably Homebrew) that omit the
+  # compiler's optional tools/dochack source.
+  for module in ["common", "data", "scales", "stats", "grammar",
+      "serialization", "scene", "guides", "composition", "render",
+      "render/wgpu"]:
+    exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot/" &
+         module & ".nim"
+  exec "nim doc --index:off --outdir:pages/api --hints:off src/UniPlot.nim"
+  exec "nimble book"
+  # Nimibook is the landing site; the generated reference remains under api/.
+  cpDir "book/__site", "pages"
+  done "docs"
+
+# One entry per Nim test so every task (test, testRelease, testCi*,
+# coverage) compiles the same set from a single source of truth.
+const testBins = [
+  ("test_version", "test_version"),
+  ("test_data", "test_data"),
+  ("test_scales", "test_scales"),
+  ("test_stats", "test_stats"),
+  ("test_serialization", "test_serialization"),
+  ("test_composition", "test_composition"),
+  ("test_plot", "test_plot"),
+  ("test_render", "test_render"),
+  ("test_wgpu_boundary", "test_wgpu_boundary"),
+]
+
+task test, "Nim tests (debug, contracts active)":
+  for (name, src) in testBins:
+    exec "nim c -r --path:src -o:build/" & name & " tests/" & src & ".nim"
+  done "test"
+
+task testRelease, "Nim tests (release, contracts compiled away)":
+  for (name, src) in testBins:
+    exec "nim c -r -d:release --path:src -o:build/" & name & "_rel tests/" & src & ".nim"
+  done "testRelease"
+
+task testCi, "Nim tests (CI subset, debug)":
+  for (name, src) in testBins:
+    exec "nim c -r --path:src -o:build/" & name & " tests/" & src & ".nim"
+  done "testCi"
+
+task testCiRelease, "Nim tests (CI subset, release)":
+  for (name, src) in testBins:
+    exec "nim c -r -d:release --path:src -o:build/" & name & "_rel tests/" & src & ".nim"
+  done "testCiRelease"
+
+task testAll, "debug + release + C ABI":
+  exec "nimble test"
+  exec "nimble testRelease"
+  exec "nimble ctest"
+  done "testAll"
+
+task example, "Nim demo (print-only; no file I/O)":
+  exec "nim c -r --path:src -o:build/demo examples/demo.nim"
+  done "example"
+
+task benchmark, "Reproducible UniPlot/Matplotlib off-screen benchmark":
+  exec "python3 benchmarks/run_benchmarks.py"
+  done "benchmark"
+
+task benchmarkScales, "Run cross-library 10^3, 10^5, and 10^6-point workloads":
+  exec "python3 benchmarks/run_workload_suite.py"
+  done "benchmarkScales"
+
+task benchmarkThermals, "Compare cold processes with warmed provider stages":
+  exec "python3 benchmarks/run_thermal_suite.py"
+  done "benchmarkThermals"
+
+task benchmarkMemory, "Measure isolated UniPlot heap and RSS high-water marks":
+  let memoryBinary = when defined(windows): "build/benchmark_memory.exe" else:
+    "build/benchmark_memory"
+  exec "nim c -d:release --mm:orc --path:src -o:" & memoryBinary &
+       " benchmarks/benchmark_memory.nim"
+  exec "nim c -r -d:release --mm:orc -o:build/run_memory_benchmarks" &
+       " benchmarks/run_memory_benchmarks.nim " & memoryBinary
+  done "benchmarkMemory"
+
+task benchmarkBindings, "Benchmark an already-built C/Python JSON bridge":
+  exec "python3 benchmarks/benchmark_bindings.py"
+  done "benchmarkBindings"
+
+task benchmarkDeps, "Install isolated Python/R/Julia benchmark dependencies":
+  exec "python3 benchmarks/install_deps.py"
+  done "benchmarkDeps"
+
+task uniplot, "Build the uniplot CLI (inspect and render PNG/SVG)":
+  exec "nim c --path:src -o:bin/uniplot bin/uniplot_cli.nim"
+  done "uniplot"
+
+task wgpuCheck, "Compile the optional WGPU scene/resource boundary (no native runtime)":
+  exec "nim check --path:src src/UniPlot/render/wgpu.nim"
+  done "wgpuCheck"
+
+task wgpuDeps, "Install pinned wgpu-native into the ignored .deps directory":
+  exec "nim c -r -d:ssl --path:src -o:build/install_wgpu" &
+       " tools/install_wgpu.nim"
+  done "wgpuDeps"
+
+task wgpuTest, "Create a real native WGPU device (run wgpuDeps first)":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r --path:src -o:build/test_wgpu_native" &
+       " tests/test_wgpu_boundary.nim"
+  done "wgpuTest"
+
+task rasterSpecBenchmark, "Benchmark retained PlotSpec raster stages":
+  exec "nim c -r -d:release --mm:orc --path:src" &
+       " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
+  done "rasterSpecBenchmark"
+
+task benchReadme, "Splice the last baseline run into benchmarks/README.md":
+  exec "nim c -r --hints:off -o:build/export_readme benchmarks/export_readme.nim"
+  done "benchReadme"
+
+task rasterSpecBaseline, "Record three-run PlotSpec raster evidence":
+  exec "nim c -d:release --mm:orc --path:src" &
+       " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
+  exec "nim c -r -d:release --mm:orc" &
+       " -o:build/run_raster_spec_baseline" &
+       " benchmarks/run_raster_spec_baseline.nim"
+  done "rasterSpecBaseline"
+
+task wgpuBenchmark, "Benchmark warm WGPU frames with explicit readback":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r -d:release --path:src -o:build/benchmark_wgpu" &
+       " benchmarks/benchmark_wgpu.nim"
+  done "wgpuBenchmark"
+
+task wgpuRasterBenchmark, "Benchmark real WGPU RGBA texture frames":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -r -d:release --mm:orc --path:src -o:build/benchmark_wgpu_raster" &
+       " benchmarks/benchmark_wgpu_raster.nim"
+  done "wgpuRasterBenchmark"
+
+task wgpuRasterBaseline, "Record three-run WGPU raster evidence":
+  let
+    platformName = when defined(macosx): "macos" else:
+      when defined(windows): "windows" else: "linux"
+    archName = when defined(arm64): "aarch64" else: "x86_64"
+    targetName = if platformName == "windows": platformName & "-" &
+      archName & "-msvc" else: platformName & "-" & archName
+    libraryName = when defined(macosx): "libwgpu_native.dylib" else:
+      when defined(windows): "wgpu_native.dll" else: "libwgpu_native.so"
+    libraryPath = ".deps/wgpu/29.0.1.1/" & targetName & "/lib/" &
+      libraryName
+  putEnv("UNIPLOT_WGPU_LIBRARY", getCurrentDir() & "/" & libraryPath)
+  exec "nim c -d:release --mm:orc --path:src -o:build/benchmark_wgpu_raster" &
+       " benchmarks/benchmark_wgpu_raster.nim"
+  exec "nim c -r -d:release --mm:orc -o:build/run_wgpu_raster_baseline" &
+       " benchmarks/run_wgpu_raster_baseline.nim"
+  done "wgpuRasterBaseline"
+
+# Nim takes `-o:` literally and appends no platform extension.
+const
+  sharedLib =
+    when defined(windows): "libUniPlot.dll"
+    elif defined(macosx): "libUniPlot.dylib"
+    else: "libUniPlot.so"
+  staticLib = "libUniPlot.a"  # MinGW `ar` on Windows, so `.a` everywhere.
+
+  # @rpath install_name, so the copy bundled in the wheel is found at import.
+  macArgs =
+    when defined(macosx): " --passL:\"-Wl,-install_name,@rpath/" & sharedLib & "\""
+    else: ""
+
+task clib, "C shared library":
+  exec "nim c --nimcache:build/nimcache-clib --app:lib --noMain --mm:arc" &
+       " -d:release -o:" & sharedLib & macArgs &
+       " src/UniPlot/c_api.nim"
+  done "clib"
+
+task clibStatic, "C static library":
+  exec "nim c --nimcache:build/nimcache-clib-static --app:staticlib -d:staticNoAutoInit --noMain" &
+       " --mm:arc -d:release -o:" & staticLib &
+       " src/UniPlot/c_api.nim"
+  done "clibStatic"
+
+task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
+  # CPython on Windows is MSVC-built and cannot link MinGW output. MSVC's
+  # linker takes the lib name verbatim (no `lib` prefix, unlike MinGW), so the
+  # output is `UniPlot.lib` — the intentional exception to the sharedLib /
+  # staticLib naming. setup.py's Windows branch matches: `LIB_NAME =
+  # "UniPlot.lib"` and `libraries=["UniPlot"]`.
+  exec "nim c --nimcache:build/nimcache-clib-msvc --cc:vcc --app:staticlib -d:staticNoAutoInit" &
+       " --noMain --mm:arc -d:release" &
+       " -o:UniPlot.lib src/UniPlot/c_api.nim"
+  done "clibMsvc"
+
+# Nim's MinGW toolchain names it mingw32-make.
+let makeExe = if findExe("mingw32-make").len > 0: "mingw32-make" else: "make"
+
+# `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
+task ctest, "C ABI tests":
+  exec "nimble clibStatic"
+  exec makeExe & " -C tests/c"
+  done "ctest"
+
+task cexample, "C demo (print-only consumer of the uniplot_* ABI)":
+  exec "nimble clibStatic"
+  exec makeExe & " -C examples/c"
+  done "cexample"
+
+task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
+  exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
+  done "pyDeps"
+
+# The extension links the vcc static lib on Windows, the shared lib elsewhere.
+task pyLib, "Build the library the Python extension links against":
+  when defined(windows):
+    exec "nimble clibMsvc"
+  else:
+    exec "nimble clib"
+  done "pyLib"
+
+task buildCython, "Cython extension in-place":
+  exec "nimble pyLib"
+  exec "nimble pyDeps"
+  # nimscript `cd` (lib/system/nimscript.nim) changes the VM cwd for the next
+  # exec without a shell, so the task works under nimble's no-shell exec on Windows.
+  cd "py"
+  exec "python3 setup.py build_ext --inplace"
+  cd ".."
+  done "buildCython"
+
+task pyTest, "Cython extension + pytest":
+  exec "nimble buildCython"
+  cd "py"
+  exec "python3 -m pytest -q"
+  cd ".."
+  done "pyTest"
+
+task pyWheel, "wheel":
+  exec "nimble pyLib"
+  exec "nimble pyDeps"
+  cd "py"
+  exec "python3 -m pip wheel --no-deps --no-build-isolation --wheel-dir dist ."
+  cd ".."
+  done "pyWheel"
+
+task pySdist, "Python source distribution":
+  exec "nimble pyDeps"
+  cd "py"
+  exec "python3 setup.py sdist"
+  cd ".."
+  done "pySdist"
+
+task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
+  # gcov and lcov driven directly, no coco. Linux and macOS only.
+  # --debugger:native attributes lines to the .nim sources, not the generated C.
+  # --include keeps stdlib out of the capture, where lcov 2.x aborts on Nim's
+  # codegen. Nim's native debugger mapping can still attribute a generated C
+  # branch a few lines past the end of its source module. genhtml calls this a
+  # `range` error, so suppress that mapping-only diagnostic while preserving
+  # every other capture and report failure.
+  let cache = "build/covcache"
+  rmDir cache
+  rmDir "coverage"
+  rmFile "lcov.info"
+  # Each coverage binary gets its own nimcache subdir. Sharing one nimcache
+  # across the differently-instrumented `nim c` builds re-instruments the
+  # shared stdlib modules with a different gcov counter layout each time, so
+  # when the binaries run they write conflicting `.gcda` to the same paths and
+  # lcov aborts on `cannot merge previous GCDA file: mismatched number of
+  # counters`. `lcov --capture --directory build/covcache` recurses into the
+  # subdirs, so aggregation is unchanged.
+  const bins = testBins
+  let gcovTool = when defined(macosx): " --gcov-tool tools/llvm-gcov.sh" else: ""
+  for (name, src) in bins:
+    exec "nim c --path:src --nimcache:" & cache & "/" & name &
+         " --debugger:native --passC:--coverage --passL:--coverage" &
+         " -o:build/test_cov_" & name & " tests/" & src & ".nim"
+    exec "./build/test_cov_" & name
+  exec "lcov --capture --directory " & cache & " --base-directory ." &
+       " --include \"*/src/UniPlot/*\" --output-file lcov.info --quiet" &
+       gcovTool
+  exec "genhtml lcov.info --output-directory coverage --legend --quiet" &
+       " --ignore-errors range"
+  exec "lcov --summary lcov.info"
+  done "coverage"

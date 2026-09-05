@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 lituus-lab
+from pathlib import Path
+import sys
+
+import uniplot
+
+
+def main() -> int:
+    if len(sys.argv) != 18:
+        raise SystemExit(
+            "usage: book_demo.py FONT MATRIX.svg MATRIX.png BOX.svg BOX.png "
+            "HEAT.svg HEAT.png HIST.svg HIST.png GROUPED.svg GROUPED.png "
+            "NUMHEAT.svg NUMHEAT.png IMAGE.svg IMAGE.png TIME.svg TIME.png")
+    (font, svg_path, png_path, box_svg_path, box_png_path,
+     heat_svg_path, heat_png_path, histogram_svg_path,
+     histogram_png_path, grouped_svg_path, grouped_png_path,
+     numeric_heat_svg_path, numeric_heat_png_path, image_svg_path,
+     image_png_path, temporal_svg_path, temporal_png_path) = map(
+        Path, sys.argv[1:])
+    x = [0, 1, 2, 3, 4, 5]
+    y = [1.2, 2.2, 1.8, 3.7, 3.1, 4.6]
+    figure = (
+        uniplot.Plot(800, 500)
+        .line(x, y, color="#267a5e", width=2.5,
+              style=uniplot.LINE_DASHED)
+        .scatter(x[1:-1], y[1:-1], color="#dc7c28", radius=5.0,
+                 shape=uniplot.MARKER_CROSS)
+        .title("Py")
+        .secondary_y(1.8, 32.0, "F")
+        .annotate_text(3.15, 4.25, "peak", color="#7a3db8")
+        .annotate_arrow(3.75, 4.15, 3.0, 3.7, color="#7a3db8")
+    )
+    figure = uniplot.Plot.from_json(figure.to_json(), 800, 500)
+    figure.categorical_column(
+        "region", ["west", "west", "west", "east", "east", "east"])
+    figure.categorical_column(
+        "phase", ["early", "late", "late", "late", "late", "late"])
+    svg_path.write_bytes(uniplot.facet_matrix_svg(
+        figure, "region", "phase", font, width=1000, height=700, gap=16,
+        shared_x=True, shared_y=True))
+    png_path.write_bytes(uniplot.facet_matrix_png(
+        figure, "region", "phase", font, width=1000, height=700, gap=16,
+        shared_x=True, shared_y=True))
+    boxes = (uniplot.Plot(760, 440)
+             .boxplot(
+                 ["control"] * 5 + ["treated"] * 5,
+                 [1.0, 1.4, 1.8, 2.1, 5.2, 2.0, 2.4, 2.7, 3.0, 3.3],
+                 color="#267a5e", outlier_color="#d64255")
+             .title("Python grouped boxplot"))
+    box_svg_path.write_bytes(boxes.svg(font))
+    box_png_path.write_bytes(boxes.png(font))
+    heatmap = (uniplot.Plot(760, 440)
+               .heatmap(
+                   ["morning", "morning", "afternoon", "evening", "evening"],
+                   ["north", "north", "north", "north", "south"],
+                   [2.0, 4.0, 7.0, 5.0, 9.0],
+                   aggregation=uniplot.AGG_MEAN)
+               .title("Python categorical heatmap"))
+    heat_svg_path.write_bytes(heatmap.svg(font))
+    heat_png_path.write_bytes(heatmap.png(font))
+    histogram = (uniplot.Plot(760, 440)
+                 .automatic_histogram(
+                     [-1.0, 0.0, 0.3, 0.9, 1.0, 1.4, 2.0, 3.0],
+                     uniplot.HISTOGRAM_FREEDMAN_DIACONIS,
+                     color="#267a5e", density=True)
+                 .title("Python automatic FD density"))
+    histogram_svg_path.write_bytes(histogram.svg(font))
+    histogram_png_path.write_bytes(histogram.png(font))
+    grouped = (uniplot.Plot(760, 440)
+               .aggregate(
+                   ["beta", "alpha", "beta", "empty", "alpha"],
+                   [1.0, 4.0, 3.0, float("nan"), 8.0],
+                   aggregation=uniplot.AGG_MEAN, color="#9b4d96")
+               .title("Python grouped mean"))
+    grouped_svg_path.write_bytes(grouped.svg(font))
+    grouped_png_path.write_bytes(grouped.png(font))
+    numeric_heatmap = (uniplot.Plot(760, 440)
+                       .numeric_heatmap(
+                           [0.0, 1.0, 3.0, 6.0], [10.0, 20.0, 40.0],
+                           [1.0, 4.0, 2.0, 6.0, float("nan"), 9.0])
+                       .title("Python numeric cell grid"))
+    numeric_heat_svg_path.write_bytes(numeric_heatmap.svg(font))
+    numeric_heat_png_path.write_bytes(numeric_heatmap.png(font))
+    pixels = bytes([
+        45, 120, 220, 255, 85, 210, 220, 220,
+        35, 65, 155, 220, 170, 235, 245, 255])
+    image_plot = (uniplot.Plot(760, 440)
+                  .image(pixels, 2, 2, 4, 0.5, 2.5, 0.5, 2.5,
+                         uniplot.RASTER_NEAREST)
+                  .title("Python data-mapped image mark"))
+    image_svg_path.write_bytes(image_plot.svg(font))
+    image_png_path.write_bytes(image_plot.png(font))
+    temporal = (uniplot.Plot(760, 440)
+                .line([1704067200, 1704067260, 1704067320, 1704067380,
+                       1704067440], [0, 42, 75, 130, 190],
+                      color="#2457c5")
+                .scale_x_utc()
+                .scale_y_duration()
+                .title("Python UTC and duration axes"))
+    temporal_svg_path.write_bytes(temporal.svg(font))
+    temporal_png_path.write_bytes(temporal.png(font))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
