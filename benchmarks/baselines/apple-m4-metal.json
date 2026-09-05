@@ -1,0 +1,45 @@
+{
+  "adapter": "Apple M4",
+  "backend": "metal",
+  "points": 1000,
+  "canvas": "800x500",
+  "residency": "managed-budget-chunked-lru-ring-3-scene-key-v1",
+  "repeated_runs": 3,
+  "iterations_per_run": 50,
+  "preparation": {
+    "mean_ms": 73.71702800666668,
+    "max_ratio": 1.1
+  },
+  "scene_identity": {
+    "mean_ms": 0.8433083333333334,
+    "max_ratio": 1.25
+  },
+  "scene_cache_hit": {
+    "mean_ms": 0.8225013866666666,
+    "max_ratio": 1.25
+  },
+  "automatic_submit": {
+    "mean_ms": 0.8398574666666665,
+    "max_ratio": 1.25
+  },
+  "upload_submit": {
+    "mean_ms": 1.038210573333333,
+    "max_ratio": 1.25
+  },
+  "submit": {
+    "mean_ms": 0.09145469999999999,
+    "max_ratio": 2.5
+  },
+  "publication_frame": {
+    "mean_ms": 3.086800033333333,
+    "max_ratio": 1.2
+  },
+  "direct_burst_single": {
+    "mean_ms": 3.1207675333333333,
+    "max_ratio": 1.25
+  },
+  "direct_burst_ring": {
+    "mean_ms": 0.09530365333333334,
+    "max_ratio": 2.0
+  }
+}
