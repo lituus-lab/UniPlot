@@ -13,14 +13,38 @@ CELLS = [
     ("md", """# UniPlot — Python quickstart
 
 The Python API drives the same pure-Nim scene and renderers as the Nim and C
-surfaces. A font path is explicit so output is reproducible."""),
+surfaces. The font is located rather than assumed: the library renders text
+with one the caller supplies and ships none of its own."""),
     ("code", """from pathlib import Path
 import sys
 sys.path.insert(0, "py")
 import uniplot
 
 uniplot.version(), uniplot.abi_version()"""),
-    ("code", """font = Path("tests/DejaVuSans.ttf")
+    ("code", """# The wheel bundles the native library; the text font is the caller's, so
+# this looks where one is likely to be. Run from the repository the first
+# candidate answers; run against an installed wheel elsewhere, a system font
+# does.
+candidates = [
+    Path("tests/DejaVuSans.ttf"),
+    Path("../tests/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/Library/Fonts/Arial Unicode.ttf"),
+    Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+]
+font = next((c for c in candidates if c.exists()), None)
+if font is None:
+    # Last resort, because a runner image is not a promise: take the first
+    # TrueType file the system font directories offer.
+    for root in (Path("/usr/share/fonts"), Path("/Library/Fonts"),
+                 Path("/System/Library/Fonts")):
+        if root.is_dir():
+            font = next(iter(sorted(root.rglob("*.ttf"))), None)
+            if font is not None:
+                break
+if font is None:
+    raise SystemExit("no TrueType font found; pass one of your own to render")
+font
 figure = (uniplot.Plot(480, 300)
           .line([0, 1, 2, 3], [1, 3, 2, 4])
           .scatter([0, 1, 2, 3], [1, 3, 2, 4], color="#cc3344")
