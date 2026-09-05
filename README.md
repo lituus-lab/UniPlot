@@ -35,6 +35,24 @@ rendering engines.
 - an optional native WGPU backend for offscreen scene rendering and readback,
   with no GPU dependency in the core.
 
+## Nim example
+
+```nim
+import UniPlot
+import UniGlyph
+
+let font = loadTtf("tests/DejaVuSans.ttf")
+var figure = linePlot([0.0, 1.0, 2.0, 3.0], [1.0, 3.0, 2.0, 4.0])
+figure.labels(title = "First UniPlot", x = "time", y = "value")
+
+# A recipe becomes a retained scene, and the scene renders deterministically.
+let scene = figure.compileScene(Size(width: 720, height: 420))
+echo scene.nodes.len, " scene nodes"        # 24
+echo scene.toSvg(font).len, " bytes of SVG" # 43075
+```
+
+The book works through the same path in more detail, one chapter per stage.
+
 ## Architecture
 
 ```text
