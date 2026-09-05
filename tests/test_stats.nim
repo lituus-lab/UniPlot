@@ -12,6 +12,17 @@ suite "statistics":
     check bins.len == 2
     check bins[0].count + bins[1].count == 4
 
+  test "an extreme finite range keeps its bin bounds finite":
+    # `hi - lo` overflows here, which used to make the first bound NaN and
+    # every later one infinite, with both samples landing in bin zero.
+    let bins = histogram(@[-1e308, 1e308], 2)
+    check bins.len == 2
+    for bin in bins:
+      check bin.lower.isFinite
+      check bin.upper.isFinite
+    check bins[0].count == 1
+    check bins[1].count == 1
+
   test "histogram recipe produces one bar per bin":
     let spec = histogramPlot([0.0, 0.2, 0.8, 1.0], 2)
     check spec.layers.len == 1

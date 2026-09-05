@@ -415,12 +415,26 @@ proc histogram*(values: openArray[float64]; binCount = 30): seq[HistogramBin] {.
     for value in finite:
       lo = min(lo, value); hi = max(hi, value)
     if lo == hi: hi = lo + 1.0
-    let step = (hi - lo) / float64(binCount)
+    # Interpolated between the ends, as `automaticHistogramBreaks` does, rather
+    # than stepped from `lo`: `hi - lo` overflows to infinity across an extreme
+    # finite range, which made every boundary after the first infinite and the
+    # first one NaN. `histogram(@[-1e308, 1e308], 2)` showed it.
+    proc boundary(index: int): float64 =
+      if index == 0: lo
+      elif index == binCount: hi
+      else:
+        let ratio = float64(index) / float64(binCount)
+        lo * (1.0 - ratio) + hi * ratio
     for i in 0 ..< binCount:
-      result.add HistogramBin(lower: lo + float64(i) * step,
-        upper: lo + float64(i + 1) * step)
+      result.add HistogramBin(lower: boundary(i), upper: boundary(i + 1))
     for value in finite:
-      let index = min(binCount - 1, int(floor((value - lo) / step)))
+      # Located by the boundaries themselves: a width computed from the ends
+      # overflows the same way the step did.
+      var index = binCount - 1
+      for i in 0 ..< binCount:
+        if value < result[i].upper:
+          index = i
+          break
       inc result[index].count
 
 proc histogramBreaks*(values, breaks: openArray[float64]):
