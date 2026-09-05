@@ -30,7 +30,7 @@ jobs:
     with:
       library: UniPlot
       module: uniplot
-      python-smoke-test: py/tests/test_uniplot.py
+      python-smoke-test: py/tests/test_smoke.py
 
   wgpu:
     # UniPlot's own, because no other engine has one: the optional WGPU scene

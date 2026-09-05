@@ -432,10 +432,20 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
          " --debugger:native --passC:--coverage --passL:--coverage" &
          " -o:build/test_cov_" & name & " tests/" & src & ".nim"
     exec "./build/test_cov_" & name
+  # `mismatch`: lcov 2.x and gcov disagree on the end line of the destructors
+  # Nim generates -- here one for NimContracts' PreConditionDefect. A compiler
+  # artefact with no source-level fix; every other lcov error still fails.
   exec "lcov --capture --directory " & cache & " --base-directory ." &
        " --include \"*/src/UniPlot/*\" --output-file lcov.info --quiet" &
-       gcovTool
+       " --ignore-errors mismatch" & gcovTool
+  # That one artefact answers to two names: lcov 2.0, the version the runners
+  # install, calls it `unmapped` and rejects `range` outright, while 2.5 calls
+  # it `range`. Ask which is there rather than assume.
+  let genhtmlRange =
+    if gorgeEx("genhtml --version").output.contains("LCOV version 2.0"):
+      " --ignore-errors unmapped"
+    else: " --filter range --ignore-errors range"
   exec "genhtml lcov.info --output-directory coverage --legend --quiet" &
-       " --ignore-errors range"
+       genhtmlRange
   exec "lcov --summary lcov.info"
   done "coverage"
