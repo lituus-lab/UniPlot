@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[json, sequtils, tables, unittest]
+import std/[json, math, sequtils, tables, unittest]
 import UniColor
 import UniImage/core as uimg
 import UniPlot
