@@ -64,3 +64,7 @@ examples/c/demo
 
 *.log
 *.core
+
+# `benchmarkDeps` resolves the Julia environment here. Project.toml is the
+# declaration and is tracked; the Manifest is the resolution for one machine.
+benchmarks/julia/Manifest.toml
