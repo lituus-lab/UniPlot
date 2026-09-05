@@ -69,7 +69,13 @@ jobs:
       - run: nimble install -y
       - run: $GATE wgpuCheck
       - run: $GATE wgpuDeps
-      - run: $GATE wgpuTest
+      # Only where a driver exists. Linux gets the software Vulkan one
+      # installed above and macOS has Metal; the Windows runner has neither,
+      # and wgpu-native does not report that -- it takes the process down with
+      # no message, which no `try` in the test can catch. The boundary is
+      # still compiled there by `wgpuCheck`.
+      - if: runner.os != 'Windows'
+        run: $GATE wgpuTest
 
   all-green:
     name: All green
