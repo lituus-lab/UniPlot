@@ -1,0 +1,18 @@
+[nimib]
+srcDir = "."
+homeDir = "__site"
+
+[nimibook]
+title = "UniPlot — scientific visualisation in pure Nim"
+description = "Executable user manual for UniPlot 1.0"
+author = "lituus-lab"
+
+[nav]
+numbered = true
+
+[theme]
+default = "light"
+available = ["light", "dark", "rust", "coal", "navy", "ayu"]
+
+[repository]
+url = "https://github.com/lituus-lab/UniPlot"

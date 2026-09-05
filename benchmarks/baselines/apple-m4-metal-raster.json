@@ -1,0 +1,34 @@
+{
+  "date": "2026-08-16",
+  "machine": "Apple M4",
+  "architecture": "arm64",
+  "os": "macosx",
+  "os_version": "26.5.1",
+  "nim": "2.2.10",
+  "wgpu_native": "29.0.1.1",
+  "backend": "metal",
+  "build": "-d:release --mm:orc",
+  "runs": 3,
+  "iterations_per_run": 20,
+  "warmup_iterations": 3,
+  "canvas": "800x600",
+  "image": "512x512 RGBA8",
+  "semantics": {
+    "submit": "enqueue one resident RGBA8 texture without readback",
+    "publication_frame": "render through an RGBA16F premultiplied target and publish straight RGBA8"
+  },
+  "submit": {
+    "run_mean_ms": [0.13020814999999997, 0.1216814, 0.12693525000000003],
+    "median_run_mean_ms": 0.12693525000000003
+  },
+  "publication_frame": {
+    "run_mean_ms": [6.636789650000001, 6.577477050000001, 6.542450100000001],
+    "median_run_mean_ms": 6.577477050000001
+  },
+  "texture_uploads_per_prepared_identity": 1,
+  "texture_upload_bytes": 1048576,
+  "prepared_cache_bytes": 1048832,
+  "managed_gpu_bytes": 9083136,
+  "managed_gpu_peak_bytes": 9083136,
+  "managed_gpu_byte_budget": 536870912
+}
