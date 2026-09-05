@@ -26,7 +26,17 @@ proc enumValue[T: enum](node: JsonNode; name: string): T =
     raise fail("field '" & name & "' has an unknown value")
 
 proc finiteNumber(node: JsonNode; name: string): float64 =
-  let value = node.field(name, JFloat).getFloat
+  ## An integral number is a number. `decodedNumber` and the colour-component
+  ## loop both accept `JInt`, so requiring `JFloat` here rejected exactly the
+  ## payloads they had just accepted: `{"components": [0, 0, 0], "alpha": 0}`
+  ## decoded the components and then refused the alpha. Encoded output is
+  ## unaffected -- `%float64` always emits a float.
+  if node.kind != JObject or not node.hasKey(name):
+    raise fail("missing field '" & name & "'")
+  let field = node[name]
+  if field.kind notin {JInt, JFloat}:
+    raise fail("field '" & name & "' has the wrong type")
+  let value = field.getFloat
   if not value.isFinite: raise fail("field '" & name & "' must be finite")
   value
 
