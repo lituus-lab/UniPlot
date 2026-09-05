@@ -10,6 +10,12 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    # bash on every runner, Windows included: the gate is called as `$GATE`,
+    # which PowerShell reads as an undefined variable and refuses to parse.
+    shell: bash
+
 # A newer push makes the previous run's answer irrelevant: cancel it rather
 # than pay for both.
 concurrency:
