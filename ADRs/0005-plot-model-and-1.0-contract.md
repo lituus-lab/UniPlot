@@ -42,3 +42,11 @@ The C ABI and Python binding expose owned plot handles and additive procedural
 recipes rather than duplicating the complete tagged grammar object model.
 Nested custom layers and raw retained scenes remain Nim-only where no stable
 flat representation exists.
+
+The statistical helpers stay Nim-only too, and for two separate reasons.
+`histogramBinCount`, `automaticHistogramBreaks` and `contourSegments` are
+inputs the recipes consume, not results a caller asks for: a C caller adds a
+histogram layer and the binning happens inside it. `quantile`, `summarize` and
+`aggregateGroups` are thin over UniStatistics, which ADR-0012 makes the owner
+of those definitions and which exposes its own C ABI -- a second entry point
+here would be a second place for them to drift.
