@@ -428,14 +428,18 @@ proc histogram*(values: openArray[float64]; binCount = 30): seq[HistogramBin] {.
     for i in 0 ..< binCount:
       result.add HistogramBin(lower: boundary(i), upper: boundary(i + 1))
     for value in finite:
-      # Located by the boundaries themselves: a width computed from the ends
-      # overflows the same way the step did.
-      var index = binCount - 1
-      for i in 0 ..< binCount:
-        if value < result[i].upper:
-          index = i
-          break
-      inc result[index].count
+      # Located by the boundaries themselves, because a width computed from the
+      # ends overflows the same way the step did -- but by halving, not by
+      # scanning: a linear walk made this O(values * bins), which is billions
+      # of comparisons at a hundred thousand of each. The uppers ascend, so the
+      # first one above the value is the bin.
+      var low = 0
+      var high = binCount - 1
+      while low < high:
+        let middle = (low + high) div 2
+        if value < result[middle].upper: high = middle
+        else: low = middle + 1
+      inc result[low].count
 
 proc histogramBreaks*(values, breaks: openArray[float64]):
     seq[HistogramBin] {.contractual.} =
