@@ -31,7 +31,7 @@ optional. A space separates the colon from the description.
 ```text
 feat(scales): add logarithmic tick generation
 fix(c_api): clamp negative index instead of raising
-docs: clarify clone map
+docs(scales): explain how ticks are chosen
 feat(core)!: drop the old accumulator API
 ```
 

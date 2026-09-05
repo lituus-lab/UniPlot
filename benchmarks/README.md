@@ -23,34 +23,65 @@ a 128×128 grid, a 256×256 dense raster heatmap and a 1,000-point signed-power
 line, plus a 1,000-point retained polar line with its circular guides.
 Allocation is included in every phase; setup and warmups are not.
 
-The current Apple M4 medians are 0.3199 / 8.5595 / 7.5729 ms for the retained
-raster construction / compile / publication phases, 0.0212 / 3.1977 / 7.0374
-ms for the 64-mark phases, and 0.0151 / 0.1354 / 13.1101 ms for temporal
-construction / compile / CPU publication. Temporal construction copies the
-two 1,000-value columns; compilation includes deterministic tick selection and
-UTC/duration formatting. Automatic histogram selection costs 14.3750 ms;
-complete PlotSpec construction including the same selection costs 15.9323 ms,
-then scene compilation/publication costs 0.0291 / 22.6336 ms. Selection sorts
-finite samples to compute exact type-7 quartiles; no linear-time approximation
-is substituted. The range-safe linear fit costs 0.5881 ms; complete smoothing
-construction, including one Student-t critical value and 200 interval
-evaluations, costs 0.7480 ms, followed by 0.0693 / 8.4011 ms for compilation
-and publication. The compact-QR degree-three polynomial fit over the same
-10,000 pairs costs 1.5566 ms; full construction including 200 predictions,
-compilation and publication cost 1.6673 / 0.0395 / 7.7144 ms. The pre-compact
-implementation materialised a 10,000×10,000 Q matrix and measured about
-774 ms; that historical diagnostic is not a retained baseline. The exact
-5,000×256 Gaussian estimate costs 8.6374 ms; complete density PlotSpec
-construction costs 8.6647 ms, followed by 0.0747 / 10.3250 ms for compilation
-and publication. Minor estimate versus
-construction inversions are normal timing noise between separate windows.
-Contour extraction costs 1.2886 ms; complete construction, compilation and
-publication cost 1.3757 / 1.3980 / 26.1355 ms. The RGBA8 palette-table heatmap
-costs 1.4382 / 1.7657 / 7.2804 ms for the same three stages. Signed-power
-construction, compilation and publication cost 0.0161 / 0.1638 / 15.3094 ms.
-Polar construction, projection/guide compilation and publication cost
-0.0175 / 0.2265 / 16.5970 ms. This includes 128-segment retained rings and
-does not measure a backend-specific polar primitive.
+`nimble benchReadme` writes the table below from the JSON a run produced, so
+every number here was measured rather than typed. Re-running on this machine
+replaces this block; a different machine appends its own beside it.
+
+What the stages mean: construction copies the caller's columns and builds the
+PlotSpec; the `*_fit`, `*_selection`, `*_estimate` and `*_extraction` rows are
+the statistical step alone, before any spec exists; compilation turns the spec
+into the retained scene, including tick selection and label formatting; and
+publication rasterises it completely on the CPU. Allocation counts in every
+phase; setup and warmups do not.
+
+<!-- bench:insert -->
+
+<!-- bench:machine=macosx-apple-m4 -->
+**Apple M4** (arm64, macosx), Nim 2.2.10, `-d:release --mm:orc`, measured 2026-09-05: 3 runs of 10 iterations, the table reporting each stage's median run mean.
+
+| Stage | Median (ms) | Lowest run (ms) | Highest run (ms) |
+|---|---|---|---|
+| Construction snapshot | 0.3803 | 0.3735 | 0.4395 |
+| Compile | 12.7820 | 10.3438 | 13.0609 |
+| Publication | 9.9281 | 9.7684 | 11.2441 |
+| Image mark construction | 0.0262 | 0.0252 | 0.0299 |
+| Image mark compile | 4.2182 | 4.0851 | 4.6715 |
+| Image mark publication | 9.3903 | 8.7151 | 9.9923 |
+| Temporal construction | 0.0277 | 0.0270 | 0.0278 |
+| Temporal compile | 0.2000 | 0.1651 | 0.2100 |
+| Temporal publication | 17.0472 | 16.7792 | 17.4054 |
+| Histogram selection | 17.0410 | 16.7366 | 17.4405 |
+| Histogram construction | 18.6317 | 18.4221 | 20.3866 |
+| Histogram compile | 0.0424 | 0.0333 | 0.0480 |
+| Histogram publication | 29.2472 | 29.1154 | 32.1713 |
+| Smoothing fit | 0.7709 | 0.7042 | 0.8323 |
+| Smoothing construction | 0.9371 | 0.9015 | 0.9570 |
+| Smoothing compile | 0.0841 | 0.0826 | 0.0932 |
+| Smoothing publication | 11.5126 | 11.0987 | 12.1455 |
+| Polynomial fit | 1.8469 | 1.8312 | 2.0933 |
+| Polynomial construction | 1.9873 | 1.7352 | 2.2009 |
+| Polynomial compile | 0.0603 | 0.0463 | 0.0775 |
+| Polynomial publication | 10.8495 | 9.9831 | 11.3033 |
+| Density estimate | 12.3792 | 11.3782 | 12.4088 |
+| Density construction | 11.2282 | 11.1957 | 12.0361 |
+| Density compile | 0.0912 | 0.0839 | 0.0961 |
+| Density publication | 14.1827 | 14.0842 | 14.2136 |
+| Contour extraction | 1.9381 | 1.4546 | 1.9971 |
+| Contour construction | 1.9355 | 1.6768 | 2.0053 |
+| Contour compile | 1.7728 | 1.7644 | 1.8028 |
+| Contour publication | 33.0104 | 32.4399 | 34.1940 |
+| Dense construction | 1.7553 | 1.6365 | 1.7715 |
+| Dense compile | 2.4174 | 1.9332 | 2.5393 |
+| Dense publication | 10.3477 | 10.1945 | 10.5019 |
+| Power construction | 0.0240 | 0.0214 | 0.0263 |
+| Power compile | 0.2107 | 0.2106 | 0.2116 |
+| Power publication | 19.8983 | 19.5875 | 20.2313 |
+| Polar construction | 0.0267 | 0.0217 | 0.0294 |
+| Polar compile | 0.2848 | 0.2539 | 0.3074 |
+| Polar publication | 21.9572 | 21.1191 | 23.3958 |
+
+<!-- /bench:machine=macosx-apple-m4 -->
+
 These are same-machine regression evidence, not cross-machine
 performance claims.
 The exact samples are stored in

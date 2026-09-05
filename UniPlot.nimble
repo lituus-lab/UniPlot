@@ -250,6 +250,10 @@ task rasterSpecBenchmark, "Benchmark retained PlotSpec raster stages":
        " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
   done "rasterSpecBenchmark"
 
+task benchReadme, "Splice the last baseline run into benchmarks/README.md":
+  exec "nim c -r --hints:off -o:build/export_readme benchmarks/export_readme.nim"
+  done "benchReadme"
+
 task rasterSpecBaseline, "Record three-run PlotSpec raster evidence":
   exec "nim c -d:release --mm:orc --path:src" &
        " -o:build/benchmark_raster_spec benchmarks/benchmark_raster_spec.nim"
