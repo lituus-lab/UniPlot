@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/[locks, tables]
+import std/tables
 import UniColor
 import UniGlyph
 import UniImage/core as uimg
@@ -35,9 +35,6 @@ proc isBlankRecipeTarget(spec: PlotSpec): bool =
     spec.references.len == 0 and spec.annotations.len == 0 and
     spec.rasters.len == 0 and spec.imageResources.len == 0
 
-var initLock: Lock
-var runtimeStarted = false
-initLock(initLock)
 
 proc NimMain() {.importc.}
 
@@ -83,11 +80,12 @@ else:
 
 
 proc uniplot_init*(): cint {.exportc, dynlib, cdecl.} =
+  ## Starting the runtime is `ensureRuntime`'s job and only its job: the
+  ## once-primitive above already guarantees a single NimMain. Repeating it
+  ## here behind a Nim global ran it twice in a static build -- module
+  ## initialization resets that global, which is the trap the section above
+  ## explains and this call reintroduced.
   ensureRuntime()
-  withLock initLock:
-    if not runtimeStarted:
-      NimMain()
-      runtimeStarted = true
   UNIPLOT_OK
 
 proc uniplot_version*(): cstring {.exportc, dynlib,
