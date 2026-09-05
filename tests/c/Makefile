@@ -17,6 +17,12 @@ LIB    := $(ROOT)/libUniPlot.a
 # Named in the recipe, never as a prerequisite: make would look for a file
 # called `-lm`.
 SYSLIBS := -lz -lm
+ifneq ($(OS),Windows_NT)
+  # -pthread where libpthread is a separate library. glibc 2.34 folded it into
+  # libc, so the runners link without it, but an older glibc or a musl target
+  # does not -- and the archive carries Nim's threading either way.
+  SYSLIBS += -pthread
+endif
 
 ifeq ($(OS),Windows_NT)
   BIN  := test_uniplot.exe

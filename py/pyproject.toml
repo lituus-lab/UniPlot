@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 [build-system]
-requires = ["setuptools>=64", "wheel", "Cython>=3.0"]
+requires = ["setuptools==83.0.0", "wheel==0.47.0", "Cython==3.2.8"]
 build-backend = "setuptools.build_meta"
 
 [project]
