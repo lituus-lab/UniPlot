@@ -51,7 +51,10 @@ figure = (uniplot.Plot(480, 300)
           .title("Python quickstart"))
 svg = figure.svg(font)
 png = figure.png(font)
-(svg[:4], png[:4], len(svg), len(png))"""),
+# The magic bytes, not the lengths: an SVG's size follows the font's metrics,
+# and this notebook's recorded output is compared against a fresh run on a
+# machine whose fonts are not this one's.
+(svg[:4], png[:4], len(svg) > 0, len(png) > 0)"""),
     ("md", """`svg` and `png` were compiled from one retained scene. The wheel
 bundles the native library; users provide the TrueType font used for text."""),
 ]
