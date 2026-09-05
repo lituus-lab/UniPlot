@@ -39,12 +39,17 @@ proc isBlankRecipeTarget(spec: PlotSpec): bool =
 proc NimMain() {.importc.}
 
 
-# A shared library runs NimMain from DllMain (Windows) or an ELF constructor;
-# a static one has neither, so nothing initializes the Nim runtime. The first
-# entry point then enters Nim code whose globals were never set up and the
-# process faults. The static-library tasks pass -d:staticNoAutoInit; shared
-# builds must not, or NimMain runs twice.
-when defined(staticNoAutoInit):
+# Nothing initializes the Nim runtime in any of these builds. A shared library
+# would normally run NimMain from DllMain or an ELF constructor, but `clib`
+# passes `--noMain`, which is exactly what suppresses that -- and a static
+# library never had one. The first entry point would then enter Nim code whose
+# globals were never set up, and the process faults.
+#
+# So the guard is unconditional. It used to be `when defined(staticNoAutoInit)`
+# on the belief that the shared build initialized itself; the shared library's
+# only initialization was in fact an explicit NimMain inside `uniplot_init`,
+# and removing that as a duplicate broke every Python test at once.
+when true:
   # A once primitive, not a plain flag: two threads reaching an entry point
   # together would both see the flag unset, both call NimMain, and the second
   # would enter Nim code the first had not finished initializing. The platform
