@@ -42,7 +42,17 @@ whole PR into one commit whose subject is the title.
 ## Workflow
 
 1. Branch from `main`, one logical change per commit.
-2. Pass the gates: `nimble testAll`, `nimble pyTest`.
+2. Pass the gates, through the gate binary and never bare:
+
+   ```bash
+   nim c --hints:off -o:build/unigate tools/gate.nim   # once
+   build/unigate testAll
+   build/unigate pyTest
+   ```
+
+   `nimble testAll` on its own exits 0 even when a command inside the task
+   failed, so its success proves nothing; the gate reads the marker the task
+   writes on its last line.
 3. Open a PR; CI runs the 3-OS Nim matrix + C ABI + Python.
 
 ## Pre-commit
@@ -56,7 +66,7 @@ pre-commit install
 
 `pre-commit install` sets up the pre-commit, pre-push and commit-msg hooks at
 once. Hooks: hygiene (trailing whitespace, EOF, yaml/toml, large files),
-`nimble lint` on `*.nim`, `nimble checkVGraph` before push, Conventional Commits
+`build/unigate lint` on `*.nim`, `build/unigate checkVGraph` before push, Conventional Commits
 via `cz check` on the commit message, and a DCO sign-off check. Run everything
 manually:
 

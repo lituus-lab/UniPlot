@@ -20,18 +20,24 @@ UniGlyph and UniCrypto. Domain engines are forbidden dependencies.
 ## Build and gates
 
 ```bash
-nimble lint
-nimble checkVGraph
-nimble test
-nimble testRelease
-nimble testAll
-nimble example
-nimble ctest
-nimble pyTest
-nimble coverage
-nimble book
-nimble docs
+nim c --hints:off -o:build/unigate tools/gate.nim   # the failure gate, once
+
+build/unigate lint
+build/unigate checkVGraph
+build/unigate testAll     # debug + release + C ABI
+build/unigate example
+build/unigate ctest
+build/unigate pyTest
+build/unigate coverage
+build/unigate docs        # book + API reference into pages/
+build/unigate canary      # must fail
 ```
+
+Never `nimble <task>` bare where the answer matters: nimble 0.22 exits 0 even
+when an `exec` inside the task failed. Each task writes its own success marker
+on its last line, and the gate is what turns a missing marker into a non-zero
+exit -- `nimble canary` exits 0 on a file that cannot compile, `build/unigate
+canary` exits 1.
 
 ## Code conventions
 
