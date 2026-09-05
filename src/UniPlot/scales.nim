@@ -240,10 +240,20 @@ proc alignedTicks(scale: ContinuousScale; step: float64): seq[float64] =
     lo = min(scale.domainMin, scale.domainMax)
     hi = max(scale.domainMin, scale.domainMax)
     first = ceil(lo / step) * step
-  var value = first
-  while value <= hi and result.len < 10_000:
+  # Each tick from its index, never accumulated. Accumulation carries drift over
+  # a long axis, and a step smaller than the ULP of `value` would leave
+  # `value += step` returning the same number for ten thousand iterations. That
+  # second case was not reachable through the public API when this was written:
+  # a duration domain large enough for it is refused before `alignedTicks` sees
+  # it. The index form costs nothing and does not depend on that staying true.
+  if step <= 0 or not step.isFinite or not first.isFinite:
+    return scale.ticks()
+  var index = 0
+  while result.len < 10_000:
+    let value = first + float64(index) * step
+    if not (value <= hi): break
     result.add value
-    value += step
+    inc index
   if result.len < 2:
     result = scale.ticks()
 
