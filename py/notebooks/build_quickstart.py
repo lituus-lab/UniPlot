@@ -31,13 +31,15 @@ candidates = [
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     Path("/Library/Fonts/Arial Unicode.ttf"),
     Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+    Path(r"C:\Windows\Fonts\arial.ttf"),
+    Path(r"C:\Windows\Fonts\segoeui.ttf"),
 ]
 font = next((c for c in candidates if c.exists()), None)
 if font is None:
     # Last resort, because a runner image is not a promise: take the first
     # TrueType file the system font directories offer.
     for root in (Path("/usr/share/fonts"), Path("/Library/Fonts"),
-                 Path("/System/Library/Fonts")):
+                 Path("/System/Library/Fonts"), Path(r"C:\Windows\Fonts")):
         if root.is_dir():
             font = next(iter(sorted(root.rglob("*.ttf"))), None)
             if font is not None:
