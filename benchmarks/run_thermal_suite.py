@@ -2,6 +2,7 @@
 # Copyright 2026 lituus-lab
 import json
 import subprocess
+import time
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,19 +22,28 @@ def run(iterations: int, warmups: int) -> dict:
 
 def main() -> int:
     RESULTS.mkdir(exist_ok=True)
+    # An untimed pass first: `run_benchmarks.py` compiles UniPlot on its first
+    # invocation, and the semantics below exclude that. Without it the timed
+    # run measured a build.
+    run(1, 0)
+    started = time.perf_counter()
     cold = run(1, 0)
+    cold_wall_ms = (time.perf_counter() - started) * 1000.0
     warm = run(20, 3)
     report = {
         "schema": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "points": 1_000,
         "cold_process": cold,
+        "cold_process_wall_ms": round(cold_wall_ms, 3),
         "warm_process": warm,
         "semantics": {
             "cold_process_wall_ms": (
-                "Provider subprocess startup, runtime/library initialization, "
+                "Wall time of one full cold run: the runner's own startup, "
+                "the provider subprocess, runtime and library initialization, "
                 "reference construction, one real SVG and PNG render, JSON "
-                "serialization, and shutdown. UniPlot compilation is excluded."
+                "serialization, and shutdown. UniPlot compilation is excluded "
+                "by compiling in an untimed pass first."
             ),
             "warm_stages": (
                 "Per-stage measurements after three loop warmups in a separate "

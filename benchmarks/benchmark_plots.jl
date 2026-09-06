@@ -7,6 +7,12 @@ using Statistics
 iterations = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 20
 point_count = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1000
 warmups = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : 3
+# Checked before the arrays are allocated: zero iterations leaves the summary
+# with nothing to describe, and a negative warmup count removes measurements
+# while the report still states the iterations asked for.
+if iterations <= 0 || point_count <= 0 || warmups < 0
+    error("iterations and point count must be positive, warmups non-negative")
+end
 x = collect(0:(point_count - 1)) ./ 25
 y = sin.(x) .+ 0.02 .* x
 

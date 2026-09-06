@@ -54,9 +54,9 @@ int main(void) {
   uniplot_plot *restored = uniplot_plot_from_json(
     json, json_length, 800, 500);
   uniplot_buffer_free(json, json_length);
-  uniplot_plot_free(plot);
-  plot = restored;
 
+  /* Both handles, side by side: freeing the original and aliasing it to the
+     restored one put the same plot in both panels. */
   uniplot_plot *panels[] = {plot, restored};
   int status = uniplot_render_grid_svg_shared(
     panels, 2, 2, 1000, 420, 16, 1, 1,
@@ -65,6 +65,7 @@ int main(void) {
     fwrite(bytes, 1, length, stdout);
     uniplot_buffer_free(bytes, length);
   }
+  uniplot_plot_free(restored);
   uniplot_plot_free(plot);
   return status;
 }
