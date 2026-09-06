@@ -61,6 +61,8 @@ proc validatePage*(path: string; minSvg = 0; requirePng = false) =
   # and an inline `<image href="plot.png">` both passed the old pair and both
   # publish a page that needs a file the site does not carry. The contract is
   # that a page stands alone, so the only accepted form is an embedded one.
+  # The attribute is matched with its opening quote, which is what nimib emits;
+  # an unquoted `src=plot.png` would not be seen at all.
   for (opening, attribute) in [("<img", "src=\""), ("<image", "href=\"")]:
     var index = html.find(opening)
     while index >= 0:
@@ -71,8 +73,11 @@ proc validatePage*(path: string; minSvg = 0; requirePng = false) =
       if at >= 0:
         let valueStart = at + attribute.len
         let valueEnd = tag.find('"', valueStart)
-        if valueEnd > valueStart:
-          let value = tag[valueStart ..< valueEnd]
-          doAssert value.startsWith("data:"),
-            path & " references an image the page does not carry: " & value
+        # An unterminated value has no closing quote to find; an empty one ends
+        # where it starts. Skipping either let the reference through unread.
+        doAssert valueEnd >= valueStart,
+          path & " has an unterminated image reference: " & tag
+        let value = tag[valueStart ..< valueEnd]
+        doAssert value.startsWith("data:"),
+          path & " references an image the page does not carry: " & value
       index = html.find(opening, closing)
