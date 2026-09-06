@@ -67,7 +67,9 @@ proc validatePage*(path: string; minSvg = 0; requirePng = false) =
     var index = html.find(opening)
     while index >= 0:
       let closing = html.find('>', index)
-      if closing < 0: break
+      # Breaking here abandoned this tag and every later one, so a page ending
+      # in an unclosed <img src="plot.png" validated with the reference unread.
+      doAssert closing >= 0, path & " has an unterminated image tag"
       let tag = html[index .. closing]
       let at = tag.find(attribute)
       if at >= 0:
