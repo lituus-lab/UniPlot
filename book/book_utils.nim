@@ -57,5 +57,22 @@ proc validatePage*(path: string; minSvg = 0; requirePng = false) =
   if requirePng:
     doAssert html.contains("data:image/png;base64,iVBORw0KGgo"),
       path & " is missing an embedded UniPlot PNG"
-  doAssert not html.contains("src=\"../") and not html.contains("src=\"book/"),
-    path & " contains a plot image with an external relative dependency"
+  # Every image reference, not two spellings of a relative one: `src="plot.png"`
+  # and an inline `<image href="plot.png">` both passed the old pair and both
+  # publish a page that needs a file the site does not carry. The contract is
+  # that a page stands alone, so the only accepted form is an embedded one.
+  for (opening, attribute) in [("<img", "src=\""), ("<image", "href=\"")]:
+    var index = html.find(opening)
+    while index >= 0:
+      let closing = html.find('>', index)
+      if closing < 0: break
+      let tag = html[index .. closing]
+      let at = tag.find(attribute)
+      if at >= 0:
+        let valueStart = at + attribute.len
+        let valueEnd = tag.find('"', valueStart)
+        if valueEnd > valueStart:
+          let value = tag[valueStart ..< valueEnd]
+          doAssert value.startsWith("data:"),
+            path & " references an image the page does not carry: " & value
+      index = html.find(opening, closing)

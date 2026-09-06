@@ -6,6 +6,13 @@ args <- commandArgs(trailingOnly=TRUE)
 iterations <- if (length(args) >= 1) as.integer(args[[1]]) else 20
 point_count <- if (length(args) >= 2) as.integer(args[[2]]) else 1000
 warmups <- if (length(args) >= 3) as.integer(args[[3]]) else 3
+# Checked before the vectors are allocated: zero iterations leaves the summary
+# with nothing to describe, and a negative warmup count removes measurements
+# while the report still states the iterations asked for.
+if (is.na(iterations) || iterations <= 0 || is.na(point_count) ||
+    point_count <= 0 || is.na(warmups) || warmups < 0) {
+  stop("iterations and point count must be positive, warmups non-negative")
+}
 data <- data.frame(x=(0:(point_count - 1)) / 25)
 data$y <- sin(data$x) + 0.02 * data$x
 

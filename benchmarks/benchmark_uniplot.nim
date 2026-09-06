@@ -228,6 +228,12 @@ when isMainModule:
   let pointCount = if paramCount() >= 2: parseInt(paramStr(2)) else: 1000
   let fontPath = if paramCount() >= 3: paramStr(3) else: "tests/DejaVuSans.ttf"
   let warmups = if paramCount() >= 4: parseInt(paramStr(4)) else: 3
+  # Checked before anything is allocated: zero iterations leaves the summary
+  # with no samples to describe, and a negative warmup count silently removes
+  # measurements while the report still states the iterations asked for.
+  if iterations <= 0: quit("iterations must be positive", 2)
+  if pointCount <= 0: quit("point count must be positive", 2)
+  if warmups < 0: quit("warmups cannot be negative", 2)
   let font = loadTtf(fontPath)
   let size = Size(width: 800, height: 500)
   let referenceSpec = sampleSpec(pointCount)

@@ -33,6 +33,12 @@ def main():
     iterations = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     point_count = int(sys.argv[2]) if len(sys.argv) > 2 else 1000
     warmups = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+    # Checked before anything is allocated: zero iterations leaves the summary
+    # with no samples to describe, and a negative warmup count silently removes
+    # measurements while the report still states the iterations asked for.
+    if iterations <= 0 or point_count <= 0 or warmups < 0:
+        raise SystemExit(
+            "iterations and point count must be positive, warmups non-negative")
     xs = [index / 25.0 for index in range(point_count)]
     ys = [math.sin(x) + 0.02 * x for x in xs]
     construct, svg, png = [], [], []

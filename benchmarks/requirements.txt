@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-matplotlib>=3.10,<4
-plotly>=6,<7
-kaleido>=1,<2
+# Pinned, not bounded: a baseline recorded against one set of comparators is
+# only comparable to a run against the same ones, and a range lets a later
+# install move the numbers without moving this file. These are the versions
+# the environment was resolved to when the pins were taken.
+matplotlib==3.11.1
+plotly==6.9.0
+kaleido==1.4.0
