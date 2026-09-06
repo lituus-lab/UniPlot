@@ -51,10 +51,11 @@ for iteration in 1:(iterations + warmups)
   end
 end
 
-@printf(paste0(
-  "{\"provider\":\"Plots.jl\",\"version\":\"%s\",\"iterations\":%d,",
-  "\"points\":%d,\"width\":800,\"height\":500,\"warmup_iterations\":%d,",
-  "\"stages\":{\"construct_compile\":%s,\"svg_from_compiled_scene\":%s,",
-  "\"png_from_compiled_scene\":%s},\"guard\":%d}\n"),
+# One literal, continued with backslashes: @printf resolves its format at macro
+# expansion and rejects any expression, so the pieces cannot be joined at all.
+@printf("{\"provider\":\"Plots.jl\",\"version\":\"%s\",\"iterations\":%d,\
+\"points\":%d,\"width\":800,\"height\":500,\"warmup_iterations\":%d,\
+\"stages\":{\"construct_compile\":%s,\"svg_from_compiled_scene\":%s,\
+\"png_from_compiled_scene\":%s},\"guard\":%d}\n",
   string(pkgversion(Plots)), iterations, point_count, warmups, describe(construct),
   describe(svg_times), describe(png_times), guard)
